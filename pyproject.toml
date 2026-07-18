@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "verticalbar-ocpm-engine"
+version = "0.1.0"
+description = "Vertical Bar process-mining query layer for pg_ocpm"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Vertical Bar", email = "engineering@vertical.bar" }]
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/verticalbarHQ/ocpm-engine"
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<9", "ruff>=0.9,<1"]
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
