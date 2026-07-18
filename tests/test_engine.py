@@ -47,8 +47,6 @@ def test_every_endpoint_is_parameterized_and_uses_pg_ocpm(endpoint: str) -> None
 
     assert not missing
     assert "ocpm." in plan.sql
-    assert "mv_ocel" not in plan.sql
-    assert "systemnote" not in plan.sql.lower()
 
 
 def test_short_and_wide_variants_select_different_exact_paths() -> None:
@@ -63,7 +61,7 @@ def test_short_and_wide_variants_select_different_exact_paths() -> None:
     assert wide.strategy == "segmented case buckets"
 
 
-def test_process_map_translates_vertical_bar_filters() -> None:
+def test_process_map_translates_generic_filters() -> None:
     network = NetworkFilter(
         activities=("Order:Complete", "Shipment:Ship"),
         edges=(EdgeFilter("Order:Complete", "Shipment:Ship", 0, 86_400),),

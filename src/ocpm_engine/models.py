@@ -9,7 +9,7 @@ from typing import Any, Mapping
 
 
 class Endpoint(StrEnum):
-    """Process-mining request shapes used by the Vertical Bar API."""
+    """Generic process-mining request shapes."""
 
     PROCESS_MAP = "process_map"
     VARIANT_LIST = "variant_list"

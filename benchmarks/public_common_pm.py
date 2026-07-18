@@ -425,6 +425,8 @@ def native_dfg(rows: list[TransitionCount]) -> dict:
 def reference_next(rows: list[TransitionCount]) -> dict:
     winners: dict[tuple[str, str], tuple[str, int]] = {}
     for row in rows:
+        if row.train_count <= 0:
+            continue
         group = (row.source, row.edge_type)
         candidate = (row.target, row.train_count)
         current = winners.get(group)
@@ -437,7 +439,8 @@ def reference_next(rows: list[TransitionCount]) -> dict:
     correct = sum(
         row.test_count
         for row in rows
-        if winners[(row.source, row.edge_type)][0] == row.target
+        if (row.source, row.edge_type) in winners
+        and winners[(row.source, row.edge_type)][0] == row.target
     )
     total = sum(row.test_count for row in rows)
     return {

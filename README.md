@@ -43,14 +43,11 @@ queries.
 For the public SAP O2C/P2P release benchmark, including latency, storage,
 concurrency, correctness gates, and published context, see
 [Public common-process-mining performance](docs/public-common-pm-performance.md).
+For the three-way comparison of lightly indexed PostgreSQL with PM4Py,
+`pg_ocpm` with PM4Py, and `pg_ocpm` with ocpm-engine, see
+[SAP PM4Py three-way performance](docs/sap-pm4py-three-way-performance.md).
 For the detailed application read-path design and code references, see
 [Application query performance improvements](docs/technical-performance-improvements.md).
-For the correctness-gated Goodr comparison of index-light PostgreSQL, the
-fully indexed Vertical Bar layout, and `pg_ocpm`, see
-[Three-way Vertical Bar OCPM benchmark](docs/verticalbar-goodr-performance-comparison.md).
-The same three representations are evaluated on bottleneck, rework, SLA,
-conformance, and temporal prediction workloads in the
-[common process-mining benchmark](docs/common-pm-goodr-performance-comparison.md).
 
 ## Install
 
@@ -67,8 +64,8 @@ pip install -e '.[dev]'
 pytest
 ```
 
-Run the self-contained public benchmark with `make perf-public` and validate
-the committed result with `make perf-public-check`. See
+Run both self-contained public SAP benchmarks with `make perf-public` and
+validate the committed results with `make perf-public-check`. See
 [the benchmark guide](benchmarks/README.md) for the exact methodology.
 
 ## Use

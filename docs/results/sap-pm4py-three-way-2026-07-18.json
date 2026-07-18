@@ -1,0 +1,1404 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-18T21:33:23.478740+00:00",
+  "source": {
+    "title": "Collection of Object-Centric Event Logs (OCEL 2.0 relational SQLite)",
+    "doi": "10.5281/zenodo.8261133",
+    "license": "CC BY 4.0",
+    "datasets": [
+      "sap_o2c",
+      "sap_p2p"
+    ]
+  },
+  "environment": {
+    "client": {
+      "python": "3.11.15",
+      "platform": "Linux-7.0.11-orbstack-00360-gc9bc4d96ac70-aarch64-with-glibc2.36",
+      "machine": "aarch64",
+      "logical_cpus_visible": 18,
+      "pm4py_version": "2.7.23.3",
+      "ocpm_engine_version": "0.2.0"
+    },
+    "database": {
+      "vanilla_pg": {
+        "pg_ocpm_version": null,
+        "postgres_version": "16.14 (Debian 16.14-1.pgdg13+1)",
+        "shared_buffers": "1GB",
+        "effective_cache_size": "4GB",
+        "work_mem": "16MB",
+        "max_parallel_workers_per_gather": "4",
+        "jit": "off"
+      },
+      "pg_ocpm": {
+        "pg_ocpm_version": "0.3.0",
+        "postgres_version": "16.14 (Debian 16.14-1.pgdg13+1)",
+        "shared_buffers": "1GB",
+        "effective_cache_size": "4GB",
+        "work_mem": "16MB",
+        "max_parallel_workers_per_gather": "4",
+        "jit": "off"
+      }
+    }
+  },
+  "method": {
+    "warmups": 1,
+    "measured_runs": 5,
+    "random_seed": 20260718,
+    "train_fraction": 0.8,
+    "latency_scope": "database extraction plus client materialization, model construction, and scoring",
+    "execution_order": "randomized per measured three-way comparison",
+    "correctness_gate": "three-way canonical answer equality before sample acceptance",
+    "concurrency_model": "prestarted warmed process workers with one PostgreSQL connection per worker",
+    "memory_model": "fresh process baseline and peak RSS including engine import and one request",
+    "vanilla_index_policy": "relational integrity indexes plus one workload secondary B-tree, ocel_e2o_object",
+    "result_cache_used": false
+  },
+  "summary": {
+    "correct_workloads": 8,
+    "total_workloads": 8,
+    "geometric_mean_pg_ocpm_pm4py_speedup_vs_vanilla": 1.319,
+    "geometric_mean_ocpm_engine_speedup_vs_vanilla": 21.064,
+    "geometric_mean_ocpm_engine_speedup_vs_pg_ocpm_pm4py": 15.975
+  },
+  "datasets": [
+    {
+      "dataset": "sap_o2c",
+      "source_counts": {
+        "events": 98350,
+        "objects": 107767,
+        "event_object_links": 236265,
+        "object_object_links": 0
+      },
+      "fixture": {
+        "dataset_name": "sap_o2c",
+        "baseline_dataset_id": 1,
+        "ocpm_dataset_id": 1,
+        "tenant_id": 1,
+        "object_type": "MATERIAL",
+        "from_time": "1992-06-23T23:59:59.999999+00:00",
+        "train_to": "2015-04-28T00:00:00+00:00",
+        "test_from": "2015-04-28T00:00:00.000001+00:00",
+        "to_time": "2020-04-28T00:00:00.000001+00:00",
+        "cases": 4198,
+        "train_cases": 3987,
+        "test_cases": 139
+      },
+      "summary": {
+        "correct_workloads": 4,
+        "total_workloads": 4,
+        "geometric_mean_pg_ocpm_pm4py_speedup_vs_vanilla": 1.352,
+        "geometric_mean_ocpm_engine_speedup_vs_vanilla": 16.175,
+        "geometric_mean_ocpm_engine_speedup_vs_pg_ocpm_pm4py": 11.964
+      },
+      "latency": [
+        {
+          "workload": "dfg_conformance_95pct",
+          "correct": true,
+          "vanilla_pg_pm4py": {
+            "p50_ms": 137.187,
+            "p95_ms": 145.495,
+            "minimum_ms": 135.15,
+            "runs": 5,
+            "input": {
+              "source": "vanilla_pg",
+              "event_rows": 47899,
+              "dataframe_bytes": 7765500,
+              "aggregate_rows": 59
+            }
+          },
+          "pg_ocpm_pm4py": {
+            "p50_ms": 103.641,
+            "p95_ms": 105.037,
+            "minimum_ms": 99.736,
+            "runs": 5,
+            "input": {
+              "source": "pg_ocpm",
+              "event_rows": 47899,
+              "dataframe_bytes": 7765500,
+              "aggregate_rows": 59
+            }
+          },
+          "pg_ocpm_ocpm_engine": {
+            "p50_ms": 11.806,
+            "p95_ms": 12.19,
+            "minimum_ms": 11.523,
+            "runs": 5,
+            "input": {
+              "aggregate_rows": 59
+            }
+          },
+          "speedups": {
+            "pg_ocpm_pm4py_vs_vanilla": 1.324,
+            "pg_ocpm_ocpm_engine_vs_vanilla": 11.62,
+            "pg_ocpm_ocpm_engine_vs_pg_ocpm_pm4py": 8.779
+          },
+          "first_execution_counts": {
+            "vanilla_pg_pm4py": 2,
+            "pg_ocpm_pm4py": 1,
+            "pg_ocpm_ocpm_engine": 2
+          },
+          "answer_sha256": "1aed0c4b1b87355a88d662c1dcffb0b87290bddda11f67a1facac9c40b77e6f2"
+        },
+        {
+          "workload": "variant_conformance_95pct",
+          "correct": true,
+          "vanilla_pg_pm4py": {
+            "p50_ms": 126.397,
+            "p95_ms": 136.186,
+            "minimum_ms": 124.461,
+            "runs": 5,
+            "input": {
+              "source": "vanilla_pg",
+              "event_rows": 47899,
+              "dataframe_bytes": 7765500,
+              "aggregate_rows": 798
+            }
+          },
+          "pg_ocpm_pm4py": {
+            "p50_ms": 90.008,
+            "p95_ms": 97.121,
+            "minimum_ms": 89.722,
+            "runs": 5,
+            "input": {
+              "source": "pg_ocpm",
+              "event_rows": 47899,
+              "dataframe_bytes": 7765500,
+              "aggregate_rows": 798
+            }
+          },
+          "pg_ocpm_ocpm_engine": {
+            "p50_ms": 15.559,
+            "p95_ms": 15.907,
+            "minimum_ms": 15.247,
+            "runs": 5,
+            "input": {
+              "aggregate_rows": 798
+            }
+          },
+          "speedups": {
+            "pg_ocpm_pm4py_vs_vanilla": 1.404,
+            "pg_ocpm_ocpm_engine_vs_vanilla": 8.124,
+            "pg_ocpm_ocpm_engine_vs_pg_ocpm_pm4py": 5.785
+          },
+          "first_execution_counts": {
+            "vanilla_pg_pm4py": 2,
+            "pg_ocpm_pm4py": 0,
+            "pg_ocpm_ocpm_engine": 3
+          },
+          "answer_sha256": "3007f996860dd92b1ab63dac59871de67c40bcf547d05a43336bb5cba7d2b07e"
+        },
+        {
+          "workload": "next_activity_prediction",
+          "correct": true,
+          "vanilla_pg_pm4py": {
+            "p50_ms": 139.573,
+            "p95_ms": 140.582,
+            "minimum_ms": 137.11,
+            "runs": 5,
+            "input": {
+              "source": "vanilla_pg",
+              "event_rows": 47899,
+              "dataframe_bytes": 7765500,
+              "aggregate_rows": 59
+            }
+          },
+          "pg_ocpm_pm4py": {
+            "p50_ms": 101.255,
+            "p95_ms": 103.345,
+            "minimum_ms": 100.434,
+            "runs": 5,
+            "input": {
+              "source": "pg_ocpm",
+              "event_rows": 47899,
+              "dataframe_bytes": 7765500,
+              "aggregate_rows": 59
+            }
+          },
+          "pg_ocpm_ocpm_engine": {
+            "p50_ms": 11.803,
+            "p95_ms": 11.91,
+            "minimum_ms": 11.521,
+            "runs": 5,
+            "input": {
+              "aggregate_rows": 59
+            }
+          },
+          "speedups": {
+            "pg_ocpm_pm4py_vs_vanilla": 1.378,
+            "pg_ocpm_ocpm_engine_vs_vanilla": 11.825,
+            "pg_ocpm_ocpm_engine_vs_pg_ocpm_pm4py": 8.579
+          },
+          "first_execution_counts": {
+            "vanilla_pg_pm4py": 1,
+            "pg_ocpm_pm4py": 1,
+            "pg_ocpm_ocpm_engine": 3
+          },
+          "answer_sha256": "7bf7c8546f7612532ff1003f0899d4f69cfa4e94b01dbcf7f0ac32cf1fd54628"
+        },
+        {
+          "workload": "edge_bottleneck_ranking",
+          "correct": true,
+          "vanilla_pg_pm4py": {
+            "p50_ms": 190.407,
+            "p95_ms": 194.817,
+            "minimum_ms": 189.329,
+            "runs": 5,
+            "input": {
+              "source": "vanilla_pg",
+              "event_rows": 72919,
+              "dataframe_bytes": 11690470,
+              "aggregate_rows": 60
+            }
+          },
+          "pg_ocpm_pm4py": {
+            "p50_ms": 146.008,
+            "p95_ms": 147.209,
+            "minimum_ms": 145.901,
+            "runs": 5,
+            "input": {
+              "source": "pg_ocpm",
+              "event_rows": 72919,
+              "dataframe_bytes": 11690470,
+              "aggregate_rows": 60
+            }
+          },
+          "pg_ocpm_ocpm_engine": {
+            "p50_ms": 3.105,
+            "p95_ms": 3.24,
+            "minimum_ms": 3.072,
+            "runs": 5,
+            "input": {
+              "aggregate_rows": 60
+            }
+          },
+          "speedups": {
+            "pg_ocpm_pm4py_vs_vanilla": 1.304,
+            "pg_ocpm_ocpm_engine_vs_vanilla": 61.323,
+            "pg_ocpm_ocpm_engine_vs_pg_ocpm_pm4py": 47.024
+          },
+          "first_execution_counts": {
+            "vanilla_pg_pm4py": 0,
+            "pg_ocpm_pm4py": 4,
+            "pg_ocpm_ocpm_engine": 1
+          },
+          "answer_sha256": "ff1ce26ec456b25a54344923c7976cdb12c97365966eaaa0d5c423d855610661"
+        }
+      ],
+      "concurrency": {
+        "workload": "dfg_conformance_95pct",
+        "levels": [
+          "1",
+          "2",
+          "4",
+          "8"
+        ],
+        "vanilla_pg_pm4py": {
+          "1": {
+            "p50_ms": 136.283,
+            "p95_ms": 160.402,
+            "minimum_ms": 135.088,
+            "runs": 16,
+            "requests": 16,
+            "wall_ms": 2217.129,
+            "throughput_qps": 7.217,
+            "correct": true
+          },
+          "2": {
+            "p50_ms": 153.372,
+            "p95_ms": 155.602,
+            "minimum_ms": 151.809,
+            "runs": 16,
+            "requests": 16,
+            "wall_ms": 1228.412,
+            "throughput_qps": 13.025,
+            "correct": true
+          },
+          "4": {
+            "p50_ms": 170.962,
+            "p95_ms": 176.668,
+            "minimum_ms": 168.784,
+            "runs": 16,
+            "requests": 16,
+            "wall_ms": 687.529,
+            "throughput_qps": 23.272,
+            "correct": true
+          },
+          "8": {
+            "p50_ms": 245.743,
+            "p95_ms": 250.749,
+            "minimum_ms": 235.333,
+            "runs": 16,
+            "requests": 16,
+            "wall_ms": 495.568,
+            "throughput_qps": 32.286,
+            "correct": true
+          }
+        },
+        "pg_ocpm_pm4py": {
+          "1": {
+            "p50_ms": 101.847,
+            "p95_ms": 113.553,
+            "minimum_ms": 100.555,
+            "runs": 16,
+            "requests": 16,
+            "wall_ms": 1645.884,
+            "throughput_qps": 9.721,
+            "correct": true
+          },
+          "2": {
+            "p50_ms": 106.345,
+            "p95_ms": 132.632,
+            "minimum_ms": 104.034,
+            "runs": 16,
+            "requests": 16,
+            "wall_ms": 896.767,
+            "throughput_qps": 17.842,
+            "correct": true
+          },
+          "4": {
+            "p50_ms": 114.011,
+            "p95_ms": 117.496,
+            "minimum_ms": 111.417,
+            "runs": 16,
+            "requests": 16,
+            "wall_ms": 463.538,
+            "throughput_qps": 34.517,
+            "correct": true
+          },
+          "8": {
+            "p50_ms": 138.397,
+            "p95_ms": 144.875,
+            "minimum_ms": 134.613,
+            "runs": 16,
+            "requests": 16,
+            "wall_ms": 287.493,
+            "throughput_qps": 55.654,
+            "correct": true
+          }
+        },
+        "pg_ocpm_ocpm_engine": {
+          "1": {
+            "p50_ms": 11.339,
+            "p95_ms": 13.944,
+            "minimum_ms": 10.904,
+            "runs": 16,
+            "requests": 16,
+            "wall_ms": 187.183,
+            "throughput_qps": 85.478,
+            "correct": true
+          },
+          "2": {
+            "p50_ms": 12.805,
+            "p95_ms": 13.783,
+            "minimum_ms": 12.217,
+            "runs": 16,
+            "requests": 16,
+            "wall_ms": 104.153,
+            "throughput_qps": 153.62,
+            "correct": true
+          },
+          "4": {
+            "p50_ms": 13.615,
+            "p95_ms": 14.365,
+            "minimum_ms": 12.546,
+            "runs": 16,
+            "requests": 16,
+            "wall_ms": 55.018,
+            "throughput_qps": 290.811,
+            "correct": true
+          },
+          "8": {
+            "p50_ms": 14.694,
+            "p95_ms": 16.303,
+            "minimum_ms": 14.103,
+            "runs": 16,
+            "requests": 16,
+            "wall_ms": 32.947,
+            "throughput_qps": 485.628,
+            "correct": true
+          }
+        }
+      },
+      "memory": {
+        "dfg_conformance_95pct": {
+          "vanilla_pg_pm4py": {
+            "engine": "vanilla_pg_pm4py",
+            "dataset": "sap_o2c",
+            "workload": "dfg_conformance_95pct",
+            "baseline_rss_bytes": 37351424,
+            "peak_rss_bytes": 198774784,
+            "incremental_peak_bytes": 161423360,
+            "elapsed_ms": 508.88,
+            "input": {
+              "source": "vanilla_pg",
+              "event_rows": 47899,
+              "dataframe_bytes": 7765500,
+              "aggregate_rows": 59
+            },
+            "answer_sha256": "1aed0c4b1b87355a88d662c1dcffb0b87290bddda11f67a1facac9c40b77e6f2"
+          },
+          "pg_ocpm_pm4py": {
+            "engine": "pg_ocpm_pm4py",
+            "dataset": "sap_o2c",
+            "workload": "dfg_conformance_95pct",
+            "baseline_rss_bytes": 37380096,
+            "peak_rss_bytes": 198791168,
+            "incremental_peak_bytes": 161411072,
+            "elapsed_ms": 478.669,
+            "input": {
+              "source": "pg_ocpm",
+              "event_rows": 47899,
+              "dataframe_bytes": 7765500,
+              "aggregate_rows": 59
+            },
+            "answer_sha256": "1aed0c4b1b87355a88d662c1dcffb0b87290bddda11f67a1facac9c40b77e6f2"
+          },
+          "pg_ocpm_ocpm_engine": {
+            "engine": "pg_ocpm_ocpm_engine",
+            "dataset": "sap_o2c",
+            "workload": "dfg_conformance_95pct",
+            "baseline_rss_bytes": 37363712,
+            "peak_rss_bytes": 38096896,
+            "incremental_peak_bytes": 733184,
+            "elapsed_ms": 16.78,
+            "input": {
+              "aggregate_rows": 59
+            },
+            "answer_sha256": "1aed0c4b1b87355a88d662c1dcffb0b87290bddda11f67a1facac9c40b77e6f2"
+          }
+        },
+        "variant_conformance_95pct": {
+          "vanilla_pg_pm4py": {
+            "engine": "vanilla_pg_pm4py",
+            "dataset": "sap_o2c",
+            "workload": "variant_conformance_95pct",
+            "baseline_rss_bytes": 37384192,
+            "peak_rss_bytes": 194011136,
+            "incremental_peak_bytes": 156626944,
+            "elapsed_ms": 493.127,
+            "input": {
+              "source": "vanilla_pg",
+              "event_rows": 47899,
+              "dataframe_bytes": 7765500,
+              "aggregate_rows": 798
+            },
+            "answer_sha256": "3007f996860dd92b1ab63dac59871de67c40bcf547d05a43336bb5cba7d2b07e"
+          },
+          "pg_ocpm_pm4py": {
+            "engine": "pg_ocpm_pm4py",
+            "dataset": "sap_o2c",
+            "workload": "variant_conformance_95pct",
+            "baseline_rss_bytes": 37392384,
+            "peak_rss_bytes": 193806336,
+            "incremental_peak_bytes": 156413952,
+            "elapsed_ms": 442.102,
+            "input": {
+              "source": "pg_ocpm",
+              "event_rows": 47899,
+              "dataframe_bytes": 7765500,
+              "aggregate_rows": 798
+            },
+            "answer_sha256": "3007f996860dd92b1ab63dac59871de67c40bcf547d05a43336bb5cba7d2b07e"
+          },
+          "pg_ocpm_ocpm_engine": {
+            "engine": "pg_ocpm_ocpm_engine",
+            "dataset": "sap_o2c",
+            "workload": "variant_conformance_95pct",
+            "baseline_rss_bytes": 37359616,
+            "peak_rss_bytes": 41041920,
+            "incremental_peak_bytes": 3682304,
+            "elapsed_ms": 19.885,
+            "input": {
+              "aggregate_rows": 798
+            },
+            "answer_sha256": "3007f996860dd92b1ab63dac59871de67c40bcf547d05a43336bb5cba7d2b07e"
+          }
+        },
+        "next_activity_prediction": {
+          "vanilla_pg_pm4py": {
+            "engine": "vanilla_pg_pm4py",
+            "dataset": "sap_o2c",
+            "workload": "next_activity_prediction",
+            "baseline_rss_bytes": 37359616,
+            "peak_rss_bytes": 198021120,
+            "incremental_peak_bytes": 160661504,
+            "elapsed_ms": 497.267,
+            "input": {
+              "source": "vanilla_pg",
+              "event_rows": 47899,
+              "dataframe_bytes": 7765500,
+              "aggregate_rows": 59
+            },
+            "answer_sha256": "7bf7c8546f7612532ff1003f0899d4f69cfa4e94b01dbcf7f0ac32cf1fd54628"
+          },
+          "pg_ocpm_pm4py": {
+            "engine": "pg_ocpm_pm4py",
+            "dataset": "sap_o2c",
+            "workload": "next_activity_prediction",
+            "baseline_rss_bytes": 37400576,
+            "peak_rss_bytes": 197632000,
+            "incremental_peak_bytes": 160231424,
+            "elapsed_ms": 459.719,
+            "input": {
+              "source": "pg_ocpm",
+              "event_rows": 47899,
+              "dataframe_bytes": 7765500,
+              "aggregate_rows": 59
+            },
+            "answer_sha256": "7bf7c8546f7612532ff1003f0899d4f69cfa4e94b01dbcf7f0ac32cf1fd54628"
+          },
+          "pg_ocpm_ocpm_engine": {
+            "engine": "pg_ocpm_ocpm_engine",
+            "dataset": "sap_o2c",
+            "workload": "next_activity_prediction",
+            "baseline_rss_bytes": 37367808,
+            "peak_rss_bytes": 38129664,
+            "incremental_peak_bytes": 761856,
+            "elapsed_ms": 16.02,
+            "input": {
+              "aggregate_rows": 59
+            },
+            "answer_sha256": "7bf7c8546f7612532ff1003f0899d4f69cfa4e94b01dbcf7f0ac32cf1fd54628"
+          }
+        },
+        "edge_bottleneck_ranking": {
+          "vanilla_pg_pm4py": {
+            "engine": "vanilla_pg_pm4py",
+            "dataset": "sap_o2c",
+            "workload": "edge_bottleneck_ranking",
+            "baseline_rss_bytes": 37359616,
+            "peak_rss_bytes": 211120128,
+            "incremental_peak_bytes": 173760512,
+            "elapsed_ms": 544.909,
+            "input": {
+              "source": "vanilla_pg",
+              "event_rows": 72919,
+              "dataframe_bytes": 11690470,
+              "aggregate_rows": 60
+            },
+            "answer_sha256": "ff1ce26ec456b25a54344923c7976cdb12c97365966eaaa0d5c423d855610661"
+          },
+          "pg_ocpm_pm4py": {
+            "engine": "pg_ocpm_pm4py",
+            "dataset": "sap_o2c",
+            "workload": "edge_bottleneck_ranking",
+            "baseline_rss_bytes": 37343232,
+            "peak_rss_bytes": 211349504,
+            "incremental_peak_bytes": 174006272,
+            "elapsed_ms": 501.472,
+            "input": {
+              "source": "pg_ocpm",
+              "event_rows": 72919,
+              "dataframe_bytes": 11690470,
+              "aggregate_rows": 60
+            },
+            "answer_sha256": "ff1ce26ec456b25a54344923c7976cdb12c97365966eaaa0d5c423d855610661"
+          },
+          "pg_ocpm_ocpm_engine": {
+            "engine": "pg_ocpm_ocpm_engine",
+            "dataset": "sap_o2c",
+            "workload": "edge_bottleneck_ranking",
+            "baseline_rss_bytes": 37359616,
+            "peak_rss_bytes": 38096896,
+            "incremental_peak_bytes": 737280,
+            "elapsed_ms": 6.684,
+            "input": {
+              "aggregate_rows": 60
+            },
+            "answer_sha256": "ff1ce26ec456b25a54344923c7976cdb12c97365966eaaa0d5c423d855610661"
+          }
+        }
+      }
+    },
+    {
+      "dataset": "sap_p2p",
+      "source_counts": {
+        "events": 24854,
+        "objects": 74489,
+        "event_object_links": 105039,
+        "object_object_links": 0
+      },
+      "fixture": {
+        "dataset_name": "sap_p2p",
+        "baseline_dataset_id": 2,
+        "ocpm_dataset_id": 2,
+        "tenant_id": 1,
+        "object_type": "EBELN_EBELP",
+        "from_time": "1994-11-10T23:59:59.999999+00:00",
+        "train_to": "2004-07-13T21:27:36+00:00",
+        "test_from": "2004-07-13T21:27:36.000001+00:00",
+        "to_time": "2020-06-04T00:00:00.000001+00:00",
+        "cases": 31143,
+        "train_cases": 24915,
+        "test_cases": 6221
+      },
+      "summary": {
+        "correct_workloads": 4,
+        "total_workloads": 4,
+        "geometric_mean_pg_ocpm_pm4py_speedup_vs_vanilla": 1.286,
+        "geometric_mean_ocpm_engine_speedup_vs_vanilla": 27.432,
+        "geometric_mean_ocpm_engine_speedup_vs_pg_ocpm_pm4py": 21.329
+      },
+      "latency": [
+        {
+          "workload": "dfg_conformance_95pct",
+          "correct": true,
+          "vanilla_pg_pm4py": {
+            "p50_ms": 122.857,
+            "p95_ms": 125.13,
+            "minimum_ms": 122.127,
+            "runs": 5,
+            "input": {
+              "source": "vanilla_pg",
+              "event_rows": 42015,
+              "dataframe_bytes": 6889800,
+              "aggregate_rows": 19
+            }
+          },
+          "pg_ocpm_pm4py": {
+            "p50_ms": 96.067,
+            "p95_ms": 96.851,
+            "minimum_ms": 95.275,
+            "runs": 5,
+            "input": {
+              "source": "pg_ocpm",
+              "event_rows": 42015,
+              "dataframe_bytes": 6889800,
+              "aggregate_rows": 19
+            }
+          },
+          "pg_ocpm_ocpm_engine": {
+            "p50_ms": 25.152,
+            "p95_ms": 25.291,
+            "minimum_ms": 25.097,
+            "runs": 5,
+            "input": {
+              "aggregate_rows": 19
+            }
+          },
+          "speedups": {
+            "pg_ocpm_pm4py_vs_vanilla": 1.279,
+            "pg_ocpm_ocpm_engine_vs_vanilla": 4.885,
+            "pg_ocpm_ocpm_engine_vs_pg_ocpm_pm4py": 3.819
+          },
+          "first_execution_counts": {
+            "vanilla_pg_pm4py": 1,
+            "pg_ocpm_pm4py": 1,
+            "pg_ocpm_ocpm_engine": 3
+          },
+          "answer_sha256": "50a406a22c92fbc5f72258d9ef43760254fd7b325c619a66926d6c1660eb926a"
+        },
+        {
+          "workload": "variant_conformance_95pct",
+          "correct": true,
+          "vanilla_pg_pm4py": {
+            "p50_ms": 119.899,
+            "p95_ms": 128.245,
+            "minimum_ms": 116.635,
+            "runs": 5,
+            "input": {
+              "source": "vanilla_pg",
+              "event_rows": 42015,
+              "dataframe_bytes": 6889800,
+              "aggregate_rows": 38
+            }
+          },
+          "pg_ocpm_pm4py": {
+            "p50_ms": 90.996,
+            "p95_ms": 91.238,
+            "minimum_ms": 90.607,
+            "runs": 5,
+            "input": {
+              "source": "pg_ocpm",
+              "event_rows": 42015,
+              "dataframe_bytes": 6889800,
+              "aggregate_rows": 38
+            }
+          },
+          "pg_ocpm_ocpm_engine": {
+            "p50_ms": 0.699,
+            "p95_ms": 0.714,
+            "minimum_ms": 0.396,
+            "runs": 5,
+            "input": {
+              "aggregate_rows": 38
+            }
+          },
+          "speedups": {
+            "pg_ocpm_pm4py_vs_vanilla": 1.318,
+            "pg_ocpm_ocpm_engine_vs_vanilla": 171.529,
+            "pg_ocpm_ocpm_engine_vs_pg_ocpm_pm4py": 130.18
+          },
+          "first_execution_counts": {
+            "vanilla_pg_pm4py": 1,
+            "pg_ocpm_pm4py": 3,
+            "pg_ocpm_ocpm_engine": 1
+          },
+          "answer_sha256": "8cb49995e14727ac411a4d892ffc4347e504418c5a65dd107af29dcb53458fda"
+        },
+        {
+          "workload": "next_activity_prediction",
+          "correct": true,
+          "vanilla_pg_pm4py": {
+            "p50_ms": 122.183,
+            "p95_ms": 125.559,
+            "minimum_ms": 120.917,
+            "runs": 5,
+            "input": {
+              "source": "vanilla_pg",
+              "event_rows": 42015,
+              "dataframe_bytes": 6889800,
+              "aggregate_rows": 19
+            }
+          },
+          "pg_ocpm_pm4py": {
+            "p50_ms": 95.919,
+            "p95_ms": 96.826,
+            "minimum_ms": 94.977,
+            "runs": 5,
+            "input": {
+              "source": "pg_ocpm",
+              "event_rows": 42015,
+              "dataframe_bytes": 6889800,
+              "aggregate_rows": 19
+            }
+          },
+          "pg_ocpm_ocpm_engine": {
+            "p50_ms": 25.242,
+            "p95_ms": 25.401,
+            "minimum_ms": 25.093,
+            "runs": 5,
+            "input": {
+              "aggregate_rows": 19
+            }
+          },
+          "speedups": {
+            "pg_ocpm_pm4py_vs_vanilla": 1.274,
+            "pg_ocpm_ocpm_engine_vs_vanilla": 4.84,
+            "pg_ocpm_ocpm_engine_vs_pg_ocpm_pm4py": 3.8
+          },
+          "first_execution_counts": {
+            "vanilla_pg_pm4py": 0,
+            "pg_ocpm_pm4py": 2,
+            "pg_ocpm_ocpm_engine": 3
+          },
+          "answer_sha256": "87e62d4dc306d84193ee6f22a4a086aab4d2af2771ad05715c5ff03ac50bef0d"
+        },
+        {
+          "workload": "edge_bottleneck_ranking",
+          "correct": true,
+          "vanilla_pg_pm4py": {
+            "p50_ms": 130.967,
+            "p95_ms": 136.528,
+            "minimum_ms": 125.975,
+            "runs": 5,
+            "input": {
+              "source": "vanilla_pg",
+              "event_rows": 42029,
+              "dataframe_bytes": 6891972,
+              "aggregate_rows": 19
+            }
+          },
+          "pg_ocpm_pm4py": {
+            "p50_ms": 102.764,
+            "p95_ms": 106.172,
+            "minimum_ms": 102.573,
+            "runs": 5,
+            "input": {
+              "source": "pg_ocpm",
+              "event_rows": 42029,
+              "dataframe_bytes": 6891972,
+              "aggregate_rows": 19
+            }
+          },
+          "pg_ocpm_ocpm_engine": {
+            "p50_ms": 0.938,
+            "p95_ms": 0.986,
+            "minimum_ms": 0.638,
+            "runs": 5,
+            "input": {
+              "aggregate_rows": 19
+            }
+          },
+          "speedups": {
+            "pg_ocpm_pm4py_vs_vanilla": 1.274,
+            "pg_ocpm_ocpm_engine_vs_vanilla": 139.624,
+            "pg_ocpm_ocpm_engine_vs_pg_ocpm_pm4py": 109.557
+          },
+          "first_execution_counts": {
+            "vanilla_pg_pm4py": 2,
+            "pg_ocpm_pm4py": 1,
+            "pg_ocpm_ocpm_engine": 2
+          },
+          "answer_sha256": "60d4081643f87c47b8b64cad58f234d23e22795ebfe2f2ee696984163fd41827"
+        }
+      ],
+      "concurrency": {
+        "workload": "dfg_conformance_95pct",
+        "levels": [
+          "1",
+          "2",
+          "4",
+          "8"
+        ],
+        "vanilla_pg_pm4py": {
+          "1": {
+            "p50_ms": 119.904,
+            "p95_ms": 153.778,
+            "minimum_ms": 118.861,
+            "runs": 16,
+            "requests": 16,
+            "wall_ms": 1987.597,
+            "throughput_qps": 8.05,
+            "correct": true
+          },
+          "2": {
+            "p50_ms": 134.85,
+            "p95_ms": 136.188,
+            "minimum_ms": 131.933,
+            "runs": 16,
+            "requests": 16,
+            "wall_ms": 1075.614,
+            "throughput_qps": 14.875,
+            "correct": true
+          },
+          "4": {
+            "p50_ms": 146.772,
+            "p95_ms": 149.199,
+            "minimum_ms": 142.292,
+            "runs": 16,
+            "requests": 16,
+            "wall_ms": 588.63,
+            "throughput_qps": 27.182,
+            "correct": true
+          },
+          "8": {
+            "p50_ms": 209.435,
+            "p95_ms": 219.035,
+            "minimum_ms": 191.106,
+            "runs": 16,
+            "requests": 16,
+            "wall_ms": 428.318,
+            "throughput_qps": 37.355,
+            "correct": true
+          }
+        },
+        "pg_ocpm_pm4py": {
+          "1": {
+            "p50_ms": 95.451,
+            "p95_ms": 102.967,
+            "minimum_ms": 94.034,
+            "runs": 16,
+            "requests": 16,
+            "wall_ms": 1549.686,
+            "throughput_qps": 10.325,
+            "correct": true
+          },
+          "2": {
+            "p50_ms": 98.695,
+            "p95_ms": 102.055,
+            "minimum_ms": 97.681,
+            "runs": 16,
+            "requests": 16,
+            "wall_ms": 793.243,
+            "throughput_qps": 20.17,
+            "correct": true
+          },
+          "4": {
+            "p50_ms": 106.084,
+            "p95_ms": 111.47,
+            "minimum_ms": 102.159,
+            "runs": 16,
+            "requests": 16,
+            "wall_ms": 429.32,
+            "throughput_qps": 37.268,
+            "correct": true
+          },
+          "8": {
+            "p50_ms": 131.083,
+            "p95_ms": 135.483,
+            "minimum_ms": 126.348,
+            "runs": 16,
+            "requests": 16,
+            "wall_ms": 264.953,
+            "throughput_qps": 60.388,
+            "correct": true
+          }
+        },
+        "pg_ocpm_ocpm_engine": {
+          "1": {
+            "p50_ms": 24.48,
+            "p95_ms": 26.793,
+            "minimum_ms": 24.155,
+            "runs": 16,
+            "requests": 16,
+            "wall_ms": 396.583,
+            "throughput_qps": 40.345,
+            "correct": true
+          },
+          "2": {
+            "p50_ms": 25.332,
+            "p95_ms": 29.451,
+            "minimum_ms": 24.76,
+            "runs": 16,
+            "requests": 16,
+            "wall_ms": 211.699,
+            "throughput_qps": 75.579,
+            "correct": true
+          },
+          "4": {
+            "p50_ms": 30.393,
+            "p95_ms": 35.127,
+            "minimum_ms": 28.955,
+            "runs": 16,
+            "requests": 16,
+            "wall_ms": 127.109,
+            "throughput_qps": 125.876,
+            "correct": true
+          },
+          "8": {
+            "p50_ms": 33.43,
+            "p95_ms": 37.306,
+            "minimum_ms": 30.814,
+            "runs": 16,
+            "requests": 16,
+            "wall_ms": 71.98,
+            "throughput_qps": 222.284,
+            "correct": true
+          }
+        }
+      },
+      "memory": {
+        "dfg_conformance_95pct": {
+          "vanilla_pg_pm4py": {
+            "engine": "vanilla_pg_pm4py",
+            "dataset": "sap_p2p",
+            "workload": "dfg_conformance_95pct",
+            "baseline_rss_bytes": 37388288,
+            "peak_rss_bytes": 189775872,
+            "incremental_peak_bytes": 152387584,
+            "elapsed_ms": 482.634,
+            "input": {
+              "source": "vanilla_pg",
+              "event_rows": 42015,
+              "dataframe_bytes": 6889800,
+              "aggregate_rows": 19
+            },
+            "answer_sha256": "50a406a22c92fbc5f72258d9ef43760254fd7b325c619a66926d6c1660eb926a"
+          },
+          "pg_ocpm_pm4py": {
+            "engine": "pg_ocpm_pm4py",
+            "dataset": "sap_p2p",
+            "workload": "dfg_conformance_95pct",
+            "baseline_rss_bytes": 37359616,
+            "peak_rss_bytes": 189779968,
+            "incremental_peak_bytes": 152420352,
+            "elapsed_ms": 448.383,
+            "input": {
+              "source": "pg_ocpm",
+              "event_rows": 42015,
+              "dataframe_bytes": 6889800,
+              "aggregate_rows": 19
+            },
+            "answer_sha256": "50a406a22c92fbc5f72258d9ef43760254fd7b325c619a66926d6c1660eb926a"
+          },
+          "pg_ocpm_ocpm_engine": {
+            "engine": "pg_ocpm_ocpm_engine",
+            "dataset": "sap_p2p",
+            "workload": "dfg_conformance_95pct",
+            "baseline_rss_bytes": 37376000,
+            "peak_rss_bytes": 38109184,
+            "incremental_peak_bytes": 733184,
+            "elapsed_ms": 28.044,
+            "input": {
+              "aggregate_rows": 19
+            },
+            "answer_sha256": "50a406a22c92fbc5f72258d9ef43760254fd7b325c619a66926d6c1660eb926a"
+          }
+        },
+        "variant_conformance_95pct": {
+          "vanilla_pg_pm4py": {
+            "engine": "vanilla_pg_pm4py",
+            "dataset": "sap_p2p",
+            "workload": "variant_conformance_95pct",
+            "baseline_rss_bytes": 37355520,
+            "peak_rss_bytes": 188928000,
+            "incremental_peak_bytes": 151572480,
+            "elapsed_ms": 475.552,
+            "input": {
+              "source": "vanilla_pg",
+              "event_rows": 42015,
+              "dataframe_bytes": 6889800,
+              "aggregate_rows": 38
+            },
+            "answer_sha256": "8cb49995e14727ac411a4d892ffc4347e504418c5a65dd107af29dcb53458fda"
+          },
+          "pg_ocpm_pm4py": {
+            "engine": "pg_ocpm_pm4py",
+            "dataset": "sap_p2p",
+            "workload": "variant_conformance_95pct",
+            "baseline_rss_bytes": 37351424,
+            "peak_rss_bytes": 188944384,
+            "incremental_peak_bytes": 151592960,
+            "elapsed_ms": 472.816,
+            "input": {
+              "source": "pg_ocpm",
+              "event_rows": 42015,
+              "dataframe_bytes": 6889800,
+              "aggregate_rows": 38
+            },
+            "answer_sha256": "8cb49995e14727ac411a4d892ffc4347e504418c5a65dd107af29dcb53458fda"
+          },
+          "pg_ocpm_ocpm_engine": {
+            "engine": "pg_ocpm_ocpm_engine",
+            "dataset": "sap_p2p",
+            "workload": "variant_conformance_95pct",
+            "baseline_rss_bytes": 37384192,
+            "peak_rss_bytes": 38187008,
+            "incremental_peak_bytes": 802816,
+            "elapsed_ms": 3.957,
+            "input": {
+              "aggregate_rows": 38
+            },
+            "answer_sha256": "8cb49995e14727ac411a4d892ffc4347e504418c5a65dd107af29dcb53458fda"
+          }
+        },
+        "next_activity_prediction": {
+          "vanilla_pg_pm4py": {
+            "engine": "vanilla_pg_pm4py",
+            "dataset": "sap_p2p",
+            "workload": "next_activity_prediction",
+            "baseline_rss_bytes": 37367808,
+            "peak_rss_bytes": 189800448,
+            "incremental_peak_bytes": 152432640,
+            "elapsed_ms": 482.04,
+            "input": {
+              "source": "vanilla_pg",
+              "event_rows": 42015,
+              "dataframe_bytes": 6889800,
+              "aggregate_rows": 19
+            },
+            "answer_sha256": "87e62d4dc306d84193ee6f22a4a086aab4d2af2771ad05715c5ff03ac50bef0d"
+          },
+          "pg_ocpm_pm4py": {
+            "engine": "pg_ocpm_pm4py",
+            "dataset": "sap_p2p",
+            "workload": "next_activity_prediction",
+            "baseline_rss_bytes": 37376000,
+            "peak_rss_bytes": 189792256,
+            "incremental_peak_bytes": 152416256,
+            "elapsed_ms": 446.617,
+            "input": {
+              "source": "pg_ocpm",
+              "event_rows": 42015,
+              "dataframe_bytes": 6889800,
+              "aggregate_rows": 19
+            },
+            "answer_sha256": "87e62d4dc306d84193ee6f22a4a086aab4d2af2771ad05715c5ff03ac50bef0d"
+          },
+          "pg_ocpm_ocpm_engine": {
+            "engine": "pg_ocpm_ocpm_engine",
+            "dataset": "sap_p2p",
+            "workload": "next_activity_prediction",
+            "baseline_rss_bytes": 37351424,
+            "peak_rss_bytes": 38084608,
+            "incremental_peak_bytes": 733184,
+            "elapsed_ms": 28.731,
+            "input": {
+              "aggregate_rows": 19
+            },
+            "answer_sha256": "87e62d4dc306d84193ee6f22a4a086aab4d2af2771ad05715c5ff03ac50bef0d"
+          }
+        },
+        "edge_bottleneck_ranking": {
+          "vanilla_pg_pm4py": {
+            "engine": "vanilla_pg_pm4py",
+            "dataset": "sap_p2p",
+            "workload": "edge_bottleneck_ranking",
+            "baseline_rss_bytes": 37347328,
+            "peak_rss_bytes": 192872448,
+            "incremental_peak_bytes": 155525120,
+            "elapsed_ms": 480.987,
+            "input": {
+              "source": "vanilla_pg",
+              "event_rows": 42029,
+              "dataframe_bytes": 6891972,
+              "aggregate_rows": 19
+            },
+            "answer_sha256": "60d4081643f87c47b8b64cad58f234d23e22795ebfe2f2ee696984163fd41827"
+          },
+          "pg_ocpm_pm4py": {
+            "engine": "pg_ocpm_pm4py",
+            "dataset": "sap_p2p",
+            "workload": "edge_bottleneck_ranking",
+            "baseline_rss_bytes": 37359616,
+            "peak_rss_bytes": 192860160,
+            "incremental_peak_bytes": 155500544,
+            "elapsed_ms": 458.772,
+            "input": {
+              "source": "pg_ocpm",
+              "event_rows": 42029,
+              "dataframe_bytes": 6891972,
+              "aggregate_rows": 19
+            },
+            "answer_sha256": "60d4081643f87c47b8b64cad58f234d23e22795ebfe2f2ee696984163fd41827"
+          },
+          "pg_ocpm_ocpm_engine": {
+            "engine": "pg_ocpm_ocpm_engine",
+            "dataset": "sap_p2p",
+            "workload": "edge_bottleneck_ranking",
+            "baseline_rss_bytes": 37371904,
+            "peak_rss_bytes": 38121472,
+            "incremental_peak_bytes": 749568,
+            "elapsed_ms": 4.142,
+            "input": {
+              "aggregate_rows": 19
+            },
+            "answer_sha256": "60d4081643f87c47b8b64cad58f234d23e22795ebfe2f2ee696984163fd41827"
+          }
+        }
+      }
+    }
+  ],
+  "storage": {
+    "vanilla_pg_pm4py": {
+      "heap_bytes": 62103552,
+      "index_bytes": 69115904,
+      "toast_bytes": 32768,
+      "total_bytes": 131350528,
+      "indexes": [
+        {
+          "table": "dataset",
+          "name": "dataset_dataset_name_key",
+          "definition": "CREATE UNIQUE INDEX dataset_dataset_name_key ON ocel.dataset USING btree (dataset_name)",
+          "bytes": 16384
+        },
+        {
+          "table": "dataset",
+          "name": "dataset_pkey",
+          "definition": "CREATE UNIQUE INDEX dataset_pkey ON ocel.dataset USING btree (dataset_id)",
+          "bytes": 16384
+        },
+        {
+          "table": "event",
+          "name": "event_dataset_id_external_event_id_key",
+          "definition": "CREATE UNIQUE INDEX event_dataset_id_external_event_id_key ON ocel.event USING btree (dataset_id, external_event_id)",
+          "bytes": 7716864
+        },
+        {
+          "table": "event",
+          "name": "event_pkey",
+          "definition": "CREATE UNIQUE INDEX event_pkey ON ocel.event USING btree (dataset_id, event_key)",
+          "bytes": 3899392
+        },
+        {
+          "table": "event_object",
+          "name": "event_object_pkey",
+          "definition": "CREATE UNIQUE INDEX event_object_pkey ON ocel.event_object USING btree (dataset_id, event_key, object_key, qualifier)",
+          "bytes": 16998400
+        },
+        {
+          "table": "event_object",
+          "name": "ocel_e2o_object",
+          "definition": "CREATE INDEX ocel_e2o_object ON ocel.event_object USING btree (dataset_id, object_type, object_key, event_key) INCLUDE (qualifier)",
+          "bytes": 22413312
+        },
+        {
+          "table": "object",
+          "name": "object_dataset_id_external_object_id_key",
+          "definition": "CREATE UNIQUE INDEX object_dataset_id_external_object_id_key ON ocel.object USING btree (dataset_id, external_object_id)",
+          "bytes": 12312576
+        },
+        {
+          "table": "object",
+          "name": "object_pkey",
+          "definition": "CREATE UNIQUE INDEX object_pkey ON ocel.object USING btree (dataset_id, object_key)",
+          "bytes": 5767168
+        },
+        {
+          "table": "object_object",
+          "name": "object_object_pkey",
+          "definition": "CREATE UNIQUE INDEX object_object_pkey ON ocel.object_object USING btree (dataset_id, source_object_key, target_object_key, qualifier)",
+          "bytes": 8192
+        }
+      ]
+    },
+    "shared_pg_ocpm": {
+      "heap_bytes": 53010432,
+      "index_bytes": 20643840,
+      "toast_bytes": 33300480,
+      "total_bytes": 107208704,
+      "indexes": [
+        {
+          "table": "case_bucket",
+          "name": "case_bucket_pkey",
+          "definition": "CREATE UNIQUE INDEX case_bucket_pkey ON ocpm.case_bucket USING btree (dataset_id, tenant_id, object_type, path_hash, segment_id)",
+          "bytes": 122880
+        },
+        {
+          "table": "case_bucket",
+          "name": "ocpm_case_bucket_time",
+          "definition": "CREATE INDEX ocpm_case_bucket_time ON ocpm.case_bucket USING btree (dataset_id, tenant_id, object_type, min_start_time, max_start_time)",
+          "bytes": 98304
+        },
+        {
+          "table": "case_start_day_rollup",
+          "name": "case_start_day_rollup_pkey",
+          "definition": "CREATE UNIQUE INDEX case_start_day_rollup_pkey ON ocpm.case_start_day_rollup USING btree (dataset_id, tenant_id, start_day)",
+          "bytes": 237568
+        },
+        {
+          "table": "dataset",
+          "name": "dataset_dataset_name_key",
+          "definition": "CREATE UNIQUE INDEX dataset_dataset_name_key ON ocpm.dataset USING btree (dataset_name)",
+          "bytes": 16384
+        },
+        {
+          "table": "dataset",
+          "name": "dataset_pkey",
+          "definition": "CREATE UNIQUE INDEX dataset_pkey ON ocpm.dataset USING btree (dataset_id)",
+          "bytes": 16384
+        },
+        {
+          "table": "edge_bucket",
+          "name": "edge_bucket_pkey",
+          "definition": "CREATE UNIQUE INDEX edge_bucket_pkey ON ocpm.edge_bucket USING btree (dataset_id, tenant_id, source_object_type, source_activity, target_activity, target_object_type, edge_type, context, segment_id)",
+          "bytes": 73728
+        },
+        {
+          "table": "edge_bucket",
+          "name": "ocpm_edge_bucket_time",
+          "definition": "CREATE INDEX ocpm_edge_bucket_time ON ocpm.edge_bucket USING btree (dataset_id, tenant_id, source_object_type, min_source_timestamp, max_source_timestamp)",
+          "bytes": 49152
+        },
+        {
+          "table": "edge_summary",
+          "name": "edge_summary_pkey",
+          "definition": "CREATE UNIQUE INDEX edge_summary_pkey ON ocpm.edge_summary USING btree (dataset_id, tenant_id, source_activity, source_object_type, target_activity, target_object_type)",
+          "bytes": 57344
+        },
+        {
+          "table": "event_activity_rollup",
+          "name": "event_activity_rollup_pkey",
+          "definition": "CREATE UNIQUE INDEX event_activity_rollup_pkey ON ocpm.event_activity_rollup USING btree (dataset_id, tenant_id, object_type, activity, segment_id)",
+          "bytes": 40960
+        },
+        {
+          "table": "event_activity_rollup",
+          "name": "ocpm_event_activity_time",
+          "definition": "CREATE INDEX ocpm_event_activity_time ON ocpm.event_activity_rollup USING btree (dataset_id, tenant_id, object_type, min_timestamp, max_timestamp)",
+          "bytes": 40960
+        },
+        {
+          "table": "event_chunk",
+          "name": "event_chunk_pkey",
+          "definition": "CREATE UNIQUE INDEX event_chunk_pkey ON ocpm.event_chunk USING btree (dataset_id, tenant_id, object_type, chunk_id)",
+          "bytes": 40960
+        },
+        {
+          "table": "event_locator",
+          "name": "event_locator_pkey",
+          "definition": "CREATE UNIQUE INDEX event_locator_pkey ON ocpm.event_locator USING btree (dataset_id, tenant_id, object_id, object_type, chunk_id)",
+          "bytes": 10895360
+        },
+        {
+          "table": "link_adjacency_bucket",
+          "name": "link_adjacency_bucket_pkey",
+          "definition": "CREATE UNIQUE INDEX link_adjacency_bucket_pkey ON ocpm.link_adjacency_bucket USING btree (dataset_id, tenant_id, from_object_id, from_object_type)",
+          "bytes": 8880128
+        },
+        {
+          "table": "link_adjacency_rollup",
+          "name": "link_adjacency_rollup_pkey",
+          "definition": "CREATE UNIQUE INDEX link_adjacency_rollup_pkey ON ocpm.link_adjacency_rollup USING btree (dataset_id, tenant_id, from_object_type, to_object_type, segment_id)",
+          "bytes": 40960
+        },
+        {
+          "table": "link_adjacency_rollup",
+          "name": "ocpm_link_adjacency_rollup_time",
+          "definition": "CREATE INDEX ocpm_link_adjacency_rollup_time ON ocpm.link_adjacency_rollup USING btree (dataset_id, tenant_id, min_source_timestamp, max_source_timestamp)",
+          "bytes": 32768
+        },
+        {
+          "table": "provenance_fact",
+          "name": "ocpm_provenance_actor_context_time",
+          "definition": "CREATE INDEX ocpm_provenance_actor_context_time ON ocpm.provenance_fact USING btree (dataset_id, tenant_id, actor, context, valid_from)",
+          "bytes": 8192
+        },
+        {
+          "table": "provenance_fact",
+          "name": "ocpm_provenance_object_time",
+          "definition": "CREATE INDEX ocpm_provenance_object_time ON ocpm.provenance_fact USING btree (dataset_id, tenant_id, object_id, valid_from)",
+          "bytes": 8192
+        },
+        {
+          "table": "provenance_fact",
+          "name": "ocpm_provenance_record_time",
+          "definition": "CREATE INDEX ocpm_provenance_record_time ON ocpm.provenance_fact USING btree (dataset_id, tenant_id, record_type, valid_from)",
+          "bytes": 8192
+        },
+        {
+          "table": "provenance_rollup",
+          "name": "ocpm_provenance_rollup_filter_time",
+          "definition": "CREATE INDEX ocpm_provenance_rollup_filter_time ON ocpm.provenance_rollup USING btree (dataset_id, tenant_id, record_type, min_timestamp, max_timestamp)",
+          "bytes": 8192
+        },
+        {
+          "table": "result_cache",
+          "name": "result_cache_pkey",
+          "definition": "CREATE UNIQUE INDEX result_cache_pkey ON ocpm.result_cache USING btree (dataset_id, tenant_id, backbone_type, filter_hash, facet)",
+          "bytes": 8192
+        }
+      ]
+    },
+    "client_packages": {
+      "pm4py": {
+        "distribution": "pm4py",
+        "version": "2.7.23.3",
+        "license_expression": "AGPL 3.0",
+        "package_bytes": 17368856,
+        "dependency_closure_bytes": 483019373,
+        "dependency_distributions": [
+          "colorama",
+          "contourpy",
+          "cvxopt",
+          "cycler",
+          "fonttools",
+          "graphviz",
+          "kiwisolver",
+          "lxml",
+          "matplotlib",
+          "networkx",
+          "numpy",
+          "packaging",
+          "pandas",
+          "pillow",
+          "pm4py",
+          "pyparsing",
+          "python-dateutil",
+          "pytz",
+          "scipy",
+          "setuptools",
+          "six",
+          "tqdm",
+          "tzdata",
+          "wheel"
+        ],
+        "additional_database_bytes": 0
+      },
+      "ocpm_engine": {
+        "distribution": "verticalbar-ocpm-engine",
+        "version": "0.2.0",
+        "license_expression": null,
+        "package_bytes": 644377,
+        "dependency_closure_bytes": 644377,
+        "dependency_distributions": [
+          "verticalbar-ocpm-engine"
+        ],
+        "additional_database_bytes": 0
+      },
+      "shared_psycopg2_binary_bytes": 16446501
+    }
+  },
+  "payload_sha256": "f7cc7b3b19b124b15b80b588dcc8e25d36cecf2900dd54023071dace5c088054"
+}
