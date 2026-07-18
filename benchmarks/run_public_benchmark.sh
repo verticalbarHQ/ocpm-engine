@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+compose="$root/benchmarks/public/docker-compose.yml"
+pg_ocpm_source="${PG_OCPM_SOURCE:-}"
+
+if [[ -z "$pg_ocpm_source" ]]; then
+    sibling="$(cd "$root/.." && pwd)/pg_ocpm"
+    checkout="$root/.benchmarks/pg_ocpm-0.3.0"
+    if [[ -f "$sibling/pg_ocpm.control" ]]; then
+        pg_ocpm_source="$sibling"
+    else
+        if [[ ! -d "$checkout/.git" ]]; then
+            mkdir -p "$root/.benchmarks"
+            git clone --branch v0.3.0 --depth 1 \
+                https://github.com/verticalbarHQ/pg_ocpm.git "$checkout"
+        fi
+        pg_ocpm_source="$checkout"
+    fi
+fi
+
+export PG_OCPM_SOURCE="$pg_ocpm_source"
+mkdir -p "$root/.benchmarks/public-data"
+
+cleanup() {
+    docker compose -f "$compose" down --remove-orphans >/dev/null 2>&1 || true
+}
+trap cleanup EXIT INT TERM
+
+docker compose -f "$compose" down --volumes --remove-orphans
+docker compose -f "$compose" build
+docker compose -f "$compose" up -d --wait
+docker compose -f "$compose" exec -T benchmark \
+    python benchmarks/public_fixture.py \
+    --baseline-host postgres_vanilla \
+    --extension-host postgres_ocpm \
+    --baseline-db ocel_benchmark \
+    --extension-db ocel_benchmark \
+    --data-dir /data \
+    --output /results/public-prepare.json
+docker compose -f "$compose" exec -T benchmark \
+    python benchmarks/public_common_pm.py \
+    --baseline-host postgres_vanilla \
+    --extension-host postgres_ocpm \
+    --baseline-db ocel_benchmark \
+    --extension-db ocel_benchmark \
+    --output /results/public-common-pm-0.2.0.json \
+    "$@"
+
+echo "result: $root/.benchmarks/public-common-pm-0.2.0.json"

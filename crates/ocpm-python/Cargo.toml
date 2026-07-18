@@ -1,0 +1,17 @@
+[package]
+name = "ocpm-python"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Python bindings for ocpm-engine native kernels"
+publish = false
+
+[lib]
+name = "_native"
+crate-type = ["cdylib"]
+
+[dependencies]
+ocpm-core.workspace = true
+pyo3 = { version = "0.29.0", features = ["extension-module", "abi3-py311"] }

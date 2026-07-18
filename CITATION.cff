@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use this software, cite the versioned repository release."
+title: "ocpm-engine"
+type: software
+authors:
+  - name: "Vertical Bar"
+repository-code: "https://github.com/verticalbarHQ/ocpm-engine"
+version: 0.2.0
+date-released: 2026-07-18

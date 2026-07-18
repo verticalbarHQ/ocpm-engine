@@ -7,7 +7,8 @@ RESULT_DIR := .benchmarks
 VERTICALBAR_RESULT := $(RESULT_DIR)/verticalbar-goodr-three-way.json
 COMMON_PM_RESULT := $(RESULT_DIR)/common-pm-goodr-three-way.json
 
-.PHONY: perf-goodr perf-goodr-start perf-goodr-stop perf-goodr-verticalbar perf-goodr-common perf-goodr-check
+.PHONY: perf-goodr perf-goodr-start perf-goodr-stop perf-goodr-verticalbar \
+	perf-goodr-common perf-goodr-check perf-public perf-public-check
 
 perf-goodr: perf-goodr-check
 
@@ -35,3 +36,9 @@ perf-goodr-check: perf-goodr-verticalbar perf-goodr-common
 	python3 benchmarks/check_regression.py \
 		--baseline docs/results/common-pm-goodr-three-way-2026-07-18.json \
 		--candidate $(COMMON_PM_RESULT)
+
+perf-public:
+	./benchmarks/run_public_benchmark.sh
+
+perf-public-check:
+	python3 benchmarks/check_public_result.py

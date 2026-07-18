@@ -1,0 +1,70 @@
+name: ocpm-engine-public-benchmark
+
+x-postgres-environment: &postgres-environment
+  POSTGRES_DB: postgres
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: pg
+
+x-postgres-command: &postgres-command
+  - postgres
+  - -c
+  - shared_buffers=1GB
+  - -c
+  - effective_cache_size=4GB
+  - -c
+  - work_mem=16MB
+  - -c
+  - maintenance_work_mem=1GB
+  - -c
+  - max_parallel_workers_per_gather=4
+  - -c
+  - random_page_cost=1.1
+  - -c
+  - jit=off
+
+x-postgres-healthcheck: &postgres-healthcheck
+  test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+  interval: 2s
+  timeout: 3s
+  retries: 60
+
+services:
+  postgres_vanilla:
+    image: postgres:16
+    environment: *postgres-environment
+    command: *postgres-command
+    shm_size: 1gb
+    healthcheck: *postgres-healthcheck
+    volumes:
+      - vanilla-data:/var/lib/postgresql/data
+
+  postgres_ocpm:
+    build:
+      context: ${PG_OCPM_SOURCE}
+      dockerfile: Dockerfile
+      args:
+        PG_MAJOR: "16"
+    environment: *postgres-environment
+    command: *postgres-command
+    shm_size: 1gb
+    healthcheck: *postgres-healthcheck
+    volumes:
+      - ocpm-data:/var/lib/postgresql/data
+
+  benchmark:
+    build:
+      context: ../..
+      dockerfile: benchmarks/public/Dockerfile.client
+    depends_on:
+      postgres_vanilla:
+        condition: service_healthy
+      postgres_ocpm:
+        condition: service_healthy
+    volumes:
+      - ../../.benchmarks:/results
+      - ../../.benchmarks/public-data:/data
+    command: ["sleep", "infinity"]
+
+volumes:
+  vanilla-data:
+  ocpm-data:

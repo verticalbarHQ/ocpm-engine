@@ -1,0 +1,17 @@
+[package]
+name = "ocpm-postgres"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Asynchronous pg_ocpm adapter for ocpm-engine"
+publish = false
+
+[dependencies]
+ocpm-core.workspace = true
+thiserror.workspace = true
+tokio-postgres = "0.7.18"
+
+[dev-dependencies]
+tokio = { version = "1.53.0", features = ["macros", "rt"] }

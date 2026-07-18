@@ -1,0 +1,24 @@
+FROM rust:1.85-bookworm AS builder
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3-dev python3-pip python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /source
+COPY . .
+RUN python3 -m venv /build-venv \
+    && /build-venv/bin/pip install --no-cache-dir 'maturin>=1.9,<2' \
+    && /build-venv/bin/maturin build --release --locked --out /wheels
+
+FROM python:3.11-slim-bookworm
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /wheels /wheels
+RUN pip install --no-cache-dir /wheels/*.whl 'psycopg2-binary==2.9.12' \
+    && rm -rf /wheels
+
+WORKDIR /workspace
+COPY . .
+CMD ["sleep", "infinity"]

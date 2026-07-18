@@ -20,6 +20,24 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
+      - name: Install Rust MSRV
+        run: >-
+          rustup toolchain install 1.85.0 --profile minimal --no-self-update
+          --component rustfmt --component clippy
+      - name: Check release notes
+        run: python scripts/check-release-notes.py
+      - name: Check committed public benchmark gate
+        run: python benchmarks/check_public_result.py
+      - name: Test Rust workspace
+        run: cargo +1.85.0 test --workspace --all-targets --locked
+      - name: Check Rust formatting
+        run: cargo +1.85.0 fmt --all -- --check
+      - name: Lint Rust workspace
+        run: cargo +1.85.0 clippy --workspace --all-targets --locked -- -D warnings
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+          arguments: --all-features
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -e '.[dev]'
       - run: ruff check .

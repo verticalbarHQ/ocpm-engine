@@ -1,0 +1,13 @@
+[package]
+name = "ocpm-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Deterministic process-mining kernels for ocpm-engine"
+publish = false
+
+[dependencies]
+serde.workspace = true
+thiserror.workspace = true

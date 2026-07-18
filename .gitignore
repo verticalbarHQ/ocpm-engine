@@ -5,6 +5,8 @@ __pycache__/
 .benchmarks/
 build/
 dist/
+target/
 *.egg-info/
+*.so
 *.py[cod]
 .DS_Store

@@ -1,5 +1,14 @@
-"""Vertical Bar query planning for pg_ocpm."""
+"""Rust-first process-mining companion library for pg_ocpm."""
 
+from .analytics import (
+    ConformanceScore,
+    PredictionScore,
+    TransitionCount,
+    bottleneck_order,
+    dfg_conformance,
+    next_activity,
+    variant_conformance,
+)
 from .engine import OcpmEngine
 from .models import (
     EdgeFilter,
@@ -16,4 +25,11 @@ __all__ = [
     "OcpmEngine",
     "ProcessMiningRequest",
     "QueryPlan",
+    "ConformanceScore",
+    "PredictionScore",
+    "TransitionCount",
+    "bottleneck_order",
+    "dfg_conformance",
+    "next_activity",
+    "variant_conformance",
 ]

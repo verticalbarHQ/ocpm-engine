@@ -1,17 +1,30 @@
 # ocpm-engine
 
-`ocpm-engine` is Vertical Bar's application query layer for
-[`pg_ocpm`](https://github.com/verticalbarHQ/pg_ocpm). It translates the process
-mining requests used by the API into parameterized SQL over the normalized
-`ocpm` schema.
+`ocpm-engine` is a Rust-first process-mining companion library for
+[`pg_ocpm`](https://github.com/verticalbarHQ/pg_ocpm). PostgreSQL performs
+selective capsule scans and sufficient-statistic aggregation; deterministic
+Rust kernels construct and score models without transferring event tables into
+Python.
 
 This package does not install another PostgreSQL extension or create database
 objects. PostgreSQL must already have `pg_ocpm` installed and the target dataset
 must already be finalized with `ocpm.finish_load(...)`.
 
-Required extension version: `pg_ocpm >= 0.2.0`.
+Required extension version: `pg_ocpm >= 0.3.0`. See the
+[release notes](CHANGELOG.md) for every library version.
 
-## Supported request shapes
+## Native analytics
+
+- frequency-covered DFG and complete-variant conformance;
+- deterministic next-activity models;
+- stable bottleneck ranking; and
+- Python 3.11+ stable-ABI bindings that release the GIL during native work.
+
+The `ocpm-postgres` crate provides an asynchronous adapter for single-window and
+multi-window DFG/variant counts. Multi-window requests retrieve aligned
+training, test, comparison-period, or drift statistics in one database request.
+
+The existing Python query planner remains available for these request shapes:
 
 - Filtered process maps with date, case status, variant, activity, case-duration,
   and edge-duration filters
@@ -27,7 +40,10 @@ It selects bounded one-hop traversal for narrow windows, transitive closure for
 wide or unbounded windows, and exact boundary reconstruction for wide variant
 queries.
 
-For the detailed read-path design and code references, see
+For the public SAP O2C/P2P release benchmark, including latency, storage,
+concurrency, correctness gates, and published context, see
+[Public common-process-mining performance](docs/public-common-pm-performance.md).
+For the detailed application read-path design and code references, see
 [Application query performance improvements](docs/technical-performance-improvements.md).
 For the correctness-gated Goodr comparison of index-light PostgreSQL, the
 fully indexed Vertical Bar layout, and `pg_ocpm`, see
@@ -51,14 +67,26 @@ pip install -e '.[dev]'
 pytest
 ```
 
-To execute both versioned Goodr performance regression suites in the parent
-Dendrites Docker fixture, run `make perf-goodr`. See
-[the benchmark guide](benchmarks/README.md) for gates and prerequisites.
+Run the self-contained public benchmark with `make perf-public` and validate
+the committed result with `make perf-public-check`. See
+[the benchmark guide](benchmarks/README.md) for the exact methodology.
 
 ## Use
 
-The package has no database-driver dependency. It works with a psycopg2-style
-cursor and returns parameterized SQL separately from its values.
+Compact aggregate rows can be scored directly:
+
+```python
+from ocpm_engine import TransitionCount, dfg_conformance
+
+rows = [
+    TransitionCount("Create", "Approve", "directly_follows", 900, 95),
+    TransitionCount("Create", "Reject", "directly_follows", 100, 5),
+]
+result = dfg_conformance(rows, coverage=0.95)
+```
+
+The compatibility query-planning API works with a psycopg2-style cursor and
+returns parameterized SQL separately from its values:
 
 ```python
 from datetime import UTC, datetime, timedelta
@@ -102,6 +130,16 @@ normalized `ocpm` schema. `ocpm-engine` begins at the read path after
 Application-only response decoration, authorization, labels, and external
 record URLs should remain in the API service. New server-side primitives belong
 in `pg_ocpm` only when they are useful across OCPM workloads.
+
+## Project status and licensing
+
+The dependency graph is locked and license-gated; see
+[third-party notices](THIRD_PARTY_NOTICES.md). This repository currently grants
+no open-source license. The researched licensing and contribution options are
+documented in the [open-source and IP strategy](docs/open-source-and-ip-strategy.md)
+so a deliberate legal decision can precede relicensing and broad promotion. The
+[prior-art and ICPM roadmap](docs/prior-art-and-icpm-roadmap.md) separates known
+prior work from candidate research contributions and required evidence.
 
 ## Ownership
 
