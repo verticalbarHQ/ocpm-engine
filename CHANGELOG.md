@@ -4,6 +4,18 @@ All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
 
 ## Unreleased
 
+## 0.3.0 - 2026-07-18
+
+- Added bounded, explainable Jensen-Shannon drift scoring for any labeled DFG,
+  variant, or activity-frequency distribution, with native Rust execution and
+  GIL-releasing Python bindings.
+- Added an asynchronous adapter for the storage-neutral `pg_ocpm 0.4.0`
+  activity profile and raised the minimum supported extension version.
+- Added a licensed-project capability survey, recent-research roadmap, and
+  placement rationale for database versus middleware algorithms.
+- Expanded the public SAP benchmark with correctness-gated activity-profile
+  and DFG-drift workloads, concurrency, and storage accounting.
+
 - Prevented test-only transitions with zero training frequency from creating
   next-activity model predictions.
 - Added a correctness-gated SAP O2C/P2P comparison of vanilla PostgreSQL with

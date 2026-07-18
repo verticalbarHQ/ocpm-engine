@@ -9,18 +9,20 @@ This package does not install another PostgreSQL extension or create database
 objects. PostgreSQL must already have `pg_ocpm` installed and the target dataset
 must already be finalized with `ocpm.finish_load(...)`.
 
-Required extension version: `pg_ocpm >= 0.3.0`. See the
+Required extension version: `pg_ocpm >= 0.4.0`. See the
 [release notes](CHANGELOG.md) for every library version.
 
 ## Native analytics
 
 - frequency-covered DFG and complete-variant conformance;
 - deterministic next-activity models;
-- stable bottleneck ranking; and
+- stable bottleneck ranking;
+- explainable DFG, variant, or activity-frequency drift using bounded
+  Jensen-Shannon divergence; and
 - Python 3.11+ stable-ABI bindings that release the GIL during native work.
 
-The `ocpm-postgres` crate provides an asynchronous adapter for single-window and
-multi-window DFG/variant counts. Multi-window requests retrieve aligned
+The `ocpm-postgres` crate provides an asynchronous adapter for activity profiles
+and single-window and multi-window DFG/variant counts. Multi-window requests retrieve aligned
 training, test, comparison-period, or drift statistics in one database request.
 
 The existing Python query planner remains available for these request shapes:
@@ -47,6 +49,9 @@ For the three-way comparison of lightly indexed PostgreSQL with PM4Py,
 [SAP PM4Py three-way performance](docs/sap-pm4py-three-way-performance.md).
 For the detailed application read-path design and code references, see
 [Application query performance improvements](docs/technical-performance-improvements.md).
+For the open-source capability survey, license boundary, research review, and
+database-versus-engine placement decisions, see
+[Process-mining capability map](docs/process-mining-capability-map.md).
 
 ## Install
 

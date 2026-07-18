@@ -16,6 +16,8 @@ pub enum AnalyticsError {
     InvalidCoverage,
     #[error("all input columns must have the same length")]
     ColumnLengthMismatch,
+    #[error("frequency counts overflowed an unsigned 64-bit total")]
+    CountOverflow,
 }
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -52,6 +54,23 @@ pub struct VariantConformanceResult {
     pub test_total: u64,
     pub model_size: usize,
     pub model: Vec<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct DriftContributor {
+    pub label: String,
+    pub baseline_share: f64,
+    pub current_share: f64,
+    pub share_delta: f64,
+    pub js_contribution: f64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct FrequencyDriftResult {
+    pub divergence: f64,
+    pub baseline_total: u64,
+    pub current_total: u64,
+    pub contributors: Vec<DriftContributor>,
 }
 
 fn validate_coverage(coverage: f64) -> Result<(), AnalyticsError> {
@@ -223,6 +242,100 @@ pub fn rank_bottlenecks(
     Ok(indexes)
 }
 
+/// Compare two labeled frequency distributions with Jensen-Shannon divergence.
+///
+/// Duplicate labels are aggregated before scoring. The divergence uses base-2
+/// logarithms and is therefore bounded by `[0, 1]`. If exactly one window has
+/// observations, the change is maximal and the nonempty distribution provides
+/// the contributor shares. This explicit empty-window policy avoids smoothing
+/// parameters that would make results depend on the label vocabulary.
+pub fn frequency_drift(
+    rows: impl IntoIterator<Item = (String, u64, u64)>,
+    top_n: usize,
+) -> Result<FrequencyDriftResult, AnalyticsError> {
+    let mut aggregated: HashMap<String, (u64, u64)> = HashMap::new();
+    for (label, baseline, current) in rows {
+        let counts = aggregated.entry(label).or_default();
+        counts.0 = counts
+            .0
+            .checked_add(baseline)
+            .ok_or(AnalyticsError::CountOverflow)?;
+        counts.1 = counts
+            .1
+            .checked_add(current)
+            .ok_or(AnalyticsError::CountOverflow)?;
+    }
+
+    let baseline_total = aggregated.values().try_fold(0_u64, |total, counts| {
+        total
+            .checked_add(counts.0)
+            .ok_or(AnalyticsError::CountOverflow)
+    })?;
+    let current_total = aggregated.values().try_fold(0_u64, |total, counts| {
+        total
+            .checked_add(counts.1)
+            .ok_or(AnalyticsError::CountOverflow)
+    })?;
+
+    let mut contributors = Vec::with_capacity(aggregated.len());
+    let mut divergence = 0.0;
+    for (label, (baseline, current)) in aggregated {
+        let baseline_share = if baseline_total == 0 {
+            0.0
+        } else {
+            baseline as f64 / baseline_total as f64
+        };
+        let current_share = if current_total == 0 {
+            0.0
+        } else {
+            current as f64 / current_total as f64
+        };
+        let js_contribution = if baseline_total == 0 && current_total == 0 {
+            0.0
+        } else if baseline_total == 0 {
+            current_share
+        } else if current_total == 0 {
+            baseline_share
+        } else {
+            let midpoint = (baseline_share + current_share) * 0.5;
+            let baseline_term = if baseline_share == 0.0 {
+                0.0
+            } else {
+                0.5 * baseline_share * (baseline_share / midpoint).log2()
+            };
+            let current_term = if current_share == 0.0 {
+                0.0
+            } else {
+                0.5 * current_share * (current_share / midpoint).log2()
+            };
+            baseline_term + current_term
+        };
+        divergence += js_contribution;
+        contributors.push(DriftContributor {
+            label,
+            baseline_share,
+            current_share,
+            share_delta: current_share - baseline_share,
+            js_contribution,
+        });
+    }
+
+    contributors.sort_unstable_by(|left, right| {
+        right
+            .js_contribution
+            .total_cmp(&left.js_contribution)
+            .then_with(|| left.label.cmp(&right.label))
+    });
+    contributors.truncate(top_n);
+
+    Ok(FrequencyDriftResult {
+        divergence: divergence.clamp(0.0, 1.0),
+        baseline_total,
+        current_total,
+        contributors,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -283,5 +396,30 @@ mod tests {
             rank_bottlenecks(&[10, 20, 30], &[2.0, 2.0, 1.0]).unwrap(),
             vec![1, 0, 2]
         );
+    }
+
+    #[test]
+    fn drift_is_bounded_explainable_and_aggregates_duplicate_labels() {
+        let result = frequency_drift(
+            vec![("A".into(), 5, 0), ("A".into(), 5, 0), ("B".into(), 0, 10)],
+            2,
+        )
+        .unwrap();
+        assert_eq!(result.baseline_total, 10);
+        assert_eq!(result.current_total, 10);
+        assert_eq!(result.divergence, 1.0);
+        assert_eq!(result.contributors[0].label, "A");
+        assert_eq!(result.contributors[0].js_contribution, 0.5);
+        assert_eq!(result.contributors[1].label, "B");
+    }
+
+    #[test]
+    fn identical_and_empty_distributions_have_no_drift() {
+        let identical = frequency_drift(vec![("A".into(), 7, 7), ("B".into(), 3, 3)], 10).unwrap();
+        assert_eq!(identical.divergence, 0.0);
+
+        let empty = frequency_drift(Vec::<(String, u64, u64)>::new(), 10).unwrap();
+        assert_eq!(empty.divergence, 0.0);
+        assert!(empty.contributors.is_empty());
     }
 }

@@ -1,4 +1,4 @@
-//! Thin asynchronous adapter over pg_ocpm 0.3 aggregate interfaces.
+//! Thin asynchronous adapter over pg_ocpm 0.4 aggregate interfaces.
 
 use ocpm_core::TransitionKey;
 use std::time::SystemTime;
@@ -35,6 +35,15 @@ FROM ocpm.variant_window_counts($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 ORDER BY object_type, path_hash
 "#;
 
+pub const ACTIVITY_PROFILE_SQL: &str = r#"
+SELECT object_type, activity, case_frequency, occurrence_frequency,
+       start_frequency, end_frequency
+FROM ocpm.activity_profile(
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+)
+ORDER BY object_type, activity
+"#;
+
 #[derive(Debug, Error)]
 pub enum AdapterError {
     #[error(transparent)]
@@ -66,6 +75,39 @@ pub struct WindowedVariantCount {
     pub object_type: String,
     pub path_hash: String,
     pub frequencies: Vec<i64>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ActivityProfile {
+    pub object_type: String,
+    pub activity: String,
+    pub case_frequency: i64,
+    pub occurrence_frequency: i64,
+    pub start_frequency: i64,
+    pub end_frequency: i64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ActivityProfileFilter {
+    pub object_types: Option<Vec<String>>,
+    pub statuses: Option<Vec<String>>,
+    pub variant_hashes: Option<Vec<String>>,
+    pub include_activities: Option<Vec<String>>,
+    pub exclude_activities: Option<Vec<String>>,
+    pub minimum_case_frequency: i64,
+}
+
+impl Default for ActivityProfileFilter {
+    fn default() -> Self {
+        Self {
+            object_types: None,
+            statuses: None,
+            variant_hashes: None,
+            include_activities: None,
+            exclude_activities: None,
+            minimum_case_frequency: 1,
+        }
+    }
 }
 
 /// Prepared statements are cached by tokio-postgres/PostgreSQL for repeated use;
@@ -221,6 +263,48 @@ pub async fn variant_window_counts(
             object_type: row.get(0),
             path_hash: row.get(1),
             frequencies: row.get(2),
+        })
+        .collect())
+}
+
+/// Fetch storage-neutral activity frequencies derived from filtered case
+/// capsules. PostgreSQL applies every filter before the compact rows cross the
+/// client boundary.
+pub async fn activity_profile(
+    client: &Client,
+    dataset_id: i64,
+    tenant_id: i64,
+    from_timestamp: SystemTime,
+    to_timestamp: SystemTime,
+    filter: &ActivityProfileFilter,
+) -> Result<Vec<ActivityProfile>, AdapterError> {
+    let statement = client.prepare(ACTIVITY_PROFILE_SQL).await?;
+    let rows = client
+        .query(
+            &statement,
+            &[
+                &dataset_id,
+                &tenant_id,
+                &from_timestamp,
+                &to_timestamp,
+                &filter.object_types,
+                &filter.statuses,
+                &filter.variant_hashes,
+                &filter.include_activities,
+                &filter.exclude_activities,
+                &filter.minimum_case_frequency,
+            ],
+        )
+        .await?;
+    Ok(rows
+        .into_iter()
+        .map(|row| ActivityProfile {
+            object_type: row.get(0),
+            activity: row.get(1),
+            case_frequency: row.get(2),
+            occurrence_frequency: row.get(3),
+            start_frequency: row.get(4),
+            end_frequency: row.get(5),
         })
         .collect())
 }

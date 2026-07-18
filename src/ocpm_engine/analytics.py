@@ -37,6 +37,23 @@ class PredictionScore:
     predictions: tuple[tuple[str, str, str], ...]
 
 
+@dataclass(frozen=True, slots=True)
+class DriftContributor:
+    label: str
+    baseline_share: float
+    current_share: float
+    share_delta: float
+    js_contribution: float
+
+
+@dataclass(frozen=True, slots=True)
+class DriftScore:
+    divergence: float
+    baseline_total: int
+    current_total: int
+    contributors: tuple[DriftContributor, ...]
+
+
 def _extension():
     if _native is None:
         raise RuntimeError(
@@ -109,3 +126,25 @@ def bottleneck_order(
     """Return stable indexes ranked by duration, frequency, then input order."""
 
     return tuple(_extension().bottleneck_order(list(frequencies), list(mean_durations)))
+
+
+def frequency_drift(
+    labels: Sequence[str],
+    baseline_counts: Sequence[int],
+    current_counts: Sequence[int],
+    *,
+    top_n: int = 10,
+) -> DriftScore:
+    """Score and explain change between two aligned frequency distributions."""
+
+    if top_n < 0:
+        raise ValueError("top_n must be nonnegative")
+    result = _extension().frequency_drift(
+        list(labels), list(baseline_counts), list(current_counts), top_n
+    )
+    return DriftScore(
+        divergence=result[0],
+        baseline_total=result[1],
+        current_total=result[2],
+        contributors=tuple(DriftContributor(*item) for item in result[3]),
+    )

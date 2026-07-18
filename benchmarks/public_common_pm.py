@@ -31,6 +31,7 @@ from ocpm_engine import (
     TransitionCount,
     bottleneck_order,
     dfg_conformance,
+    frequency_drift,
     next_activity,
     variant_conformance,
 )
@@ -303,6 +304,45 @@ FROM ocpm.edge_duration_time_series(
 )
 """
 
+ACTIVITY_PROFILE_BASE = """
+WITH ordered AS MATERIALIZED (
+    SELECT eo.object_key AS case_id,
+           event.activity,
+           row_number() OVER lifecycle AS position,
+           count(*) OVER lifecycle AS path_length,
+           min(event.event_timestamp) OVER lifecycle AS case_start,
+           max(event.event_timestamp) OVER lifecycle AS case_end
+    FROM ocel.event_object eo
+    JOIN ocel.event event
+      ON event.dataset_id=eo.dataset_id AND event.event_key=eo.event_key
+    WHERE eo.dataset_id=%(dataset_id)s AND eo.object_type=%(object_type)s
+    WINDOW lifecycle AS (
+        PARTITION BY eo.object_key
+        ORDER BY event.event_timestamp,event.event_key
+        ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+    )
+)
+SELECT %(object_type)s::text AS object_type,activity,
+       count(DISTINCT case_id)::bigint AS case_frequency,
+       count(*)::bigint AS occurrence_frequency,
+       count(*) FILTER (WHERE position=1)::bigint AS start_frequency,
+       count(*) FILTER (WHERE position=path_length)::bigint AS end_frequency
+FROM ordered
+WHERE case_start >= %(from_time)s AND case_end <= %(to_time)s
+GROUP BY activity
+ORDER BY object_type,activity
+"""
+
+ACTIVITY_PROFILE_EXT = """
+SELECT object_type,activity,case_frequency,occurrence_frequency,
+       start_frequency,end_frequency
+FROM ocpm.activity_profile(
+    %(dataset_id)s,1,%(from_time)s,%(to_time)s,
+    ARRAY[%(object_type)s],NULL,NULL,NULL,NULL,1
+)
+ORDER BY object_type,activity
+"""
+
 
 @dataclass(frozen=True)
 class Fixture:
@@ -367,7 +407,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=20260718)
     parser.add_argument("--concurrency", default="1,4,8,16")
     parser.add_argument("--concurrency-requests", type=int, default=32)
-    parser.add_argument("--output", default="docs/results/public-common-pm-0.2.0.json")
+    parser.add_argument("--output", default="docs/results/public-common-pm-0.3.0.json")
     args = parser.parse_args()
     if args.database:
         args.baseline_db = args.database
@@ -464,6 +504,83 @@ def native_next(rows: list[TransitionCount]) -> dict:
     }
 
 
+def reference_drift(rows: list[TransitionCount], top_n: int = 10) -> dict:
+    baseline_total = sum(row.train_count for row in rows)
+    current_total = sum(row.test_count for row in rows)
+    contributors = []
+    divergence = 0.0
+    for row in rows:
+        label = json.dumps(
+            [row.source, row.target, row.edge_type], separators=(",", ":")
+        )
+        baseline_share = row.train_count / baseline_total if baseline_total else 0.0
+        current_share = row.test_count / current_total if current_total else 0.0
+        if baseline_total == 0 and current_total == 0:
+            contribution = 0.0
+        elif baseline_total == 0:
+            contribution = current_share
+        elif current_total == 0:
+            contribution = baseline_share
+        else:
+            midpoint = (baseline_share + current_share) * 0.5
+            baseline_term = (
+                0.0
+                if baseline_share == 0.0
+                else 0.5 * baseline_share * math.log2(baseline_share / midpoint)
+            )
+            current_term = (
+                0.0
+                if current_share == 0.0
+                else 0.5 * current_share * math.log2(current_share / midpoint)
+            )
+            contribution = baseline_term + current_term
+        divergence += contribution
+        contributors.append(
+            [
+                label,
+                round(baseline_share, 12),
+                round(current_share, 12),
+                round(current_share - baseline_share, 12),
+                round(contribution, 12),
+            ]
+        )
+    contributors.sort(key=lambda item: (-item[4], item[0]))
+    return {
+        "divergence": round(min(max(divergence, 0.0), 1.0), 12),
+        "baseline_total": baseline_total,
+        "current_total": current_total,
+        "contributors": contributors[:top_n],
+    }
+
+
+def native_drift(rows: list[TransitionCount], top_n: int = 10) -> dict:
+    labels = [
+        json.dumps([row.source, row.target, row.edge_type], separators=(",", ":"))
+        for row in rows
+    ]
+    score = frequency_drift(
+        labels,
+        [row.train_count for row in rows],
+        [row.test_count for row in rows],
+        top_n=top_n,
+    )
+    return {
+        "divergence": round(score.divergence, 12),
+        "baseline_total": score.baseline_total,
+        "current_total": score.current_total,
+        "contributors": [
+            [
+                item.label,
+                round(item.baseline_share, 12),
+                round(item.current_share, 12),
+                round(item.share_delta, 12),
+                round(item.js_contribution, 12),
+            ]
+            for item in score.contributors
+        ],
+    }
+
+
 def variant_result(rows: list[tuple], native: bool) -> dict:
     variants = [str(row[0]) for row in rows]
     train = [int(row[1]) for row in rows]
@@ -523,6 +640,14 @@ def base_variant_counts(db: Database, fixture: Fixture) -> list[tuple]:
 
 def ext_variant_counts(db: Database, fixture: Fixture) -> list[tuple]:
     return db.rows(VARIANT_WINDOW_COUNTS_EXT, params(fixture, True))
+
+
+def activity_profile(db: Database, fixture: Fixture, extension: bool) -> list[list]:
+    rows = db.rows(
+        ACTIVITY_PROFILE_EXT if extension else ACTIVITY_PROFILE_BASE,
+        params(fixture, extension),
+    )
+    return normalize_rows(rows)
 
 
 def normalize_rows(
@@ -850,6 +975,7 @@ def concurrency_sweep(
     fixture: Fixture,
     expected: str,
     extension: bool,
+    drift: bool = False,
 ) -> dict:
     levels = [int(value) for value in args.concurrency.split(",") if value]
     host = args.extension_host if extension else args.baseline_host
@@ -861,11 +987,15 @@ def concurrency_sweep(
         rows = (
             ext_pair_counts(db, fixture) if extension else base_pair_counts(db, fixture)
         )
-        answer = (
-            native_dfg(transition_rows(rows))
-            if extension
-            else reference_dfg(transition_rows(rows))
-        )
+        transitions = transition_rows(rows)
+        if drift:
+            answer = (
+                native_drift(transitions) if extension else reference_drift(transitions)
+            )
+        else:
+            answer = (
+                native_dfg(transitions) if extension else reference_dfg(transitions)
+            )
         elapsed = time.perf_counter() - started
         db.close()
         if canonical(answer) != expected:
@@ -927,6 +1057,15 @@ def benchmark(args: argparse.Namespace) -> dict:
                 ),
             ),
             (
+                "dfg_frequency_drift",
+                lambda f=fixture: reference_drift(
+                    transition_rows(base_pair_counts(baseline, f))
+                ),
+                lambda f=fixture: native_drift(
+                    transition_rows(ext_pair_counts(extension, f))
+                ),
+            ),
+            (
                 "repeated_transition_rework",
                 lambda f=fixture: normalize_rows(
                     baseline.rows(REWORK_BASE, params(f, False))
@@ -949,6 +1088,11 @@ def benchmark(args: argparse.Namespace) -> dict:
                 "edge_duration_time_series",
                 lambda f=fixture: duration_series(baseline, f, False),
                 lambda f=fixture: duration_series(extension, f, True),
+            ),
+            (
+                "activity_profile",
+                lambda f=fixture: activity_profile(baseline, f, False),
+                lambda f=fixture: activity_profile(extension, f, True),
             ),
         ]
         rows = []
@@ -976,6 +1120,19 @@ def benchmark(args: argparse.Namespace) -> dict:
         ),
         "pg_ocpm_rust": concurrency_sweep(args, concurrency_fixture, expected, True),
     }
+    drift_expected = canonical(
+        native_drift(transition_rows(ext_pair_counts(extension, concurrency_fixture)))
+    )
+    drift_concurrency = {
+        "fixture": concurrency_fixture.name,
+        "workload": "dfg_frequency_drift",
+        "vanilla_postgres_python": concurrency_sweep(
+            args, concurrency_fixture, drift_expected, False, True
+        ),
+        "pg_ocpm_rust": concurrency_sweep(
+            args, concurrency_fixture, drift_expected, True, True
+        ),
+    }
     storage = {
         "vanilla_postgres": schema_storage(baseline, "ocel"),
         "pg_ocpm": schema_storage(extension, "ocpm"),
@@ -998,7 +1155,7 @@ def benchmark(args: argparse.Namespace) -> dict:
     result = {
         "schema_version": 1,
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "release": {"ocpm_engine": "0.2.0", "pg_ocpm": str(version)},
+        "release": {"ocpm_engine": "0.3.0", "pg_ocpm": str(version)},
         "source": {
             "title": "Collection of Object-Centric Event Logs (SAP IDES O2C and P2P)",
             "doi": "10.5281/zenodo.8261133",
@@ -1027,7 +1184,7 @@ def benchmark(args: argparse.Namespace) -> dict:
         },
         "summary": {
             "correct_workloads": correctness,
-            "total_workloads": len(fixtures) * 7,
+            "total_workloads": len(fixtures) * 9,
             "geometric_mean_speedup": round(geometric, 3),
             "minimum_speedup": round(min(all_speedups), 3),
             "target_speedup": 10.0,
@@ -1036,6 +1193,7 @@ def benchmark(args: argparse.Namespace) -> dict:
         "datasets": datasets,
         "storage": storage,
         "concurrency": concurrency,
+        "drift_concurrency": drift_concurrency,
     }
     encoded = json.dumps(result, indent=2, default=str) + "\n"
     result["payload_sha256"] = hashlib.sha256(encoded.encode()).hexdigest()

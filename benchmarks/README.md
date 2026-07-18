@@ -8,10 +8,11 @@ PostgreSQL 16 databases containing the same facts: indexed relational OCEL in
 vanilla PostgreSQL and the compact `pg_ocpm` serving schema.
 
 `public_common_pm.py` covers DFG and variant conformance, next-activity
-prediction, repeated-transition rework, bottleneck ranking and prediction, and
-edge-duration time series. A candidate sample is timed only after its canonical
-answer equals the independent Python reference answer. Both the geometric mean
-and every individual workload must be at least 10x faster.
+prediction, DFG frequency drift, repeated-transition rework, bottleneck ranking
+and prediction, edge-duration time series, and filtered activity profiles. A
+candidate sample is timed only after its canonical answer equals the independent
+Python reference answer. Both the geometric mean and every individual workload
+must be at least 10x faster across all 18 dataset/workload pairs.
 
 Run the complete Docker-isolated path with:
 
@@ -22,15 +23,15 @@ make perf-public-check
 ```
 
 `PG_OCPM_SOURCE` must identify a local `pg_ocpm` checkout. Alternatively, set
-`PG_OCPM_REPOSITORY` to a public Git URL and the runner will clone tag `v0.3.0`
+`PG_OCPM_REPOSITORY` to a public Git URL and the runner will clone tag `v0.4.0`
 into the ignored benchmark workspace.
 
 The runner builds a release-mode stable-ABI Rust wheel, recreates both database
 volumes, records nine randomized measured runs after two warmups, runs 1/4/8/16
-worker concurrency sweeps, writes `.benchmarks/public-common-pm-0.2.0.json`, and
-stops its containers on exit. `check_public_result.py` validates the committed
-payload digest, correctness flags, workload count, and 10x gates without
-requiring Docker.
+worker concurrency sweeps for DFG conformance and drift, writes
+`.benchmarks/public-common-pm-0.3.0.json`, and stops its containers on exit.
+`check_public_result.py` validates the committed payload digest, correctness
+flags, workload count, and 10x gates without requiring Docker.
 
 See [the public performance report](../docs/public-common-pm-performance.md) for
 the recorded environment, results, limitations, and published comparison

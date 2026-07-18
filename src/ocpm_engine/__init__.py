@@ -2,10 +2,13 @@
 
 from .analytics import (
     ConformanceScore,
+    DriftContributor,
+    DriftScore,
     PredictionScore,
     TransitionCount,
     bottleneck_order,
     dfg_conformance,
+    frequency_drift,
     next_activity,
     variant_conformance,
 )
@@ -26,10 +29,13 @@ __all__ = [
     "ProcessMiningRequest",
     "QueryPlan",
     "ConformanceScore",
+    "DriftContributor",
+    "DriftScore",
     "PredictionScore",
     "TransitionCount",
     "bottleneck_order",
     "dfg_conformance",
+    "frequency_drift",
     "next_activity",
     "variant_conformance",
 ]

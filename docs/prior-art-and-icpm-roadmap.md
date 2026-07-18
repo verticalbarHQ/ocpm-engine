@@ -56,8 +56,8 @@ These are hypotheses for literature and patent review, not claims:
    boundary, not Rust bindings alone.
 4. **Storage-performance co-optimization.** The representation uses 41.0% less
    total space and 82.7% less index space than the indexed relational OCEL
-   baseline in the public fixture while lowering all 14 measured p50 latencies
-   by at least 16.884x.
+   baseline in the public fixture while lowering all 18 measured p50 latencies
+   by at least 17.183x.
 5. **Correctness-gated reproducible evaluation.** Every timed pair must produce
    the same canonical answer, the release artifact carries a digest, and
    latency, index/heap/TOAST storage, and concurrency use one containerized
@@ -139,7 +139,7 @@ Suggested artifact sequence:
    notebook/dashboard, anonymous reviewer access if the track requires it, and
    a complete artifact appendix.
 
-Do not submit an abstract centered only on the 35.927x headline. Reviewers will
+Do not submit an abstract centered only on the 33.146x headline. Reviewers will
 reasonably ask which component caused it, whether precomputation is charged,
 whether outputs are equivalent, how it compares with current tools, and whether
 the result survives scale and cold-cache conditions. The roadmap above is the
