@@ -141,7 +141,7 @@ wheels = [
 ]
 
 [[package]]
-name = "verticalbar-ocpm-engine"
+name = "ocpm-engine"
 version = "0.2.0"
 source = { editable = "." }
 

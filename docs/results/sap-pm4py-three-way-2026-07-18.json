@@ -1387,18 +1387,18 @@
         "additional_database_bytes": 0
       },
       "ocpm_engine": {
-        "distribution": "verticalbar-ocpm-engine",
+        "distribution": "ocpm-engine",
         "version": "0.2.0",
         "license_expression": null,
-        "package_bytes": 644377,
-        "dependency_closure_bytes": 644377,
+        "package_bytes": 643549,
+        "dependency_closure_bytes": 643549,
         "dependency_distributions": [
-          "verticalbar-ocpm-engine"
+          "ocpm-engine"
         ],
         "additional_database_bytes": 0
       },
       "shared_psycopg2_binary_bytes": 16446501
     }
   },
-  "payload_sha256": "f7cc7b3b19b124b15b80b588dcc8e25d36cecf2900dd54023071dace5c088054"
+  "payload_sha256": "cce8444f6536307a209417bea9362a4fb42ee978fc9d15fe84f04fae2a2534aa"
 }

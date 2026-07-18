@@ -1016,7 +1016,7 @@ def package_storage() -> dict[str, Any]:
     result = {}
     for engine, distribution in (
         ("pm4py", "pm4py"),
-        ("ocpm_engine", "verticalbar-ocpm-engine"),
+        ("ocpm_engine", "ocpm-engine"),
     ):
         closure = dependency_closure(distribution)
         closure_bytes = 0
@@ -1381,7 +1381,7 @@ def benchmark(args: argparse.Namespace) -> dict[str, Any]:
             "machine": platform.machine(),
             "logical_cpus_visible": os.cpu_count(),
             "pm4py_version": metadata.version("pm4py"),
-            "ocpm_engine_version": metadata.version("verticalbar-ocpm-engine"),
+            "ocpm_engine_version": metadata.version("ocpm-engine"),
         },
         "database": {
             "vanilla_pg": database_environment(baseline, False),

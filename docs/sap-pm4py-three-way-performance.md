@@ -85,5 +85,8 @@ The vanilla index total also includes primary-key and uniqueness indexes require
 - Train and test partitions contain complete cases only; cases spanning the temporal boundary are excluded from both partitions.
 - Concurrency uses prestarted, warmed process workers with one PostgreSQL connection per worker.
 - Peak RSS uses a fresh process for each dataset, workload, and engine path.
+- The client package footprint reflects a clean 0.2.0 wheel rebuilt from the
+  current package metadata; the metadata-only rename does not alter measured
+  workload execution paths.
 - Source: Zenodo DOI `10.5281/zenodo.8261133`, CC BY 4.0.
 - PM4Py package licensing must be evaluated separately before product integration; installed metadata is retained in JSON.

@@ -35,7 +35,7 @@ if f'module.add("__version__", "{version}")?' not in native:
 
 lock = (root / "uv.lock").read_text()
 lock_match = re.search(
-    r'\[\[package\]\]\s+name = "verticalbar-ocpm-engine"\s+version = "([^"]+)"',
+    r'\[\[package\]\]\s+name = "ocpm-engine"\s+version = "([^"]+)"',
     lock,
     re.MULTILINE,
 )

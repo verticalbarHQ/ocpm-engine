@@ -1,10 +1,9 @@
 # ocpm-engine
 
-`ocpm-engine` is a Rust-first process-mining companion library for
-[`pg_ocpm`](https://github.com/verticalbarHQ/pg_ocpm). PostgreSQL performs
-selective capsule scans and sufficient-statistic aggregation; deterministic
-Rust kernels construct and score models without transferring event tables into
-Python.
+`ocpm-engine` is a Rust-first process-mining companion library for `pg_ocpm`.
+PostgreSQL performs selective capsule scans and sufficient-statistic
+aggregation; deterministic Rust kernels construct and score models without
+transferring event tables into Python.
 
 This package does not install another PostgreSQL extension or create database
 objects. PostgreSQL must already have `pg_ocpm` installed and the target dataset
@@ -52,7 +51,7 @@ For the detailed application read-path design and code references, see
 ## Install
 
 ```sh
-pip install git+https://github.com/verticalbarHQ/ocpm-engine.git
+python -m pip install .
 ```
 
 For local development:
@@ -132,12 +131,6 @@ in `pg_ocpm` only when they are useful across OCPM workloads.
 
 The dependency graph is locked and license-gated; see
 [third-party notices](THIRD_PARTY_NOTICES.md). This repository currently grants
-no open-source license. The researched licensing and contribution options are
-documented in the [open-source and IP strategy](docs/open-source-and-ip-strategy.md)
-so a deliberate legal decision can precede relicensing and broad promotion. The
+no open-source license. The
 [prior-art and ICPM roadmap](docs/prior-art-and-icpm-roadmap.md) separates known
 prior work from candidate research contributions and required evidence.
-
-## Ownership
-
-Copyright © 2026 [Vertical Bar](https://vertical.bar). All rights reserved.

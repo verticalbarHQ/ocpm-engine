@@ -3,7 +3,6 @@ message: "If you use this software, cite the versioned repository release."
 title: "ocpm-engine"
 type: software
 authors:
-  - name: "Vertical Bar"
-repository-code: "https://github.com/verticalbarHQ/ocpm-engine"
+  - name: "ocpm-engine contributors"
 version: 0.2.0
 date-released: 2026-07-18

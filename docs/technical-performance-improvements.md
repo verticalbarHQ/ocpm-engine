@@ -17,7 +17,7 @@ The comparison in this document is architectural:
   JSON value.
 
 Measured extension-level comparisons against vanilla PostgreSQL are maintained
-in the [`pg_ocpm` benchmark report](https://github.com/verticalbarHQ/pg_ocpm/blob/main/docs/benchmarks.md).
+in the `pg_ocpm` repository's `docs/benchmarks.md` report.
 
 ## Read-path architecture
 
@@ -364,4 +364,4 @@ boundary prevents endpoint-specific behavior from expanding the extension's
 schema while still ensuring each request uses the lowest-cost exact primitive.
 
 For the database internals, storage comparison, and measured public benchmark,
-see the [`pg_ocpm` technical performance document](https://github.com/verticalbarHQ/pg_ocpm/blob/main/docs/technical-performance-improvements.md).
+see `docs/technical-performance-improvements.md` in the `pg_ocpm` repository.

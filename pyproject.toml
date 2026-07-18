@@ -3,16 +3,13 @@ requires = ["maturin>=1.9,<2"]
 build-backend = "maturin"
 
 [project]
-name = "verticalbar-ocpm-engine"
+name = "ocpm-engine"
 version = "0.2.0"
 description = "Rust-first process-mining companion library for pg_ocpm"
 readme = "README.md"
 requires-python = ">=3.11"
-authors = [{ name = "Vertical Bar", email = "engineering@vertical.bar" }]
+authors = [{ name = "ocpm-engine contributors" }]
 dependencies = []
-
-[project.urls]
-Repository = "https://github.com/verticalbarHQ/ocpm-engine"
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<9", "ruff>=0.9,<1"]

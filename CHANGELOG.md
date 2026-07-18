@@ -10,6 +10,8 @@ All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
   PM4Py, `pg_ocpm` with PM4Py, and `pg_ocpm` with ocpm-engine.
 - Removed data-source and application-specific benchmark artifacts and naming
   from the public engine; public comparisons retain the vanilla PostgreSQL arm.
+- Renamed project distribution metadata to `ocpm-engine` and removed
+  organization-specific authorship, URLs, and public-facing prose.
 
 ## 0.2.0 - 2026-07-18
 

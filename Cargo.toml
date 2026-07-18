@@ -10,8 +10,7 @@ resolver = "2"
 version = "0.2.0"
 edition = "2024"
 rust-version = "1.85"
-authors = ["Vertical Bar <engineering@vertical.bar>"]
-repository = "https://github.com/verticalbarHQ/ocpm-engine"
+authors = ["ocpm-engine contributors"]
 
 [workspace.dependencies]
 ocpm-core = { path = "crates/ocpm-core", version = "0.2.0" }
