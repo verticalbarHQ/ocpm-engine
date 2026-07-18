@@ -18,9 +18,6 @@ The comparison in this document is architectural:
 
 Measured extension-level comparisons against vanilla PostgreSQL are maintained
 in the [`pg_ocpm` benchmark report](https://github.com/verticalbarHQ/pg_ocpm/blob/main/docs/benchmarks.md).
-Application-query and common process-mining comparisons are maintained in the
-[Vertical Bar Goodr benchmark](verticalbar-goodr-performance-comparison.md) and
-[common process-mining Goodr benchmark](common-pm-goodr-performance-comparison.md).
 
 ## Read-path architecture
 

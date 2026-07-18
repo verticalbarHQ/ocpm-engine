@@ -48,4 +48,16 @@ docker compose -f "$compose" exec -T benchmark \
     --output /results/public-common-pm-0.2.0.json \
     "$@"
 
+docker compose -f "$compose" exec -T postgres_vanilla \
+    psql -U postgres -d ocel_benchmark \
+    < "$root/benchmarks/public/prepare_pm4py_baseline.sql"
+docker compose -f "$compose" exec -T benchmark \
+    python benchmarks/sap_pm4py_three_way.py \
+    --baseline-host postgres_vanilla \
+    --extension-host postgres_ocpm \
+    --database ocel_benchmark \
+    --output /results/sap-pm4py-three-way.json \
+    --report /results/sap-pm4py-three-way.md
+
 echo "result: $root/.benchmarks/public-common-pm-0.2.0.json"
+echo "result: $root/.benchmarks/sap-pm4py-three-way.json"

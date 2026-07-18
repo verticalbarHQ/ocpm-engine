@@ -15,9 +15,10 @@ contributions.
 The resolved `ocpm-engine` Rust graph uses permissive license choices and is
 checked by `cargo-deny`. The wheel has no Python runtime dependency. The public
 benchmark uses CC BY 4.0 data with attribution and verified source hashes.
-PM4Py is neither copied nor linked; the baseline kernels are independently
-implemented. `pg_ocpm` uses PostgreSQL's public extension API and has no bundled
-third-party source.
+PM4Py is not copied or shipped as a runtime dependency; one disposable public
+benchmark image installs its AGPL-licensed distribution for external
+comparison. The ocpm-engine kernels are independently implemented. `pg_ocpm`
+uses PostgreSQL's public extension API and has no bundled third-party source.
 
 ## The three objectives pull in different directions
 

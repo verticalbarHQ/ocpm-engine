@@ -37,6 +37,19 @@ def test_native_next_activity_and_variant_conformance() -> None:
     assert variant[4] == ("v1",)
 
 
+def test_native_next_activity_ignores_test_only_transitions() -> None:
+    prediction = next_activity(
+        (
+            TransitionCount("A", "B", "Order", 10, 0),
+            TransitionCount("Z", "Y", "Order", 0, 5),
+        )
+    )
+
+    assert prediction.test_total == 5
+    assert prediction.correct == 0
+    assert prediction.predictions == (("A", "Order", "B"),)
+
+
 def test_native_bottleneck_rank_and_validation() -> None:
     assert bottleneck_order([10, 20, 30], [2.0, 2.0, 1.0]) == (1, 0, 2)
     with pytest.raises(ValueError, match="same length"):

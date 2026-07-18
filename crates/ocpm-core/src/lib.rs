@@ -123,6 +123,9 @@ pub fn next_activity_prediction(
     let rows: Vec<_> = rows.into_iter().collect();
     let mut winners: HashMap<(String, String), (String, u64)> = HashMap::new();
     for (key, train_count, _) in &rows {
+        if *train_count == 0 {
+            continue;
+        }
         let group = (key.source.clone(), key.edge_type.clone());
         let candidate = (key.target.clone(), *train_count);
         winners
@@ -254,6 +257,20 @@ mod tests {
         let result = next_activity_prediction(vec![(key("A", "C"), 10, 3), (key("A", "B"), 10, 7)]);
         assert_eq!(result.correct, 7);
         assert_eq!(result.predictions[0].2, "B");
+    }
+
+    #[test]
+    fn next_activity_ignores_test_only_transitions_during_training() {
+        let result = next_activity_prediction(vec![
+            (key("A", "B"), 10, 0),
+            (key("Z", "Y"), 0, 5),
+        ]);
+        assert_eq!(result.test_total, 5);
+        assert_eq!(result.correct, 0);
+        assert_eq!(
+            result.predictions,
+            vec![("A".into(), "Order".into(), "B".into())]
+        );
     }
 
     #[test]

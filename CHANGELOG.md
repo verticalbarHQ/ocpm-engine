@@ -2,6 +2,13 @@
 
 All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
 
+## Unreleased
+
+- Prevented test-only transitions with zero training frequency from creating
+  next-activity model predictions.
+- Added a correctness-gated SAP O2C/P2P comparison of vanilla PostgreSQL with
+  PM4Py, `pg_ocpm` with PM4Py, and `pg_ocpm` with ocpm-engine.
+
 ## 0.2.0 - 2026-07-18
 
 - Added a Rust 2024 core for deterministic DFG conformance, variant
@@ -21,4 +28,3 @@ All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
 
 - Added parameterized query planning for the Vertical Bar process-mining read
   paths over `pg_ocpm`.
-- Added Goodr correctness-gated performance regression suites.
