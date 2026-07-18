@@ -16,9 +16,14 @@ and every individual workload must be at least 10x faster.
 Run the complete Docker-isolated path with:
 
 ```sh
+export PG_OCPM_SOURCE=/path/to/pg_ocpm
 make perf-public
 make perf-public-check
 ```
+
+`PG_OCPM_SOURCE` must identify a local `pg_ocpm` checkout. Alternatively, set
+`PG_OCPM_REPOSITORY` to a public Git URL and the runner will clone tag `v0.3.0`
+into the ignored benchmark workspace.
 
 The runner builds a release-mode stable-ABI Rust wheel, recreates both database
 volumes, records nine randomized measured runs after two warmups, runs 1/4/8/16

@@ -4,6 +4,7 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 compose="$root/benchmarks/public/docker-compose.yml"
 pg_ocpm_source="${PG_OCPM_SOURCE:-}"
+pg_ocpm_repository="${PG_OCPM_REPOSITORY:-}"
 
 if [[ -z "$pg_ocpm_source" ]]; then
     sibling="$(cd "$root/.." && pwd)/pg_ocpm"
@@ -11,10 +12,15 @@ if [[ -z "$pg_ocpm_source" ]]; then
     if [[ -f "$sibling/pg_ocpm.control" ]]; then
         pg_ocpm_source="$sibling"
     else
+        if [[ -z "$pg_ocpm_repository" ]]; then
+            echo "Set PG_OCPM_SOURCE to a local pg_ocpm checkout or" >&2
+            echo "set PG_OCPM_REPOSITORY to its public Git repository URL." >&2
+            exit 2
+        fi
         if [[ ! -d "$checkout/.git" ]]; then
             mkdir -p "$root/.benchmarks"
             git clone --branch v0.3.0 --depth 1 \
-                https://github.com/verticalbarHQ/pg_ocpm.git "$checkout"
+                "$pg_ocpm_repository" "$checkout"
         fi
         pg_ocpm_source="$checkout"
     fi
