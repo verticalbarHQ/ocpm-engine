@@ -27,6 +27,15 @@ It selects bounded one-hop traversal for narrow windows, transitive closure for
 wide or unbounded windows, and exact boundary reconstruction for wide variant
 queries.
 
+For the detailed read-path design and code references, see
+[Application query performance improvements](docs/technical-performance-improvements.md).
+For the correctness-gated Goodr comparison of index-light PostgreSQL, the
+fully indexed Vertical Bar layout, and `pg_ocpm`, see
+[Three-way Vertical Bar OCPM benchmark](docs/verticalbar-goodr-performance-comparison.md).
+The same three representations are evaluated on bottleneck, rework, SLA,
+conformance, and temporal prediction workloads in the
+[common process-mining benchmark](docs/common-pm-goodr-performance-comparison.md).
+
 ## Install
 
 ```sh
@@ -41,6 +50,10 @@ python3.11 -m venv .venv
 pip install -e '.[dev]'
 pytest
 ```
+
+To execute both versioned Goodr performance regression suites in the parent
+Dendrites Docker fixture, run `make perf-goodr`. See
+[the benchmark guide](benchmarks/README.md) for gates and prerequisites.
 
 ## Use
 

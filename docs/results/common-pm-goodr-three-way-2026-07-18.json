@@ -1,0 +1,1484 @@
+{
+  "generated_at": "2026-07-18T18:42:19.054890+00:00",
+  "comparison": "common process-mining operations on index-light PostgreSQL, Vertical Bar optimized PostgreSQL, and pg_ocpm",
+  "dataset": {
+    "from_ts": "2021-09-30 12:47:15+00:00",
+    "split_ts": "2026-05-25 15:23:04+00:00",
+    "to_ts": "2026-06-11 01:55:27+00:00",
+    "events": 2471989,
+    "edges": 3152848,
+    "cases": 1250972
+  },
+  "modeling": {
+    "temporal_split": "2026-05-25 15:23:04+00:00",
+    "train_fraction_by_case_start": 0.8,
+    "dfg_and_variant_model_coverage": 0.95,
+    "bottleneck_threshold_quantile": 0.75,
+    "risk_cutoff": 0.25,
+    "prediction_features": "source activity, source object type, edge type"
+  },
+  "methodology": {
+    "warmups_per_engine": 2,
+    "measured_runs_per_engine": 9,
+    "timeout_seconds": 120,
+    "randomized_engine_order": true,
+    "seed": 20260718,
+    "correctness_gate": "exact canonical JSON across all three engines",
+    "result_cache": false,
+    "latency_scope": "end-to-end database query including model fit and held-out scoring"
+  },
+  "runtime": {
+    "vanilla_postgres": {
+      "postgres_version": "16.14 (Debian 16.14-1.pgdg13+1)",
+      "shared_buffers": "1GB",
+      "effective_cache_size": "4GB",
+      "work_mem": "1GB",
+      "max_parallel_workers_per_gather": "4",
+      "random_page_cost": "1.1",
+      "jit": "off",
+      "shared_preload_libraries": ""
+    },
+    "verticalbar_optimized": {
+      "postgres_version": "16.14 (Debian 16.14-1.pgdg13+1)",
+      "shared_buffers": "1GB",
+      "effective_cache_size": "4GB",
+      "work_mem": "1GB",
+      "max_parallel_workers_per_gather": "4",
+      "random_page_cost": "1.1",
+      "jit": "off",
+      "shared_preload_libraries": ""
+    },
+    "pg_ocpm": {
+      "postgres_version": "16.14 (Debian 16.14-1.pgdg13+1)",
+      "shared_buffers": "1GB",
+      "effective_cache_size": "4GB",
+      "work_mem": "1GB",
+      "max_parallel_workers_per_gather": "4",
+      "random_page_cost": "1.1",
+      "jit": "off",
+      "shared_preload_libraries": "",
+      "pg_ocpm_version": "0.2.0"
+    }
+  },
+  "cases": [
+    {
+      "scenario": "edge_bottleneck_ranking",
+      "family": "bottleneck_detection",
+      "agreement": true,
+      "answer_hash": "11ca0bb5e70ccfc7",
+      "answer": [
+        {
+          "source": "Purchase Order:Fully Billed",
+          "target": "Bill:Open",
+          "edge_type": "link",
+          "frequency": 214,
+          "mean_duration": 10131028.570094,
+          "median_duration": 9469102.0,
+          "maximum_duration": 32496456.0,
+          "minimum_duration": 1829608.0,
+          "standard_deviation": 4507732.560588
+        },
+        {
+          "source": "Purchase Order:Fully Billed",
+          "target": "Bill:Paid In Full",
+          "edge_type": "link",
+          "frequency": 275,
+          "mean_duration": 7521063.232727,
+          "median_duration": 6821383.0,
+          "maximum_duration": 18485639.0,
+          "minimum_duration": 2333415.0,
+          "standard_deviation": 2114571.839019
+        },
+        {
+          "source": "Invoice:Paid In Full",
+          "target": "Credit Memo:Fully Applied",
+          "edge_type": "link",
+          "frequency": 133,
+          "mean_duration": 6834499.180451,
+          "median_duration": 5204971.0,
+          "maximum_duration": 55472958.0,
+          "minimum_duration": 4480.0,
+          "standard_deviation": 6781464.010668
+        },
+        {
+          "source": "Bill:Paid In Full",
+          "target": "Journal:Approved for Posting",
+          "edge_type": "link",
+          "frequency": 154,
+          "mean_duration": 6277795.792208,
+          "median_duration": 4830169.5,
+          "maximum_duration": 42250483.0,
+          "minimum_duration": 125435.0,
+          "standard_deviation": 6122982.626895
+        },
+        {
+          "source": "Invoice:Paid In Full",
+          "target": "Payment:Deposited",
+          "edge_type": "link",
+          "frequency": 1529,
+          "mean_duration": 1880183.642904,
+          "median_duration": 450949.0,
+          "maximum_duration": 61777905.0,
+          "minimum_duration": 3611.0,
+          "standard_deviation": 3736283.090828
+        },
+        {
+          "source": "Sales Order:Billed",
+          "target": "Invoice:Open",
+          "edge_type": "link",
+          "frequency": 1033,
+          "mean_duration": 1852051.246854,
+          "median_duration": 1375625.0,
+          "maximum_duration": 44847977.0,
+          "minimum_duration": 3926.0,
+          "standard_deviation": 2994668.825816
+        },
+        {
+          "source": "Sales Order:Billed",
+          "target": "Purchase Order:Fully Billed",
+          "edge_type": "link",
+          "frequency": 164,
+          "mean_duration": 1319601.353659,
+          "median_duration": 1178797.0,
+          "maximum_duration": 4085345.0,
+          "minimum_duration": 66608.0,
+          "standard_deviation": 656395.095108
+        },
+        {
+          "source": "Sales Order:Closed",
+          "target": "Item Fulfillment:Shipped",
+          "edge_type": "link",
+          "frequency": 492,
+          "mean_duration": 1147499.091463,
+          "median_duration": 700696.5,
+          "maximum_duration": 16197691.0,
+          "minimum_duration": 4767.0,
+          "standard_deviation": 1525052.673002
+        },
+        {
+          "source": "Sales Order:Closed",
+          "target": "Invoice:Paid In Full",
+          "edge_type": "link",
+          "frequency": 108,
+          "mean_duration": 1133881.805556,
+          "median_duration": 833530.0,
+          "maximum_duration": 6661945.0,
+          "minimum_duration": 22754.0,
+          "standard_deviation": 1139054.186029
+        },
+        {
+          "source": "Sales Order:Billed",
+          "target": "Invoice:Paid In Full",
+          "edge_type": "link",
+          "frequency": 4795,
+          "mean_duration": 965678.609385,
+          "median_duration": 330465.0,
+          "maximum_duration": 34661416.0,
+          "minimum_duration": 3652.0,
+          "standard_deviation": 1826668.495416
+        },
+        {
+          "source": "Sales Order:Pending Billing",
+          "target": "Item Fulfillment:Shipped",
+          "edge_type": "link",
+          "frequency": 2198,
+          "mean_duration": 556038.806187,
+          "median_duration": 228908.0,
+          "maximum_duration": 7031834.0,
+          "minimum_duration": 3978.0,
+          "standard_deviation": 685498.021214
+        },
+        {
+          "source": "Sales Order:Partially Fulfilled",
+          "target": "Item Fulfillment:Shipped",
+          "edge_type": "link",
+          "frequency": 1255,
+          "mean_duration": 540452.176892,
+          "median_duration": 294744.0,
+          "maximum_duration": 7600076.0,
+          "minimum_duration": 3702.0,
+          "standard_deviation": 747970.742237
+        },
+        {
+          "source": "Sales Order:Partially Fulfilled",
+          "target": "Invoice:Paid In Full",
+          "edge_type": "link",
+          "frequency": 102,
+          "mean_duration": 536619.833333,
+          "median_duration": 253189.5,
+          "maximum_duration": 3181042.0,
+          "minimum_duration": 8383.0,
+          "standard_deviation": 682715.020787
+        },
+        {
+          "source": "Transfer Order:Received",
+          "target": "Item Fulfillment:Shipped",
+          "edge_type": "link",
+          "frequency": 723,
+          "mean_duration": 521538.172891,
+          "median_duration": 433520.0,
+          "maximum_duration": 9586525.0,
+          "minimum_duration": 4138.0,
+          "standard_deviation": 792978.112043
+        },
+        {
+          "source": "Sales Order:Billed",
+          "target": "Item Fulfillment:Shipped",
+          "edge_type": "link",
+          "frequency": 330173,
+          "mean_duration": 148155.909045,
+          "median_duration": 66573.0,
+          "maximum_duration": 34660849.0,
+          "minimum_duration": 3601.0,
+          "standard_deviation": 390541.951863
+        },
+        {
+          "source": "Sales Order:Billed",
+          "target": "Cash Sale:Deposited",
+          "edge_type": "link",
+          "frequency": 51200,
+          "mean_duration": 90221.272773,
+          "median_duration": 27745.0,
+          "maximum_duration": 12402292.0,
+          "minimum_duration": 3601.0,
+          "standard_deviation": 699173.738066
+        },
+        {
+          "source": "Sales Order:Created",
+          "target": "Item Fulfillment:Shipped",
+          "edge_type": "link",
+          "frequency": 8475,
+          "mean_duration": 4258.80885,
+          "median_duration": 3629.0,
+          "maximum_duration": 7199.0,
+          "minimum_duration": 3605.0,
+          "standard_deviation": 1174.252551
+        },
+        {
+          "source": "Sales Order:Created",
+          "target": "Cash Sale:Deposited",
+          "edge_type": "link",
+          "frequency": 277086,
+          "mean_duration": 3873.568546,
+          "median_duration": 3627.0,
+          "maximum_duration": 7200.0,
+          "minimum_duration": 3605.0,
+          "standard_deviation": 690.190696
+        },
+        {
+          "source": "Cash Sale:Created",
+          "target": "Cash Sale:Deposited",
+          "edge_type": "intra",
+          "frequency": 517146,
+          "mean_duration": 3600.0,
+          "median_duration": 3600.0,
+          "maximum_duration": 3600.0,
+          "minimum_duration": 3600.0,
+          "standard_deviation": 0.0
+        },
+        {
+          "source": "Item Fulfillment:Created",
+          "target": "Item Fulfillment:Shipped",
+          "edge_type": "intra",
+          "frequency": 343628,
+          "mean_duration": 3600.0,
+          "median_duration": 3600.0,
+          "maximum_duration": 3600.0,
+          "minimum_duration": 3600.0,
+          "standard_deviation": 0.0
+        }
+      ],
+      "speedups": {
+        "verticalbar_vs_vanilla": 0.73,
+        "pg_ocpm_vs_vanilla": 10.188,
+        "pg_ocpm_vs_verticalbar": 13.96
+      },
+      "warmup_timeouts": {},
+      "randomized_first_counts": {
+        "pg_ocpm": 4,
+        "vanilla_postgres": 3,
+        "verticalbar_optimized": 2
+      },
+      "vanilla_postgres": {
+        "status": "completed",
+        "p50_ms": 1040.004,
+        "p95_ms": 1089.269,
+        "min_ms": 999.507,
+        "max_ms": 1089.269,
+        "mean_ms": 1038.788,
+        "runs": 9
+      },
+      "verticalbar_optimized": {
+        "status": "completed",
+        "p50_ms": 1425.06,
+        "p95_ms": 1540.945,
+        "min_ms": 1400.244,
+        "max_ms": 1540.945,
+        "mean_ms": 1440.038,
+        "runs": 9
+      },
+      "pg_ocpm": {
+        "status": "completed",
+        "p50_ms": 102.085,
+        "p95_ms": 110.107,
+        "min_ms": 101.272,
+        "max_ms": 110.107,
+        "mean_ms": 103.069,
+        "runs": 9
+      }
+    },
+    {
+      "scenario": "bottleneck_monthly_drift",
+      "family": "bottleneck_detection",
+      "agreement": true,
+      "answer_hash": "fa669501861d161f",
+      "answer": {
+        "months": [
+          {
+            "month": "2025-05",
+            "frequency": 5,
+            "mean_duration": 29808494.0,
+            "median_duration": 30844507.0
+          },
+          {
+            "month": "2025-06",
+            "frequency": 5,
+            "mean_duration": 25119273.4,
+            "median_duration": 24251064.0
+          },
+          {
+            "month": "2025-10",
+            "frequency": 18,
+            "mean_duration": 13157369.166667,
+            "median_duration": 13552582.0
+          },
+          {
+            "month": "2025-11",
+            "frequency": 20,
+            "mean_duration": 10330235.05,
+            "median_duration": 10751587.0
+          },
+          {
+            "month": "2025-12",
+            "frequency": 71,
+            "mean_duration": 9074497.591549,
+            "median_duration": 9468984.0
+          },
+          {
+            "month": "2026-01",
+            "frequency": 50,
+            "mean_duration": 9936359.94,
+            "median_duration": 9606848.5
+          },
+          {
+            "month": "2026-02",
+            "frequency": 10,
+            "mean_duration": 9252367.2,
+            "median_duration": 9169403.0
+          },
+          {
+            "month": "2026-03",
+            "frequency": 33,
+            "mean_duration": 6356110.333333,
+            "median_duration": 6638723.0
+          },
+          {
+            "month": "2026-04",
+            "frequency": 2,
+            "mean_duration": 3290646.0,
+            "median_duration": 3290646.0
+          }
+        ],
+        "source": "Purchase Order:Fully Billed",
+        "target": "Bill:Open",
+        "edge_type": "link"
+      },
+      "speedups": {
+        "verticalbar_vs_vanilla": 3.966,
+        "pg_ocpm_vs_vanilla": 5.03,
+        "pg_ocpm_vs_verticalbar": 1.268
+      },
+      "warmup_timeouts": {},
+      "randomized_first_counts": {
+        "verticalbar_optimized": 3,
+        "pg_ocpm": 5,
+        "vanilla_postgres": 1
+      },
+      "vanilla_postgres": {
+        "status": "completed",
+        "p50_ms": 510.99,
+        "p95_ms": 528.356,
+        "min_ms": 501.608,
+        "max_ms": 528.356,
+        "mean_ms": 511.14,
+        "runs": 9
+      },
+      "verticalbar_optimized": {
+        "status": "completed",
+        "p50_ms": 128.848,
+        "p95_ms": 138.332,
+        "min_ms": 125.793,
+        "max_ms": 138.332,
+        "mean_ms": 130.134,
+        "runs": 9
+      },
+      "pg_ocpm": {
+        "status": "completed",
+        "p50_ms": 101.592,
+        "p95_ms": 105.004,
+        "min_ms": 100.415,
+        "max_ms": 105.004,
+        "mean_ms": 102.345,
+        "runs": 9
+      }
+    },
+    {
+      "scenario": "repeated_transition_rework",
+      "family": "rework",
+      "agreement": true,
+      "answer_hash": "6d222c963ada3571",
+      "answer": {
+        "patterns": [
+          {
+            "source": "Sales Order:Billed",
+            "target": "Item Fulfillment:Shipped",
+            "edge_type": "link",
+            "rework_cases": 9214,
+            "excess_transitions": 11149,
+            "maximum_occurrences": 23
+          },
+          {
+            "source": "Sales Order:Partially Fulfilled",
+            "target": "Item Fulfillment:Shipped",
+            "edge_type": "link",
+            "rework_cases": 320,
+            "excess_transitions": 542,
+            "maximum_occurrences": 14
+          },
+          {
+            "source": "Transfer Order:Received",
+            "target": "Item Fulfillment:Shipped",
+            "edge_type": "link",
+            "rework_cases": 71,
+            "excess_transitions": 480,
+            "maximum_occurrences": 33
+          },
+          {
+            "source": "Sales Order:Pending Billing",
+            "target": "Item Fulfillment:Shipped",
+            "edge_type": "link",
+            "rework_cases": 290,
+            "excess_transitions": 329,
+            "maximum_occurrences": 16
+          },
+          {
+            "source": "Sales Order:Closed",
+            "target": "Item Fulfillment:Shipped",
+            "edge_type": "link",
+            "rework_cases": 90,
+            "excess_transitions": 168,
+            "maximum_occurrences": 11
+          },
+          {
+            "source": "Sales Order:Billed",
+            "target": "Purchase Order:Fully Billed",
+            "edge_type": "link",
+            "rework_cases": 48,
+            "excess_transitions": 102,
+            "maximum_occurrences": 6
+          },
+          {
+            "source": "Bill:Paid In Full",
+            "target": "Journal:Approved for Posting",
+            "edge_type": "link",
+            "rework_cases": 43,
+            "excess_transitions": 87,
+            "maximum_occurrences": 5
+          },
+          {
+            "source": "Sales Order:Pending Fulfillment",
+            "target": "Purchase Order:Pending Receipt",
+            "edge_type": "link",
+            "rework_cases": 29,
+            "excess_transitions": 58,
+            "maximum_occurrences": 4
+          },
+          {
+            "source": "Journal:Approved for Posting",
+            "target": "Journal:Approved for Posting",
+            "edge_type": "link",
+            "rework_cases": 11,
+            "excess_transitions": 38,
+            "maximum_occurrences": 8
+          },
+          {
+            "source": "Transfer Order:Pending Receipt",
+            "target": "Item Fulfillment:Shipped",
+            "edge_type": "link",
+            "rework_cases": 6,
+            "excess_transitions": 37,
+            "maximum_occurrences": 15
+          },
+          {
+            "source": "Sales Order:Pending Billing/Partially Fulfilled",
+            "target": "Item Fulfillment:Shipped",
+            "edge_type": "link",
+            "rework_cases": 15,
+            "excess_transitions": 28,
+            "maximum_occurrences": 5
+          },
+          {
+            "source": "Purchase Order:Fully Billed",
+            "target": "Bill:Paid In Full",
+            "edge_type": "link",
+            "rework_cases": 18,
+            "excess_transitions": 27,
+            "maximum_occurrences": 4
+          },
+          {
+            "source": "Sales Order:Billed",
+            "target": "Invoice:Paid In Full",
+            "edge_type": "link",
+            "rework_cases": 19,
+            "excess_transitions": 19,
+            "maximum_occurrences": 2
+          },
+          {
+            "source": "Purchase Order:Partially Received",
+            "target": "Bill:Open",
+            "edge_type": "link",
+            "rework_cases": 4,
+            "excess_transitions": 14,
+            "maximum_occurrences": 8
+          },
+          {
+            "source": "Purchase Order:Fully Billed",
+            "target": "Bill:Open",
+            "edge_type": "link",
+            "rework_cases": 10,
+            "excess_transitions": 12,
+            "maximum_occurrences": 4
+          },
+          {
+            "source": "Sales Order:Created",
+            "target": "Item Fulfillment:Shipped",
+            "edge_type": "link",
+            "rework_cases": 7,
+            "excess_transitions": 7,
+            "maximum_occurrences": 2
+          },
+          {
+            "source": "Sales Order:Closed",
+            "target": "Purchase Order:Fully Billed",
+            "edge_type": "link",
+            "rework_cases": 2,
+            "excess_transitions": 7,
+            "maximum_occurrences": 5
+          },
+          {
+            "source": "Sales Order:Closed",
+            "target": "Invoice:Paid In Full",
+            "edge_type": "link",
+            "rework_cases": 4,
+            "excess_transitions": 5,
+            "maximum_occurrences": 3
+          },
+          {
+            "source": "Purchase Order:Pending Receipt",
+            "target": "Bill:Open",
+            "edge_type": "link",
+            "rework_cases": 4,
+            "excess_transitions": 4,
+            "maximum_occurrences": 2
+          },
+          {
+            "source": "Invoice:Paid In Full",
+            "target": "Credit Memo:Fully Applied",
+            "edge_type": "link",
+            "rework_cases": 3,
+            "excess_transitions": 4,
+            "maximum_occurrences": 3
+          }
+        ],
+        "rework_cases": 10197,
+        "excess_transitions": 13134
+      },
+      "speedups": {
+        "verticalbar_vs_vanilla": 1.01,
+        "pg_ocpm_vs_vanilla": 0.964,
+        "pg_ocpm_vs_verticalbar": 0.954
+      },
+      "warmup_timeouts": {},
+      "randomized_first_counts": {
+        "vanilla_postgres": 3,
+        "verticalbar_optimized": 2,
+        "pg_ocpm": 4
+      },
+      "vanilla_postgres": {
+        "status": "completed",
+        "p50_ms": 1662.467,
+        "p95_ms": 1855.982,
+        "min_ms": 1612.862,
+        "max_ms": 1855.982,
+        "mean_ms": 1700.877,
+        "runs": 9
+      },
+      "verticalbar_optimized": {
+        "status": "completed",
+        "p50_ms": 1646.375,
+        "p95_ms": 1838.66,
+        "min_ms": 1605.87,
+        "max_ms": 1838.66,
+        "mean_ms": 1662.846,
+        "runs": 9
+      },
+      "pg_ocpm": {
+        "status": "completed",
+        "p50_ms": 1725.028,
+        "p95_ms": 1829.908,
+        "min_ms": 1682.515,
+        "max_ms": 1829.908,
+        "mean_ms": 1733.338,
+        "runs": 9
+      }
+    },
+    {
+      "scenario": "sla_breach_detection",
+      "family": "performance_compliance",
+      "agreement": true,
+      "answer_hash": "dde60aa020d35d0f",
+      "answer": [
+        {
+          "threshold": 0.0,
+          "test_cases": 212,
+          "breach_rate": 0.004717,
+          "object_type": "Bill Payment",
+          "train_cases": 1029,
+          "breach_cases": 1,
+          "mean_breach_duration": 3600.0
+        },
+        {
+          "threshold": 3600.0,
+          "test_cases": 92607,
+          "breach_rate": 0.0,
+          "object_type": "Cash Sale",
+          "train_cases": 424548,
+          "breach_cases": 0,
+          "mean_breach_duration": null
+        },
+        {
+          "threshold": 3600.0,
+          "test_cases": 85315,
+          "breach_rate": 0.0,
+          "object_type": "Item Fulfillment",
+          "train_cases": 258325,
+          "breach_cases": 0,
+          "mean_breach_duration": null
+        },
+        {
+          "threshold": 3600.0,
+          "test_cases": 62804,
+          "breach_rate": 0.0,
+          "object_type": "Sales Order",
+          "train_cases": 278386,
+          "breach_cases": 0,
+          "mean_breach_duration": null
+        },
+        {
+          "threshold": 0.0,
+          "test_cases": 4409,
+          "breach_rate": 0.0,
+          "object_type": "Cash Refund",
+          "train_cases": 11057,
+          "breach_cases": 0,
+          "mean_breach_duration": null
+        },
+        {
+          "threshold": 3600.0,
+          "test_cases": 1332,
+          "breach_rate": 0.0,
+          "object_type": "Invoice",
+          "train_cases": 5355,
+          "breach_cases": 0,
+          "mean_breach_duration": null
+        },
+        {
+          "threshold": 3600.0,
+          "test_cases": 1048,
+          "breach_rate": 0.0,
+          "object_type": "Journal",
+          "train_cases": 4456,
+          "breach_cases": 0,
+          "mean_breach_duration": null
+        },
+        {
+          "threshold": 0.0,
+          "test_cases": 700,
+          "breach_rate": 0.0,
+          "object_type": "Loyalty Program Transaction",
+          "train_cases": 3989,
+          "breach_cases": 0,
+          "mean_breach_duration": null
+        },
+        {
+          "threshold": 0.0,
+          "test_cases": 503,
+          "breach_rate": 0.0,
+          "object_type": "Bin Transfer",
+          "train_cases": 3709,
+          "breach_cases": 0,
+          "mean_breach_duration": null
+        },
+        {
+          "threshold": 3600.0,
+          "test_cases": 321,
+          "breach_rate": 0.0,
+          "object_type": "Bill",
+          "train_cases": 2063,
+          "breach_cases": 0,
+          "mean_breach_duration": null
+        },
+        {
+          "threshold": 0.0,
+          "test_cases": 280,
+          "breach_rate": 0.0,
+          "object_type": "Inventory Adjustment",
+          "train_cases": 1737,
+          "breach_cases": 0,
+          "mean_breach_duration": null
+        },
+        {
+          "threshold": 0.0,
+          "test_cases": 228,
+          "breach_rate": 0.0,
+          "object_type": "Item Receipt",
+          "train_cases": 1000,
+          "breach_cases": 0,
+          "mean_breach_duration": null
+        },
+        {
+          "threshold": 3600.0,
+          "test_cases": 71,
+          "breach_rate": 0.0,
+          "object_type": "Payment",
+          "train_cases": 1495,
+          "breach_cases": 0,
+          "mean_breach_duration": null
+        },
+        {
+          "threshold": 3600.0,
+          "test_cases": 66,
+          "breach_rate": 0.0,
+          "object_type": "Expense Report",
+          "train_cases": 222,
+          "breach_cases": 0,
+          "mean_breach_duration": null
+        },
+        {
+          "threshold": 0.0,
+          "test_cases": 60,
+          "breach_rate": 0.0,
+          "object_type": "Ownership Transfer",
+          "train_cases": 243,
+          "breach_cases": 0,
+          "mean_breach_duration": null
+        },
+        {
+          "threshold": 3600.0,
+          "test_cases": 50,
+          "breach_rate": 0.0,
+          "object_type": "Transfer Order",
+          "train_cases": 325,
+          "breach_cases": 0,
+          "mean_breach_duration": null
+        },
+        {
+          "threshold": 0.0,
+          "test_cases": 41,
+          "breach_rate": 0.0,
+          "object_type": "Transfer",
+          "train_cases": 151,
+          "breach_cases": 0,
+          "mean_breach_duration": null
+        },
+        {
+          "threshold": 0.0,
+          "test_cases": 36,
+          "breach_rate": 0.0,
+          "object_type": "Check",
+          "train_cases": 153,
+          "breach_cases": 0,
+          "mean_breach_duration": null
+        },
+        {
+          "threshold": 3600.0,
+          "test_cases": 33,
+          "breach_rate": 0.0,
+          "object_type": "Order Reservation",
+          "train_cases": 1132,
+          "breach_cases": 0,
+          "mean_breach_duration": null
+        },
+        {
+          "threshold": 3600.0,
+          "test_cases": 25,
+          "breach_rate": 0.0,
+          "object_type": "Purchase Order",
+          "train_cases": 758,
+          "breach_cases": 0,
+          "mean_breach_duration": null
+        }
+      ],
+      "speedups": {
+        "verticalbar_vs_vanilla": 1.013,
+        "pg_ocpm_vs_vanilla": 8.26,
+        "pg_ocpm_vs_verticalbar": 8.153
+      },
+      "warmup_timeouts": {},
+      "randomized_first_counts": {
+        "verticalbar_optimized": 6,
+        "pg_ocpm": 3
+      },
+      "vanilla_postgres": {
+        "status": "completed",
+        "p50_ms": 3736.434,
+        "p95_ms": 3849.66,
+        "min_ms": 3701.849,
+        "max_ms": 3849.66,
+        "mean_ms": 3744.086,
+        "runs": 9
+      },
+      "verticalbar_optimized": {
+        "status": "completed",
+        "p50_ms": 3688.146,
+        "p95_ms": 3809.396,
+        "min_ms": 3658.943,
+        "max_ms": 3809.396,
+        "mean_ms": 3719.588,
+        "runs": 9
+      },
+      "pg_ocpm": {
+        "status": "completed",
+        "p50_ms": 452.371,
+        "p95_ms": 459.834,
+        "min_ms": 442.58,
+        "max_ms": 459.834,
+        "mean_ms": 452.043,
+        "runs": 9
+      }
+    },
+    {
+      "scenario": "dfg_conformance",
+      "family": "conformance",
+      "agreement": true,
+      "answer_hash": "7f36d0791e02825a",
+      "answer": {
+        "fitness": 0.940496,
+        "test_edges": 615282,
+        "model_edges": 8,
+        "top_deviations": [
+          {
+            "source": "Sales Order:Billed",
+            "target": "Cash Sale:Deposited",
+            "edge_type": "link",
+            "test_count": 20186
+          },
+          {
+            "source": "Cash Refund",
+            "target": "Cash Refund:Created",
+            "edge_type": "intra",
+            "test_count": 4409
+          },
+          {
+            "source": "Invoice",
+            "target": "Invoice:Created",
+            "edge_type": "intra",
+            "test_count": 1332
+          },
+          {
+            "source": "Journal",
+            "target": "Journal:Created",
+            "edge_type": "intra",
+            "test_count": 1048
+          },
+          {
+            "source": "Journal:Created",
+            "target": "Journal:Approved for Posting",
+            "edge_type": "intra",
+            "test_count": 1047
+          },
+          {
+            "source": "Sales Order:Created",
+            "target": "Item Fulfillment:Shipped",
+            "edge_type": "link",
+            "test_count": 916
+          },
+          {
+            "source": "Sales Order:Created",
+            "target": "Sales Order:Pending Billing",
+            "edge_type": "intra",
+            "test_count": 864
+          },
+          {
+            "source": "Invoice:Created",
+            "target": "Invoice:Paid In Full",
+            "edge_type": "intra",
+            "test_count": 855
+          },
+          {
+            "source": "Loyalty Program Transaction",
+            "target": "Loyalty Program Transaction:Created",
+            "edge_type": "intra",
+            "test_count": 700
+          },
+          {
+            "source": "Sales Order:Pending Billing",
+            "target": "Item Fulfillment:Shipped",
+            "edge_type": "link",
+            "test_count": 694
+          },
+          {
+            "source": "Sales Order:Created",
+            "target": "Sales Order:Pending Fulfillment",
+            "edge_type": "intra",
+            "test_count": 630
+          },
+          {
+            "source": "Bin Transfer",
+            "target": "Bin Transfer:Created",
+            "edge_type": "intra",
+            "test_count": 503
+          },
+          {
+            "source": "Invoice:Created",
+            "target": "Invoice:Open",
+            "edge_type": "intra",
+            "test_count": 477
+          },
+          {
+            "source": "Bill",
+            "target": "Bill:Created",
+            "edge_type": "intra",
+            "test_count": 321
+          },
+          {
+            "source": "Inventory Adjustment",
+            "target": "Inventory Adjustment:Created",
+            "edge_type": "intra",
+            "test_count": 280
+          },
+          {
+            "source": "Bill:Created",
+            "target": "Bill:Open",
+            "edge_type": "intra",
+            "test_count": 251
+          },
+          {
+            "source": "Item Receipt",
+            "target": "Item Receipt:Created",
+            "edge_type": "intra",
+            "test_count": 228
+          },
+          {
+            "source": "Bill Payment",
+            "target": "Bill Payment:Created",
+            "edge_type": "intra",
+            "test_count": 212
+          },
+          {
+            "source": "Sales Order:Billed",
+            "target": "Invoice:Open",
+            "edge_type": "link",
+            "test_count": 150
+          },
+          {
+            "source": "Sales Order:Created",
+            "target": "Sales Order:Partially Fulfilled",
+            "edge_type": "intra",
+            "test_count": 138
+          }
+        ],
+        "deviation_edges": 36612,
+        "conforming_edges": 578670
+      },
+      "speedups": {
+        "verticalbar_vs_vanilla": 0.549,
+        "pg_ocpm_vs_vanilla": 1.663,
+        "pg_ocpm_vs_verticalbar": 3.031
+      },
+      "warmup_timeouts": {},
+      "randomized_first_counts": {
+        "vanilla_postgres": 6,
+        "pg_ocpm": 2,
+        "verticalbar_optimized": 1
+      },
+      "vanilla_postgres": {
+        "status": "completed",
+        "p50_ms": 132.851,
+        "p95_ms": 206.683,
+        "min_ms": 120.76,
+        "max_ms": 206.683,
+        "mean_ms": 139.643,
+        "runs": 9
+      },
+      "verticalbar_optimized": {
+        "status": "completed",
+        "p50_ms": 242.137,
+        "p95_ms": 424.798,
+        "min_ms": 227.684,
+        "max_ms": 424.798,
+        "mean_ms": 258.292,
+        "runs": 9
+      },
+      "pg_ocpm": {
+        "status": "completed",
+        "p50_ms": 79.896,
+        "p95_ms": 108.946,
+        "min_ms": 79.424,
+        "max_ms": 108.946,
+        "mean_ms": 83.359,
+        "runs": 9
+      }
+    },
+    {
+      "scenario": "variant_conformance",
+      "family": "conformance",
+      "agreement": true,
+      "answer_hash": "fe49a97b02d648e1",
+      "answer": {
+        "fitness": 0.955299,
+        "test_cases": 250195,
+        "model_variants": 3,
+        "top_deviations": [
+          {
+            "path_hash": "b35c5aada6",
+            "test_count": 4409
+          },
+          {
+            "path_hash": "93f494e0ca",
+            "test_count": 1047
+          },
+          {
+            "path_hash": "3735eedb6c",
+            "test_count": 864
+          },
+          {
+            "path_hash": "60e9541653",
+            "test_count": 855
+          },
+          {
+            "path_hash": "c9bae09eb2",
+            "test_count": 700
+          },
+          {
+            "path_hash": "63da2a1c1c",
+            "test_count": 630
+          },
+          {
+            "path_hash": "876a25fb08",
+            "test_count": 503
+          },
+          {
+            "path_hash": "c8f6617b2c",
+            "test_count": 477
+          },
+          {
+            "path_hash": "5bef0fdfc4",
+            "test_count": 280
+          },
+          {
+            "path_hash": "66ce927a2f",
+            "test_count": 251
+          },
+          {
+            "path_hash": "e4c20ec8fb",
+            "test_count": 228
+          },
+          {
+            "path_hash": "a37b5c0255",
+            "test_count": 211
+          },
+          {
+            "path_hash": "0e8b3a7a7b",
+            "test_count": 138
+          },
+          {
+            "path_hash": "a60f910e4c",
+            "test_count": 70
+          },
+          {
+            "path_hash": "2bb2e6651f",
+            "test_count": 66
+          },
+          {
+            "path_hash": "797aae2c48",
+            "test_count": 66
+          },
+          {
+            "path_hash": "be7c872133",
+            "test_count": 60
+          },
+          {
+            "path_hash": "7c2ce4ac48",
+            "test_count": 41
+          },
+          {
+            "path_hash": "ca104832e3",
+            "test_count": 36
+          },
+          {
+            "path_hash": "77b5534b8b",
+            "test_count": 33
+          }
+        ],
+        "deviation_cases": 11184,
+        "conforming_cases": 239011
+      },
+      "speedups": {
+        "verticalbar_vs_vanilla": 1.008,
+        "pg_ocpm_vs_vanilla": 93.958,
+        "pg_ocpm_vs_verticalbar": 93.198
+      },
+      "warmup_timeouts": {},
+      "randomized_first_counts": {
+        "vanilla_postgres": 4,
+        "verticalbar_optimized": 3,
+        "pg_ocpm": 2
+      },
+      "vanilla_postgres": {
+        "status": "completed",
+        "p50_ms": 2981.185,
+        "p95_ms": 3192.048,
+        "min_ms": 2938.941,
+        "max_ms": 3192.048,
+        "mean_ms": 3012.266,
+        "runs": 9
+      },
+      "verticalbar_optimized": {
+        "status": "completed",
+        "p50_ms": 2957.075,
+        "p95_ms": 3198.87,
+        "min_ms": 2921.4,
+        "max_ms": 3198.87,
+        "mean_ms": 3014.706,
+        "runs": 9
+      },
+      "pg_ocpm": {
+        "status": "completed",
+        "p50_ms": 31.729,
+        "p95_ms": 32.479,
+        "min_ms": 31.025,
+        "max_ms": 32.479,
+        "mean_ms": 31.76,
+        "runs": 9
+      }
+    },
+    {
+      "scenario": "next_activity_prediction",
+      "family": "prediction",
+      "agreement": true,
+      "answer_hash": "fc34dbfcaf1fc92d",
+      "answer": {
+        "sources": [
+          {
+            "source": "Cash Sale",
+            "accuracy": 1.0,
+            "edge_type": "intra",
+            "test_edges": 92607,
+            "correct_edges": 92607,
+            "predicted_target": "Cash Sale:Created"
+          },
+          {
+            "source": "Cash Sale:Created",
+            "accuracy": 0.999903,
+            "edge_type": "intra",
+            "test_edges": 92607,
+            "correct_edges": 92598,
+            "predicted_target": "Cash Sale:Deposited"
+          },
+          {
+            "source": "Item Fulfillment",
+            "accuracy": 1.0,
+            "edge_type": "intra",
+            "test_edges": 85315,
+            "correct_edges": 85315,
+            "predicted_target": "Item Fulfillment:Created"
+          },
+          {
+            "source": "Item Fulfillment:Created",
+            "accuracy": 0.999906,
+            "edge_type": "intra",
+            "test_edges": 85315,
+            "correct_edges": 85307,
+            "predicted_target": "Item Fulfillment:Shipped"
+          },
+          {
+            "source": "Sales Order:Billed",
+            "accuracy": 0.736756,
+            "edge_type": "link",
+            "test_edges": 77715,
+            "correct_edges": 57257,
+            "predicted_target": "Item Fulfillment:Shipped"
+          },
+          {
+            "source": "Sales Order",
+            "accuracy": 1.0,
+            "edge_type": "intra",
+            "test_edges": 62804,
+            "correct_edges": 62804,
+            "predicted_target": "Sales Order:Created"
+          },
+          {
+            "source": "Sales Order:Created",
+            "accuracy": 0.972964,
+            "edge_type": "intra",
+            "test_edges": 62804,
+            "correct_edges": 61106,
+            "predicted_target": "Sales Order:Billed"
+          },
+          {
+            "source": "Sales Order:Created",
+            "accuracy": 0.978448,
+            "edge_type": "link",
+            "test_edges": 42594,
+            "correct_edges": 41676,
+            "predicted_target": "Cash Sale:Deposited"
+          },
+          {
+            "source": "Cash Refund",
+            "accuracy": 1.0,
+            "edge_type": "intra",
+            "test_edges": 4409,
+            "correct_edges": 4409,
+            "predicted_target": "Cash Refund:Created"
+          },
+          {
+            "source": "Invoice",
+            "accuracy": 1.0,
+            "edge_type": "intra",
+            "test_edges": 1332,
+            "correct_edges": 1332,
+            "predicted_target": "Invoice:Created"
+          },
+          {
+            "source": "Invoice:Created",
+            "accuracy": 0.641892,
+            "edge_type": "intra",
+            "test_edges": 1332,
+            "correct_edges": 855,
+            "predicted_target": "Invoice:Paid In Full"
+          },
+          {
+            "source": "Journal",
+            "accuracy": 1.0,
+            "edge_type": "intra",
+            "test_edges": 1048,
+            "correct_edges": 1048,
+            "predicted_target": "Journal:Created"
+          },
+          {
+            "source": "Journal:Created",
+            "accuracy": 0.999046,
+            "edge_type": "intra",
+            "test_edges": 1048,
+            "correct_edges": 1047,
+            "predicted_target": "Journal:Approved for Posting"
+          },
+          {
+            "source": "Loyalty Program Transaction",
+            "accuracy": 1.0,
+            "edge_type": "intra",
+            "test_edges": 700,
+            "correct_edges": 700,
+            "predicted_target": "Loyalty Program Transaction:Created"
+          },
+          {
+            "source": "Sales Order:Pending Billing",
+            "accuracy": 0.997126,
+            "edge_type": "link",
+            "test_edges": 696,
+            "correct_edges": 694,
+            "predicted_target": "Item Fulfillment:Shipped"
+          },
+          {
+            "source": "Bin Transfer",
+            "accuracy": 1.0,
+            "edge_type": "intra",
+            "test_edges": 503,
+            "correct_edges": 503,
+            "predicted_target": "Bin Transfer:Created"
+          },
+          {
+            "source": "Bill",
+            "accuracy": 1.0,
+            "edge_type": "intra",
+            "test_edges": 321,
+            "correct_edges": 321,
+            "predicted_target": "Bill:Created"
+          },
+          {
+            "source": "Bill:Created",
+            "accuracy": 0.218069,
+            "edge_type": "intra",
+            "test_edges": 321,
+            "correct_edges": 70,
+            "predicted_target": "Bill:Paid In Full"
+          },
+          {
+            "source": "Inventory Adjustment",
+            "accuracy": 1.0,
+            "edge_type": "intra",
+            "test_edges": 280,
+            "correct_edges": 280,
+            "predicted_target": "Inventory Adjustment:Created"
+          },
+          {
+            "source": "Item Receipt",
+            "accuracy": 1.0,
+            "edge_type": "intra",
+            "test_edges": 228,
+            "correct_edges": 228,
+            "predicted_target": "Item Receipt:Created"
+          }
+        ],
+        "accuracy": 0.960929,
+        "test_edges": 615232,
+        "correct_edges": 591194
+      },
+      "speedups": {
+        "verticalbar_vs_vanilla": 0.538,
+        "pg_ocpm_vs_vanilla": 1.569,
+        "pg_ocpm_vs_verticalbar": 2.919
+      },
+      "warmup_timeouts": {},
+      "randomized_first_counts": {
+        "verticalbar_optimized": 8,
+        "pg_ocpm": 1
+      },
+      "vanilla_postgres": {
+        "status": "completed",
+        "p50_ms": 124.852,
+        "p95_ms": 134.529,
+        "min_ms": 118.986,
+        "max_ms": 134.529,
+        "mean_ms": 126.231,
+        "runs": 9
+      },
+      "verticalbar_optimized": {
+        "status": "completed",
+        "p50_ms": 232.23,
+        "p95_ms": 404.256,
+        "min_ms": 221.567,
+        "max_ms": 404.256,
+        "mean_ms": 268.596,
+        "runs": 9
+      },
+      "pg_ocpm": {
+        "status": "completed",
+        "p50_ms": 79.554,
+        "p95_ms": 87.832,
+        "min_ms": 78.487,
+        "max_ms": 87.832,
+        "mean_ms": 80.293,
+        "runs": 9
+      }
+    },
+    {
+      "scenario": "edge_bottleneck_prediction",
+      "family": "prediction",
+      "agreement": true,
+      "answer_hash": "6cc59dec590b8c33",
+      "answer": {
+        "mae": 90283.192808,
+        "rmse": 191889.364304,
+        "recall": 1.0,
+        "precision": 0.603318,
+        "test_edges": 121322,
+        "brier_score": 0.168818,
+        "true_positives": 47498,
+        "actual_bottlenecks": 47498,
+        "predicted_bottlenecks": 78728
+      },
+      "speedups": {
+        "verticalbar_vs_vanilla": 1.503,
+        "pg_ocpm_vs_vanilla": 1.627,
+        "pg_ocpm_vs_verticalbar": 1.083
+      },
+      "warmup_timeouts": {},
+      "randomized_first_counts": {
+        "verticalbar_optimized": 4,
+        "vanilla_postgres": 4,
+        "pg_ocpm": 1
+      },
+      "vanilla_postgres": {
+        "status": "completed",
+        "p50_ms": 481.511,
+        "p95_ms": 692.006,
+        "min_ms": 478.965,
+        "max_ms": 692.006,
+        "mean_ms": 508.504,
+        "runs": 9
+      },
+      "verticalbar_optimized": {
+        "status": "completed",
+        "p50_ms": 320.418,
+        "p95_ms": 356.06,
+        "min_ms": 313.449,
+        "max_ms": 356.06,
+        "mean_ms": 324.532,
+        "runs": 9
+      },
+      "pg_ocpm": {
+        "status": "completed",
+        "p50_ms": 295.877,
+        "p95_ms": 309.121,
+        "min_ms": 290.471,
+        "max_ms": 309.121,
+        "mean_ms": 296.882,
+        "runs": 9
+      }
+    }
+  ],
+  "storage_and_index_usage": {
+    "vanilla_postgres": {
+      "heap_bytes": 1906180096,
+      "index_bytes": 0,
+      "toast_bytes": 712704,
+      "total_bytes": 1906892800,
+      "sequential_tuples_read": 305249880,
+      "index_scans": 0,
+      "index_tuples_read": 0
+    },
+    "verticalbar_optimized": {
+      "heap_bytes": 1909497856,
+      "index_bytes": 2107670528,
+      "toast_bytes": 712704,
+      "total_bytes": 4017881088,
+      "sequential_tuples_read": 69362656,
+      "index_scans": 165,
+      "index_tuples_read": 165919545
+    },
+    "pg_ocpm": {
+      "heap_bytes": 378822656,
+      "index_bytes": 153141248,
+      "toast_bytes": 191209472,
+      "total_bytes": 723173376,
+      "sequential_tuples_read": 107943,
+      "index_scans": 22,
+      "index_tuples_read": 4367
+    }
+  },
+  "summary": {
+    "total_cases": 8,
+    "matched_cases": 8,
+    "mismatches_or_timeouts": 0,
+    "geomean_verticalbar_vs_vanilla": 1.036,
+    "geomean_pg_ocpm_vs_vanilla": 4.482,
+    "geomean_pg_ocpm_vs_verticalbar": 4.328,
+    "fastest_counts": {
+      "vanilla_postgres": 0,
+      "verticalbar_optimized": 1,
+      "pg_ocpm": 7
+    }
+  }
+}

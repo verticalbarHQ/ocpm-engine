@@ -16,6 +16,7 @@ Repository = "https://github.com/verticalbarHQ/ocpm-engine"
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<9", "ruff>=0.9,<1"]
+benchmark = ["psycopg2-binary>=2.9,<3"]
 
 [tool.setuptools]
 package-dir = { "" = "src" }
@@ -26,6 +27,7 @@ where = ["src"]
 [tool.pytest.ini_options]
 addopts = "-q"
 testpaths = ["tests"]
+pythonpath = ["."]
 
 [tool.ruff]
 line-length = 88
