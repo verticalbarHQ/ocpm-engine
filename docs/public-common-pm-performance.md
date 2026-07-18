@@ -1,15 +1,15 @@
 # Public common-process-mining performance
 
-This report records the `pg_ocpm 0.3.0` and `ocpm-engine 0.2.0` release run on
-the public SAP IDES O2C and P2P logs. All 14 workload/dataset pairs passed exact
+This report records the `pg_ocpm 0.4.0` and `ocpm-engine 0.3.0` release run on
+the public SAP IDES O2C and P2P logs. All 18 workload/dataset pairs passed exact
 canonical-output comparison before their latency samples were accepted. The
-geometric-mean p50 speedup was **35.927x** and the slowest pair was **16.884x**,
+geometric-mean p50 speedup was **33.146x** and the slowest pair was **17.183x**,
 so both release gates exceeded 10x.
 
 The machine-readable result is
-[`results/public-common-pm-0.2.0.json`](results/public-common-pm-0.2.0.json)
-(file SHA-256
-`9ae178fa13572a9e633df0143ec3f921581c909e9e60474abd5d868abc140103`).
+[`results/public-common-pm-0.3.0.json`](results/public-common-pm-0.3.0.json)
+(payload SHA-256
+`17779a957f25d899270e81827e54e07f9e3498d6fcc9070ec949bbe1704ba319`).
 
 ## What was compared
 
@@ -53,28 +53,34 @@ includes database extraction/aggregation and model construction or scoring.
 
 | Dataset | Workload | Vanilla PG + Python | pg_ocpm + Rust | Speedup |
 |---|---|---:|---:|---:|
-| SAP O2C | DFG frequency conformance, 95% | 37.530 | 1.151 | 32.606x |
-| SAP O2C | Variant frequency conformance, 95% | 26.457 | 1.567 | 16.884x |
-| SAP O2C | Next-activity prediction | 38.495 | 1.166 | 33.015x |
-| SAP O2C | Repeated-transition rework | 39.463 | 2.008 | 19.653x |
-| SAP O2C | Edge bottleneck ranking | 40.598 | 1.754 | 23.146x |
-| SAP O2C | Edge bottleneck prediction | 96.779 | 2.617 | 36.981x |
-| SAP O2C | Monthly edge-duration series | 249.027 | 2.276 | 109.414x |
-| SAP P2P | DFG frequency conformance, 95% | 16.096 | 0.499 | 32.257x |
-| SAP P2P | Variant frequency conformance, 95% | 27.654 | 0.395 | 70.010x |
-| SAP P2P | Next-activity prediction | 15.686 | 0.436 | 35.977x |
-| SAP P2P | Repeated-transition rework | 17.761 | 0.747 | 23.776x |
-| SAP P2P | Edge bottleneck ranking | 16.192 | 0.508 | 31.874x |
-| SAP P2P | Edge bottleneck prediction | 34.063 | 0.759 | 44.879x |
-| SAP P2P | Monthly edge-duration series | 105.131 | 1.628 | 64.577x |
+| SAP O2C | DFG frequency conformance, 95% | 38.078 | 1.160 | 32.826x |
+| SAP O2C | Variant frequency conformance, 95% | 26.651 | 1.551 | 17.183x |
+| SAP O2C | Next-activity prediction | 38.295 | 1.203 | 31.833x |
+| SAP O2C | DFG frequency drift | 38.228 | 1.197 | 31.937x |
+| SAP O2C | Repeated-transition rework | 40.520 | 2.056 | 19.708x |
+| SAP O2C | Edge bottleneck ranking | 42.819 | 1.957 | 21.880x |
+| SAP O2C | Edge bottleneck prediction | 98.337 | 2.773 | 35.462x |
+| SAP O2C | Monthly edge-duration series | 251.292 | 2.377 | 105.718x |
+| SAP O2C | Activity profile | 48.742 | 2.624 | 18.575x |
+| SAP P2P | DFG frequency conformance, 95% | 15.695 | 0.472 | 33.252x |
+| SAP P2P | Variant frequency conformance, 95% | 28.400 | 0.531 | 53.484x |
+| SAP P2P | Next-activity prediction | 15.990 | 0.464 | 34.461x |
+| SAP P2P | DFG frequency drift | 15.946 | 0.510 | 31.267x |
+| SAP P2P | Repeated-transition rework | 18.008 | 0.865 | 20.818x |
+| SAP P2P | Edge bottleneck ranking | 16.285 | 0.552 | 29.502x |
+| SAP P2P | Edge bottleneck prediction | 34.630 | 0.832 | 41.623x |
+| SAP P2P | Monthly edge-duration series | 105.969 | 1.813 | 58.450x |
+| SAP P2P | Activity profile | 30.184 | 0.638 | 47.310x |
 
 The step change comes from changing the unit of exchange. The baseline sends
 or groups event/case rows after rebuilding order. The candidate scans aligned
-capsule arrays in C and transfers only per-transition or per-variant count
+capsule arrays in C and transfers only small count or sufficient-statistic
 vectors. `ocpm.window_cardinalities(...)` evaluates all requested train/test or
-period windows in one aggregate state, so model evaluation does not rescan or
-multiply the compact rows. PyO3 releases the Python GIL while deterministic
-Rust kernels rank, select, and score those vectors.
+period windows in one aggregate state. `ocpm.activity_profile(...)` counts
+activity multiplicity and start/end membership directly inside prebuilt case
+capsules, without materializing one SQL row per path position. PyO3 releases
+the Python GIL while deterministic Rust kernels rank, select, and score the
+vectors, including Jensen-Shannon frequency drift.
 
 ## Storage
 
@@ -101,15 +107,27 @@ That makes throughput intentionally more conservative than a production pool.
 
 | Workers | Vanilla p50 / p95 | Candidate p50 / p95 | Vanilla QPS | Candidate QPS |
 |---:|---:|---:|---:|---:|
-| 1 | 39.565 / 41.058 ms | 1.581 / 1.834 ms | 23.601 | 252.854 |
-| 4 | 43.164 / 45.006 ms | 1.734 / 2.150 ms | 84.485 | 605.423 |
-| 8 | 49.970 / 54.280 ms | 1.766 / 2.198 ms | 139.980 | 739.930 |
-| 16 | 56.320 / 60.192 ms | 2.508 / 4.103 ms | 215.328 | 824.766 |
+| 1 | 40.643 / 42.109 ms | 1.576 / 1.917 ms | 22.931 | 250.137 |
+| 4 | 42.795 / 46.251 ms | 1.780 / 2.322 ms | 85.348 | 638.456 |
+| 8 | 49.416 / 53.441 ms | 1.863 / 2.910 ms | 136.448 | 712.671 |
+| 16 | 55.107 / 58.191 ms | 2.832 / 13.303 ms | 215.092 | 753.549 |
 
-At 16 workers, candidate p50 remained **22.5x lower** and throughput was
-**3.83x higher**. Throughput gains are smaller than latency gains because both
+At 16 workers, candidate p50 remained **19.5x lower** and throughput was
+**3.50x higher**. Throughput gains are smaller than latency gains because both
 paths include connection churn and the candidate approaches the machine's
 available database/client capacity sooner.
+
+The same sweep was run for DFG frequency drift, including Rust scoring:
+
+| Workers | Vanilla p50 / p95 | Candidate p50 / p95 | Vanilla QPS | Candidate QPS |
+|---:|---:|---:|---:|---:|
+| 1 | 40.730 / 42.869 ms | 1.680 / 2.061 ms | 22.877 | 244.571 |
+| 4 | 42.939 / 46.447 ms | 1.833 / 2.022 ms | 83.988 | 624.353 |
+| 8 | 60.626 / 82.046 ms | 1.964 / 3.039 ms | 109.010 | 772.035 |
+| 16 | 56.370 / 61.024 ms | 2.682 / 4.484 ms | 217.988 | 798.915 |
+
+At 16 workers, the drift path sustained **3.67x higher throughput** with a
+**21.0x lower p50**.
 
 ## Reproduce
 
@@ -121,7 +139,7 @@ make perf-public-check
 ```
 
 The runner obtains a sibling `pg_ocpm` checkout when available or clones tag
-`v0.3.0`, builds the Rust wheel and both PostgreSQL images, checksum-verifies
+`v0.4.0`, builds the Rust wheel and both PostgreSQL images, checksum-verifies
 the public data, recreates both databases, runs the benchmark, and stops all
 containers on exit. The committed-result checker independently verifies its
 payload digest, workload count, correctness flags, and per-workload 10x gate.
@@ -160,6 +178,8 @@ performance from this independent Python reference implementation.
 
 - DFG and variant conformance are deterministic frequency-coverage models, not
   Petri-net token replay or optimal alignments.
+- Frequency drift is population drift over DFG edge counts, not automatic
+  concept-drift localization or root-cause attribution.
 - Next-activity and bottleneck prediction are transparent deterministic
   baselines. The benchmark measures execution, not predictive superiority.
 - Results are medium-size, warm-cache, single-machine measurements. They do not

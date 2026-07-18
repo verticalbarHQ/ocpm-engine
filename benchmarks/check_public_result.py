@@ -13,7 +13,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "result",
         nargs="?",
-        default="docs/results/public-common-pm-0.2.0.json",
+        default="docs/results/public-common-pm-0.3.0.json",
     )
     return parser.parse_args()
 

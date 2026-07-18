@@ -2,7 +2,7 @@
 
 ## Scope
 
-`ocpm-engine` is the application query planner for `pg_ocpm >= 0.2.0`. It does
+`ocpm-engine` is the application query planner for `pg_ocpm >= 0.4.0`. It does
 not create tables, indexes, materialized views, or another PostgreSQL
 extension. Its performance contribution is to translate a small set of
 process-mining request shapes into parameterized SQL that selects the most
@@ -95,7 +95,7 @@ request to the optimized database primitive.
 ## 2. Fail-fast `pg_ocpm` capability gate
 
 At application startup, `verify_pg_ocpm()` calls `ocpm.version()` and requires
-version 0.2.0 or later. An incompatible database is rejected before serving
+version 0.4.0 or later. An incompatible database is rejected before serving
 queries.
 
 Code:

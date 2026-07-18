@@ -1,8 +1,11 @@
-use ocpm_postgres::{dfg_counts, dfg_window_counts, variant_counts, variant_window_counts};
+use ocpm_postgres::{
+    ActivityProfileFilter, activity_profile, dfg_counts, dfg_window_counts, variant_counts,
+    variant_window_counts,
+};
 use std::time::{Duration, SystemTime};
 
 #[tokio::test]
-async fn public_adapters_prepare_and_bind_against_pg_ocpm_0_3() {
+async fn public_adapters_prepare_and_bind_against_pg_ocpm_0_4() {
     let Ok(database_url) = std::env::var("OCPM_TEST_DATABASE_URL") else {
         return;
     };
@@ -35,6 +38,12 @@ async fn public_adapters_prepare_and_bind_against_pg_ocpm_0_3() {
     );
     assert!(
         variant_window_counts(&client, 0, 0, vec![start], vec![end])
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    assert!(
+        activity_profile(&client, 0, 0, start, end, &ActivityProfileFilter::default(),)
             .await
             .unwrap()
             .is_empty()

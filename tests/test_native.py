@@ -6,6 +6,7 @@ from ocpm_engine import (
     TransitionCount,
     bottleneck_order,
     dfg_conformance,
+    frequency_drift,
     next_activity,
     variant_conformance,
 )
@@ -54,3 +55,20 @@ def test_native_bottleneck_rank_and_validation() -> None:
     assert bottleneck_order([10, 20, 30], [2.0, 2.0, 1.0]) == (1, 0, 2)
     with pytest.raises(ValueError, match="same length"):
         bottleneck_order([1], [])
+
+
+def test_native_frequency_drift_is_bounded_and_explainable() -> None:
+    score = frequency_drift(["A", "B"], [10, 0], [0, 10], top_n=2)
+
+    assert score.divergence == 1.0
+    assert score.baseline_total == 10
+    assert score.current_total == 10
+    assert tuple(item.label for item in score.contributors) == ("A", "B")
+    assert tuple(item.js_contribution for item in score.contributors) == (0.5, 0.5)
+
+
+def test_native_frequency_drift_validates_column_lengths_and_limit() -> None:
+    with pytest.raises(ValueError, match="same length"):
+        frequency_drift(["A"], [1], [])
+    with pytest.raises(ValueError, match="nonnegative"):
+        frequency_drift([], [], [], top_n=-1)

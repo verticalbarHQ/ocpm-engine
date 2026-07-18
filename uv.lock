@@ -21,6 +21,28 @@ wheels = [
 ]
 
 [[package]]
+name = "ocpm-engine"
+version = "0.3.0"
+source = { editable = "." }
+
+[package.optional-dependencies]
+benchmark = [
+    { name = "psycopg2-binary" },
+]
+dev = [
+    { name = "pytest" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "psycopg2-binary", marker = "extra == 'benchmark'", specifier = ">=2.9,<3" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8,<9" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.9,<1" },
+]
+provides-extras = ["dev", "benchmark"]
+
+[[package]]
 name = "packaging"
 version = "26.2"
 source = { registry = "https://pypi.org/simple" }
@@ -139,25 +161,3 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/cb/46/4965251734c2b6fcdca1b1b187d20bcac3af0ee5b083b89c910bb961ce3a/ruff-0.15.22-py3-none-win_amd64.whl", hash = "sha256:9be63ba1eb936acd2d1342fb8337c356353706fce233b2a15a09a97037e6acde", size = 11938297, upload-time = "2026-07-16T15:14:07.316Z" },
     { url = "https://files.pythonhosted.org/packages/57/c9/e69b1ff4c8b69093ef08b8919ab767af0569666865b39c30a8795d88d3c6/ruff-0.15.22-py3-none-win_arm64.whl", hash = "sha256:e1168075b72158510839f250027659cdd78476f40507dd517892304c41318661", size = 11298172, upload-time = "2026-07-16T15:14:10.51Z" },
 ]
-
-[[package]]
-name = "ocpm-engine"
-version = "0.2.0"
-source = { editable = "." }
-
-[package.optional-dependencies]
-benchmark = [
-    { name = "psycopg2-binary" },
-]
-dev = [
-    { name = "pytest" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "psycopg2-binary", marker = "extra == 'benchmark'", specifier = ">=2.9,<3" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8,<9" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.9,<1" },
-]
-provides-extras = ["dev", "benchmark"]
