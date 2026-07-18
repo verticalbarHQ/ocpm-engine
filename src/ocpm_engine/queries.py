@@ -1,4 +1,4 @@
-"""Parameterized SQL for Vertical Bar endpoint response shapes."""
+"""Parameterized SQL for process-mining response shapes."""
 
 CASE_WINDOW_VARIANT_SQL = """
 WITH cases AS MATERIALIZED (

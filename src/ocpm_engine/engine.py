@@ -22,7 +22,7 @@ _MINIMUM_PG_OCPM_VERSION = (0, 3, 0)
 
 
 class OcpmEngine:
-    """Build and execute the Vertical Bar read paths over an installed pg_ocpm."""
+    """Build and execute process-mining read paths over an installed pg_ocpm."""
 
     def __init__(
         self,

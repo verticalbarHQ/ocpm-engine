@@ -48,9 +48,10 @@ Subject to counsel, the best fit for the stated objectives is:
   friendlier to Python, Rust, notebook, and commercial application adoption,
   while modifications to covered library files remain shareable.
 - **One contributor agreement covering both repositories.** It should grant
-  Vertical Bar enough rights to distribute contributions under the public and
-  commercial licenses, make enforcement practical, and include a patent grant.
-  Counsel should decide whether that is a copyright license or assignment.
+  the project owner enough rights to distribute contributions under the public
+  and commercial licenses, make enforcement practical, and include a patent
+  grant. Counsel should decide whether that is a copyright license or
+  assignment.
 
 This combination maximizes reach at the integration layer while keeping the
 database acceleration core reciprocal. It does not prevent clean-room
@@ -60,8 +61,8 @@ packaging are valued above reciprocity.
 
 Do not simply add AGPL text without reviewing how the extension, PostgreSQL,
 drivers, hosted database access, and commercial distribution are packaged.
-Dual licensing also requires Vertical Bar to retain the necessary rights in
-every contribution.
+Dual licensing also requires the project owner to retain the necessary rights
+in every contribution.
 
 ## Contribution controls
 
@@ -73,8 +74,8 @@ Use both provenance and rights controls:
    relicensing rights.
 2. Require an individual or corporate contributor agreement before merge.
    The [Apache CLA guidance](https://www.apache.org/licenses/contributor-agreements.html)
-   is a useful operational reference, but Vertical Bar's agreement must match
-   its own dual-license plan.
+   is a useful operational reference, but the project owner's agreement must
+   match its dual-license plan.
 3. Protect `main`: pull request only, two reviews for native/SQL storage code,
    CODEOWNERS review, signed commits, linear history, passing compatibility,
    license, correctness, and benchmark-result checks. GitHub documents these
@@ -86,7 +87,7 @@ Use both provenance and rights controls:
 5. Publish `SECURITY.md`, a private vulnerability intake path, release signing,
    an embargo policy, and supported-version windows before general adoption.
 6. Keep trademarks separate from the code license. Publish a trademark policy
-   for the Vertical Bar and project names.
+   for the company and project names.
 
 ## Patent and disclosure gate
 
@@ -128,7 +129,7 @@ Practical sequence:
 
 ## Decision checklist
 
-- [ ] Confirm all employee/contractor assignments to Vertical Bar.
+- [ ] Confirm all employee/contractor assignments to the project owner.
 - [ ] Decide whether patent filing precedes disclosure.
 - [ ] Obtain written license compatibility and dual-license advice.
 - [ ] Choose AGPL/MPL or the Apache alternative.

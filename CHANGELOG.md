@@ -8,6 +8,8 @@ All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
   next-activity model predictions.
 - Added a correctness-gated SAP O2C/P2P comparison of vanilla PostgreSQL with
   PM4Py, `pg_ocpm` with PM4Py, and `pg_ocpm` with ocpm-engine.
+- Removed data-source and application-specific benchmark artifacts and naming
+  from the public engine; public comparisons retain the vanilla PostgreSQL arm.
 
 ## 0.2.0 - 2026-07-18
 
@@ -26,5 +28,5 @@ All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
 
 ## 0.1.0 - 2026-07-17
 
-- Added parameterized query planning for the Vertical Bar process-mining read
-  paths over `pg_ocpm`.
+- Added parameterized query planning for common process-mining read paths over
+  `pg_ocpm`.
