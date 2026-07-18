@@ -261,10 +261,7 @@ mod tests {
 
     #[test]
     fn next_activity_ignores_test_only_transitions_during_training() {
-        let result = next_activity_prediction(vec![
-            (key("A", "B"), 10, 0),
-            (key("Z", "Y"), 0, 5),
-        ]);
+        let result = next_activity_prediction(vec![(key("A", "B"), 10, 0), (key("Z", "Y"), 0, 5)]);
         assert_eq!(result.test_total, 5);
         assert_eq!(result.correct, 0);
         assert_eq!(
