@@ -14,8 +14,9 @@ All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
 - Added Python capsule metadata and row-decoding APIs that release the GIL
   during native decoding.
 - Raised the minimum supported extension version to `pg_ocpm 0.5.0`.
-- Added a reproducible public OCPQ comparison with correctness, latency,
-  concurrency, memory, and storage gates.
+- Added a reproducible public OCPQ comparison with published and pinned
+  same-host OCPQ results, correctness, latency, concurrency, memory, and
+  storage gates.
 
 ## 0.3.0 - 2026-07-18
 

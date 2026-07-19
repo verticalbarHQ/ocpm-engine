@@ -51,8 +51,8 @@ concurrency, correctness gates, and published context, see
 For the three-way comparison of lightly indexed PostgreSQL with PM4Py,
 `pg_ocpm` with PM4Py, and `pg_ocpm` with ocpm-engine, see
 [SAP PM4Py three-way performance](docs/sap-pm4py-three-way-performance.md).
-For the seven-query comparison with the results published by OCPQ, see
-[Published OCPQ comparison](docs/ocpq-performance.md).
+For the seven-query comparison with published and same-host reproduced OCPQ,
+see [OCPQ comparison](docs/ocpq-performance.md).
 For the detailed application read-path design and code references, see
 [Application query performance improvements](docs/technical-performance-improvements.md).
 For the open-source capability survey, license boundary, research review, and

@@ -117,6 +117,16 @@ DESCRIPTIONS = {
     "Q7": "offer pairs and creation events",
 }
 
+REPRODUCED_OCPQ_SOURCE = {
+    "ocpq_eval_commit": "846dd4eb9f8600ae42355968453a9412ea4759c2",
+    "ocpq_version": "0.6.7",
+    "ocpq_commit": "80457e561edd7bb9e142d959dd7e0f96e6b03f2f",
+    "docker_image": "ocpq:0.6.7-public-repro",
+    "dataset_sqlite_sha256": (
+        "02ac333a2c194b5a411cb8527dd64b4845e5110752d2ffddb531e48ce97556d7"
+    ),
+}
+
 CAPSULE_QUERIES = {
     "Q1": "SELECT ocpm.binding_object_activity_count("
     "ocpm.dataset_id('bpic2017-ocpq'),1,'Application','A_Submitted',1,1)",
@@ -191,6 +201,11 @@ def arguments() -> argparse.Namespace:
     parser.add_argument("--runs", type=int, default=50)
     parser.add_argument("--concurrency", default="1,4,8,16")
     parser.add_argument("--requests-per-worker", type=int, default=1000)
+    parser.add_argument(
+        "--reproduced-ocpq",
+        type=Path,
+        default=Path("docs/results/ocpq-reproduced-0.6.7.json"),
+    )
     parser.add_argument("--output", default="docs/results/ocpq-bpic2017-0.4.0.json")
     return parser.parse_args()
 
@@ -267,7 +282,28 @@ def percentile(samples: list[float], fraction: float) -> float:
     return ordered[min(len(ordered) - 1, math.ceil(len(ordered) * fraction) - 1)]
 
 
-def latency(args: argparse.Namespace, connection) -> dict:
+def load_reproduced_ocpq(path: Path) -> dict:
+    artifact = json.loads(path.read_text())
+    if artifact.get("schema_version") != 1 or not isinstance(
+        artifact.get("queries"), dict
+    ):
+        raise ValueError("reproduced OCPQ artifact must use schema version 1")
+    if artifact.get("source") != REPRODUCED_OCPQ_SOURCE:
+        raise ValueError("reproduced OCPQ artifact source pins are inconsistent")
+    queries = artifact["queries"]
+    if set(queries) != set(CAPSULE_QUERIES):
+        raise ValueError("reproduced OCPQ artifact must contain exactly Q1-Q7")
+    for name, query in queries.items():
+        samples = query.get("runs_ms", [])
+        if len(samples) != 10:
+            raise ValueError(f"{name} must contain ten reproduced OCPQ samples")
+        calculated = statistics.fmean(samples)
+        if not math.isclose(calculated, query["mean_ms"], rel_tol=1e-12):
+            raise ValueError(f"{name} reproduced OCPQ mean is inconsistent")
+    return {"metadata": artifact, "queries": queries}
+
+
+def latency(args: argparse.Namespace, connection, reproduced: dict) -> dict:
     result = {}
     for name, query in CAPSULE_QUERIES.items():
         fingerprint = correctness(connection, name)
@@ -276,13 +312,18 @@ def latency(args: argparse.Namespace, connection) -> dict:
         samples = [timed_capsule(connection, query)[1] for _ in range(args.runs)]
         candidate = statistics.fmean(samples)
         published = statistics.fmean(PUBLISHED_OCPQ_RUNS_MS[name])
+        reproduced_query = reproduced["queries"][name]
+        reproduced_mean = statistics.fmean(reproduced_query["runs_ms"])
         result[name] = {
             "description": DESCRIPTIONS[name],
             "published_ocpq_mean_ms": round(published, 3),
+            "reproduced_ocpq_mean_ms": round(reproduced_mean, 3),
             "pg_ocpm_ocpm_engine_mean_ms": round(candidate, 3),
             "speedup_vs_published_ocpq": round(published / candidate, 3),
+            "speedup_vs_reproduced_ocpq": round(reproduced_mean / candidate, 3),
             "capsule_bytes": capsule_bytes,
             "correctness": fingerprint,
+            "reproduced_ocpq_runs_ms": reproduced_query["runs_ms"],
             "runs_ms": [round(sample, 3) for sample in samples],
         }
     return result
@@ -363,7 +404,8 @@ def main() -> None:
             "current_setting('shared_buffers'),current_setting('work_mem')"
         )
         extension, postgres, shared_buffers, work_mem = cursor.fetchone()
-    results = latency(args, connection)
+    reproduced = load_reproduced_ocpq(args.reproduced_ocpq)
+    results = latency(args, connection, reproduced)
     artifact = {
         "schema_version": 1,
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -383,6 +425,10 @@ def main() -> None:
             "published_ocpq": (
                 "arithmetic mean of the ten author-published evaluation samples"
             ),
+            "reproduced_ocpq": (
+                "arithmetic mean of ten samples from the separately pinned "
+                "OCPQ 0.6.7 Docker environment on the candidate host"
+            ),
             "candidate": (
                 "PostgreSQL execution, one binary capsule fetched over the wire, "
                 "and native Rust decoding into an in-memory binding structure"
@@ -391,8 +437,12 @@ def main() -> None:
                 "complete SQL expansion outside the timed region, checked by exact "
                 "row count, violation/value totals, and canonical SHA-256"
             ),
-            "comparison_scope": "published OCPQ versus pg_ocpm plus ocpm-engine",
+            "comparison_scope": (
+                "published and same-host reproduced OCPQ versus pg_ocpm plus "
+                "ocpm-engine"
+            ),
         },
+        "reproduced_ocpq": reproduced["metadata"],
         "environment": {
             "postgres": postgres,
             "shared_buffers": shared_buffers,
@@ -423,6 +473,16 @@ def main() -> None:
                 ),
                 3,
             ),
+            "geometric_mean_reproduced_ocpq_ms": round(
+                math.exp(
+                    sum(
+                        math.log(item["reproduced_ocpq_mean_ms"])
+                        for item in results.values()
+                    )
+                    / 7
+                ),
+                3,
+            ),
             "geometric_mean_speedup_vs_published_ocpq": round(
                 math.exp(
                     sum(
@@ -435,6 +495,16 @@ def main() -> None:
             ),
             "minimum_speedup_vs_published_ocpq": min(
                 item["speedup_vs_published_ocpq"] for item in results.values()
+            ),
+            "geometric_mean_speedup_vs_reproduced_ocpq": round(
+                math.exp(
+                    sum(
+                        math.log(item["speedup_vs_reproduced_ocpq"])
+                        for item in results.values()
+                    )
+                    / 7
+                ),
+                3,
             ),
             "all_queries_at_least_10x": all(
                 item["speedup_vs_published_ocpq"] >= 10 for item in results.values()
