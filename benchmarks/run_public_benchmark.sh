@@ -7,11 +7,9 @@ python="${PYTHON:-python3}"
 pg_ocpm_source="${PG_OCPM_SOURCE:-}"
 pg_ocpm_repository="${PG_OCPM_REPOSITORY:-}"
 concurrency_only=false
-mode_args=()
 
 if [[ "${1:-}" == "--concurrency-only" ]]; then
     concurrency_only=true
-    mode_args=(--concurrency-only)
     shift
 fi
 
@@ -131,27 +129,47 @@ benchmark_exec \
     --extension-db ocel_benchmark \
     --data-dir /data \
     --output /results/public-prepare.json
-benchmark_exec \
-    python benchmarks/public_common_pm.py \
-    --baseline-host postgres_vanilla \
-    --extension-host postgres_ocpm \
-    --baseline-db ocel_benchmark \
-    --extension-db ocel_benchmark \
-    --output /results/public-common-pm-0.5.0.json \
-    "${mode_args[@]}" \
-    "$@"
+if [[ "$concurrency_only" == true ]]; then
+    benchmark_exec \
+        python benchmarks/public_common_pm.py \
+        --baseline-host postgres_vanilla \
+        --extension-host postgres_ocpm \
+        --baseline-db ocel_benchmark \
+        --extension-db ocel_benchmark \
+        --output /results/public-common-pm-0.5.0.json \
+        --concurrency-only
+else
+    benchmark_exec \
+        python benchmarks/public_common_pm.py \
+        --baseline-host postgres_vanilla \
+        --extension-host postgres_ocpm \
+        --baseline-db ocel_benchmark \
+        --extension-db ocel_benchmark \
+        --output /results/public-common-pm-0.5.0.json \
+        "$@"
+fi
 
 docker compose -f "$compose" exec -T postgres_vanilla \
     psql -U postgres -d ocel_benchmark \
     < "$root/benchmarks/public/prepare_pm4py_baseline.sql"
-benchmark_exec \
-    python benchmarks/sap_pm4py_three_way.py \
-    --baseline-host postgres_vanilla \
-    --extension-host postgres_ocpm \
-    --database ocel_benchmark \
-    --output /results/sap-pm4py-three-way-0.5.0.json \
-    --report /results/sap-pm4py-three-way-0.5.0.md \
-    "${mode_args[@]}"
+if [[ "$concurrency_only" == true ]]; then
+    benchmark_exec \
+        python benchmarks/sap_pm4py_three_way.py \
+        --baseline-host postgres_vanilla \
+        --extension-host postgres_ocpm \
+        --database ocel_benchmark \
+        --output /results/sap-pm4py-three-way-0.5.0.json \
+        --report /results/sap-pm4py-three-way-0.5.0.md \
+        --concurrency-only
+else
+    benchmark_exec \
+        python benchmarks/sap_pm4py_three_way.py \
+        --baseline-host postgres_vanilla \
+        --extension-host postgres_ocpm \
+        --database ocel_benchmark \
+        --output /results/sap-pm4py-three-way-0.5.0.json \
+        --report /results/sap-pm4py-three-way-0.5.0.md
+fi
 
 public_result="$root/.benchmarks/public-common-pm-0.5.0.json"
 sap_result="$root/.benchmarks/sap-pm4py-three-way-0.5.0.json"
