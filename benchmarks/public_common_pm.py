@@ -408,8 +408,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--database", help="use one database name for both sides")
     parser.add_argument("--baseline-db", default="ocel_benchmark")
     parser.add_argument("--extension-db", default="ocel_benchmark")
-    parser.add_argument("--warmups", type=int, default=2)
-    parser.add_argument("--runs", type=int, default=9)
+    parser.add_argument("--warmups", type=int, default=10)
+    parser.add_argument("--runs", type=int, default=30)
     parser.add_argument("--timeout-seconds", type=int, default=120)
     parser.add_argument("--seed", type=int, default=20260718)
     parser.add_argument("--concurrency", default="1,4,8,16")
@@ -433,6 +433,8 @@ def parse_args() -> argparse.Namespace:
     if args.database:
         args.baseline_db = args.database
         args.extension_db = args.database
+    if args.warmups < 0 or args.runs < 1:
+        parser.error("--warmups must be nonnegative and --runs must be positive")
     levels = [int(value) for value in args.concurrency.split(",") if value]
     if (
         not levels

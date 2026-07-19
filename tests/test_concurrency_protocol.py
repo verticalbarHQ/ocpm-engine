@@ -151,6 +151,56 @@ def test_public_and_sap_protocols_share_release_floors() -> None:
         assert "persistent PostgreSQL connection" in method["connection_model"]
 
 
+@pytest.mark.parametrize(
+    ("checker", "historical_warmups", "historical_runs"),
+    ((PUBLIC_CHECK, 2, 9), (SAP_CHECK, 1, 5)),
+)
+def test_release_latency_protocol_requires_ten_warmups_and_thirty_runs(
+    checker,
+    historical_warmups,
+    historical_runs,
+) -> None:
+    current = {"warmups": 10, "measured_runs": 30, "latency_scope": "same"}
+    historical = {
+        "warmups": historical_warmups,
+        "measured_runs": historical_runs,
+        "latency_scope": "same",
+    }
+
+    checker.validate_latency_sample_counts(current)
+    assert checker.latency_method(current) == checker.latency_method(historical)
+    with pytest.raises(SystemExit, match="10 warmups and 30 measured runs"):
+        checker.validate_latency_sample_counts(historical)
+
+
+@pytest.mark.parametrize("runner", (PUBLIC, SAP))
+def test_release_latency_runner_defaults_are_ten_and_thirty(
+    runner, monkeypatch
+) -> None:
+    monkeypatch.setattr(sys, "argv", ["benchmark"])
+    args = runner.parse_args()
+
+    assert args.warmups == 10
+    assert args.runs == 30
+
+
+def test_sap_first_execution_counts_require_thirty_nonnegative_integers() -> None:
+    valid = {
+        "vanilla_pg_pm4py": 10,
+        "pg_ocpm_pm4py": 9,
+        "pg_ocpm_ocpm_engine": 11,
+    }
+    SAP_CHECK.validate_first_execution_counts("sap_o2c", "dfg", valid, 30)
+
+    for invalid in (
+        {**valid, "pg_ocpm_ocpm_engine": -1},
+        {**valid, "pg_ocpm_ocpm_engine": True},
+        {**valid, "pg_ocpm_ocpm_engine": 5},
+    ):
+        with pytest.raises(SystemExit, match="randomized execution counts"):
+            SAP_CHECK.validate_first_execution_counts("sap_o2c", "dfg", invalid, 30)
+
+
 def test_public_latency_rejects_an_early_incorrect_timed_sample() -> None:
     baseline_values = iter((["exact"], ["wrong"], ["exact"]))
     extension_values = iter((["exact"], ["exact"], ["exact"]))

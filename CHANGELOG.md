@@ -17,6 +17,9 @@ All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
   requires exact external-ID output parity, and records latency, storage,
   fresh-process memory, and 1/4/8/16-client concurrency.
 - Added repeatable public OCPQ and SAP release gates.
+- Raised every public headline latency comparison to ten warmups and 30
+  randomized, exactness-checked samples while retaining the historical p50
+  values only as regression baselines.
 - Hardened public Python concurrency gates with persistent per-worker
   connections, verified worker warmups, three duration-bounded epochs,
   per-worker request floors, exact request parity, and concurrency-only artifact

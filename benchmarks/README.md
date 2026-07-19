@@ -40,7 +40,7 @@ make perf-public-preview-check
 into the ignored benchmark workspace.
 
 The runner builds a release-mode stable-ABI Rust wheel, recreates both database
-volumes, records nine randomized measured runs after two warmups, runs 1/4/8/16
+volumes, records 30 randomized measured runs after ten warmups, runs 1/4/8/16
 worker concurrency sweeps for DFG conformance and drift, writes
 `.benchmarks/public-common-pm-0.5.0.json` and
 `.benchmarks/sap-pm4py-three-way-0.5.0.json`, and stops its containers on exit.

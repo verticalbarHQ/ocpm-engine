@@ -146,6 +146,8 @@ else
         --baseline-db ocel_benchmark \
         --extension-db ocel_benchmark \
         --output /results/public-common-pm-0.5.0.json \
+        --warmups 10 \
+        --runs 30 \
         "$@"
 fi
 
@@ -168,7 +170,9 @@ else
         --extension-host postgres_ocpm \
         --database ocel_benchmark \
         --output /results/sap-pm4py-three-way-0.5.0.json \
-        --report /results/sap-pm4py-three-way-0.5.0.md
+        --report /results/sap-pm4py-three-way-0.5.0.md \
+        --warmups 10 \
+        --runs 30
 fi
 
 public_result="$root/.benchmarks/public-common-pm-0.5.0.json"

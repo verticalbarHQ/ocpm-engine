@@ -56,6 +56,8 @@ STORAGE_CEILING = 1.01
 MAXIMUM_CONCURRENCY_THROUGHPUT_CV = 0.15
 MINIMUM_CANDIDATE_THROUGHPUT_RATIO = 10.0
 MAXIMUM_CANDIDATE_CONCURRENCY_P95_MS = 15.0
+EXPECTED_LATENCY_WARMUPS = 10
+EXPECTED_LATENCY_RUNS = 30
 
 
 def parse_args() -> argparse.Namespace:
@@ -140,7 +142,21 @@ def latency_method(method: dict[str, Any]) -> dict[str, Any]:
     stable = dict(method)
     stable.pop("concurrency", None)
     stable.pop("concurrency_model", None)
+    stable.pop("warmups", None)
+    stable.pop("measured_runs", None)
     return stable
+
+
+def validate_latency_sample_counts(method: dict[str, Any]) -> None:
+    if (
+        method.get("warmups") != EXPECTED_LATENCY_WARMUPS
+        or method.get("measured_runs") != EXPECTED_LATENCY_RUNS
+    ):
+        fail(
+            "public release latency protocol requires exactly "
+            f"{EXPECTED_LATENCY_WARMUPS} warmups and "
+            f"{EXPECTED_LATENCY_RUNS} measured runs"
+        )
 
 
 def validate_regression_baseline(baseline: dict[str, Any]) -> None:
@@ -385,6 +401,7 @@ def validate_contract(
         baseline.get("method", {})
     ):
         fail("public benchmark measurement boundary or settings changed")
+    validate_latency_sample_counts(result.get("method", {}))
     validate_concurrency_protocol(result)
 
     datasets = result.get("datasets", [])

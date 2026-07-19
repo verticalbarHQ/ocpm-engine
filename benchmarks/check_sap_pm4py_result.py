@@ -55,6 +55,8 @@ MAX_PM4PY_PEAK_RSS_BYTES = 256 * 1024 * 1024
 MAXIMUM_CONCURRENCY_THROUGHPUT_CV = 0.15
 MINIMUM_ENGINE_THROUGHPUT_RATIO = 3.0
 MAXIMUM_ENGINE_CONCURRENCY_P95_MS = 50.0
+EXPECTED_LATENCY_WARMUPS = 10
+EXPECTED_LATENCY_RUNS = 30
 
 
 def parse_args() -> argparse.Namespace:
@@ -136,7 +138,35 @@ def latency_method(method: dict[str, Any]) -> dict[str, Any]:
     stable = dict(method)
     stable.pop("concurrency", None)
     stable.pop("concurrency_model", None)
+    stable.pop("warmups", None)
+    stable.pop("measured_runs", None)
     return stable
+
+
+def validate_latency_sample_counts(method: dict[str, Any]) -> None:
+    if (
+        method.get("warmups") != EXPECTED_LATENCY_WARMUPS
+        or method.get("measured_runs") != EXPECTED_LATENCY_RUNS
+    ):
+        fail(
+            "SAP release latency protocol requires exactly "
+            f"{EXPECTED_LATENCY_WARMUPS} warmups and "
+            f"{EXPECTED_LATENCY_RUNS} measured runs"
+        )
+
+
+def validate_first_execution_counts(
+    dataset: str,
+    workload: str,
+    counts: dict[str, Any],
+    measured_runs: int,
+) -> None:
+    if (
+        set(counts) != set(ENGINES)
+        or any(type(value) is not int or value < 0 for value in counts.values())
+        or sum(counts.values()) != measured_runs
+    ):
+        fail(f"{dataset}/{workload}: randomized execution counts changed")
 
 
 def validate_concurrency_protocol(result: dict[str, Any]) -> None:
@@ -284,6 +314,7 @@ def validate_contract(
         baseline.get("method", {})
     ):
         fail("SAP measurement boundary or settings changed")
+    validate_latency_sample_counts(result.get("method", {}))
     validate_concurrency_protocol(result)
     if result["environment"]["client"].get("ocpm_engine_version") != "0.5.0":
         fail("expected ocpm-engine 0.5.0")
@@ -316,9 +347,12 @@ def validate_contract(
                 fail(f"{name}/{workload}: exact latency correctness gate failed")
             if row.get("answer_sha256") != prior_row.get("answer_sha256"):
                 fail(f"{name}/{workload}: canonical answer hash changed")
-            first_counts = row.get("first_execution_counts", {})
-            if set(first_counts) != set(ENGINES) or sum(first_counts.values()) != 5:
-                fail(f"{name}/{workload}: randomized execution counts changed")
+            validate_first_execution_counts(
+                name,
+                workload,
+                row.get("first_execution_counts", {}),
+                result["method"]["measured_runs"],
+            )
             for engine in ENGINES:
                 metrics = row[engine]
                 if metrics.get("runs") != result["method"]["measured_runs"]:

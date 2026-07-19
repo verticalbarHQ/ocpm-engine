@@ -95,8 +95,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--database", default="ocel_benchmark")
     parser.add_argument("--datasets", default=",".join(DATASETS))
     parser.add_argument("--train-fraction", type=float, default=0.8)
-    parser.add_argument("--warmups", type=int, default=1)
-    parser.add_argument("--runs", type=int, default=5)
+    parser.add_argument("--warmups", type=int, default=10)
+    parser.add_argument("--runs", type=int, default=30)
     parser.add_argument("--seed", type=int, default=20260718)
     parser.add_argument("--timeout-seconds", type=int, default=120)
     parser.add_argument("--concurrency", default="1,2,4,8")
@@ -1499,7 +1499,7 @@ def render(result: dict[str, Any]) -> str:
         "## Methodology",
         "",
         (
-            f"- {result['method']['warmups']} warmup and "
+            f"- {result['method']['warmups']} warmups and "
             f"{result['method']['measured_runs']} randomized measured runs per "
             "latency comparison."
         ),
