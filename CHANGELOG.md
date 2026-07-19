@@ -4,6 +4,19 @@ All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
 
 ## Unreleased
 
+## 0.4.0 - 2026-07-18
+
+- Added generic native decoding for `pg_ocpm 0.5.0` binding-result capsules,
+  including dictionary-coded labels and lazy factorized related-object pairs.
+- Added asynchronous PostgreSQL adapters for cardinality, required-activity,
+  eventually-follows, actor-equality, maximum-delay, and pair-binding
+  operations.
+- Added Python capsule metadata and row-decoding APIs that release the GIL
+  during native decoding.
+- Raised the minimum supported extension version to `pg_ocpm 0.5.0`.
+- Added a reproducible public OCPQ comparison with correctness, latency,
+  concurrency, memory, and storage gates.
+
 ## 0.3.0 - 2026-07-18
 
 - Added bounded, explainable Jensen-Shannon drift scoring for any labeled DFG,

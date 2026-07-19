@@ -1,6 +1,7 @@
 use ocpm_core::{
-    TransitionKey, dfg_frequency_conformance, frequency_drift as score_frequency_drift,
-    next_activity_prediction, rank_bottlenecks, variant_frequency_conformance,
+    TransitionKey, binding::BindingCapsule, dfg_frequency_conformance,
+    frequency_drift as score_frequency_drift, next_activity_prediction, rank_bottlenecks,
+    variant_frequency_conformance,
 };
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -10,6 +11,7 @@ type DfgConformanceOutput = (f64, u64, u64, u64, Vec<TransitionTuple>);
 type NextActivityOutput = (f64, u64, u64, Vec<TransitionTuple>);
 type DriftContributorOutput = (String, f64, f64, f64, f64);
 type FrequencyDriftOutput = (f64, u64, u64, Vec<DriftContributorOutput>);
+type BindingRowOutput = (Vec<i64>, Option<String>, Option<bool>, Option<f64>);
 
 fn transitions(
     sources: Vec<String>,
@@ -180,13 +182,47 @@ fn frequency_drift(
     ))
 }
 
+#[pyfunction]
+fn binding_capsule_info(py: Python<'_>, capsule: Vec<u8>) -> PyResult<(u8, usize, bool)> {
+    py.detach(move || {
+        let capsule = BindingCapsule::decode(&capsule)
+            .map_err(|error| PyValueError::new_err(error.to_string()))?;
+        Ok((
+            capsule.schema() as u8,
+            capsule.row_count(),
+            capsule.is_factorized(),
+        ))
+    })
+}
+
+#[pyfunction]
+fn decode_binding_capsule(py: Python<'_>, capsule: Vec<u8>) -> PyResult<Vec<BindingRowOutput>> {
+    py.detach(move || {
+        let capsule = BindingCapsule::decode(&capsule)
+            .map_err(|error| PyValueError::new_err(error.to_string()))?;
+        Ok(capsule
+            .rows()
+            .map(|row| {
+                (
+                    row.ids().to_vec(),
+                    row.label.map(str::to_owned),
+                    row.violated,
+                    row.value,
+                )
+            })
+            .collect())
+    })
+}
+
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add("__version__", "0.3.0")?;
+    module.add("__version__", "0.4.0")?;
     module.add_function(wrap_pyfunction!(dfg_conformance, module)?)?;
     module.add_function(wrap_pyfunction!(next_activity, module)?)?;
     module.add_function(wrap_pyfunction!(variant_conformance, module)?)?;
     module.add_function(wrap_pyfunction!(bottleneck_order, module)?)?;
     module.add_function(wrap_pyfunction!(frequency_drift, module)?)?;
+    module.add_function(wrap_pyfunction!(binding_capsule_info, module)?)?;
+    module.add_function(wrap_pyfunction!(decode_binding_capsule, module)?)?;
     Ok(())
 }

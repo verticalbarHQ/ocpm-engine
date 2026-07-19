@@ -5,7 +5,7 @@ use ocpm_postgres::{
 use std::time::{Duration, SystemTime};
 
 #[tokio::test]
-async fn public_adapters_prepare_and_bind_against_pg_ocpm_0_4() {
+async fn public_adapters_prepare_and_bind_against_pg_ocpm_0_5() {
     let Ok(database_url) = std::env::var("OCPM_TEST_DATABASE_URL") else {
         return;
     };

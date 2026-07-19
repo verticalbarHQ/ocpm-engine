@@ -1,6 +1,9 @@
-//! Thin asynchronous adapter over pg_ocpm 0.4 aggregate interfaces.
+//! Thin asynchronous adapter over pg_ocpm 0.5 aggregate and binding interfaces.
 
-use ocpm_core::TransitionKey;
+use ocpm_core::{
+    TransitionKey,
+    binding::{BindingCapsule, BindingDecodeError},
+};
 use std::time::SystemTime;
 use thiserror::Error;
 use tokio_postgres::Client;
@@ -44,10 +47,200 @@ FROM ocpm.activity_profile(
 ORDER BY object_type, activity
 "#;
 
+pub const BINDING_OBJECT_ACTIVITY_COUNT_SQL: &str =
+    "SELECT ocpm.binding_object_activity_count($1, $2, $3, $4, $5, $6)";
+pub const BINDING_REQUIRES_ACTIVITY_SQL: &str =
+    "SELECT ocpm.binding_requires_activity($1, $2, $3, $4, $5)";
+pub const BINDING_EVENT_OBJECT_COUNT_SQL: &str =
+    "SELECT ocpm.binding_event_object_count($1, $2, $3, $4, $5, $6)";
+pub const BINDING_NEIGHBOR_EVENTUALLY_SQL: &str =
+    "SELECT ocpm.binding_neighbor_eventually($1, $2, $3, $4, $5, $6)";
+pub const BINDING_NEIGHBOR_ACTOR_EQUAL_SQL: &str =
+    "SELECT ocpm.binding_neighbor_actor_equal($1, $2, $3, $4, $5, $6)";
+pub const BINDING_MAX_ACTIVITY_DELAY_SQL: &str =
+    "SELECT ocpm.binding_max_activity_delay($1, $2, $3, $4, $5)";
+pub const BINDING_NEIGHBOR_PAIRS_SQL: &str =
+    "SELECT ocpm.binding_neighbor_pairs($1, $2, $3, $4, $5)";
+
 #[derive(Debug, Error)]
 pub enum AdapterError {
     #[error(transparent)]
     Postgres(#[from] tokio_postgres::Error),
+    #[error(transparent)]
+    Binding(#[from] BindingDecodeError),
+}
+
+async fn binding_capsule(
+    client: &Client,
+    sql: &str,
+    parameters: &[&(dyn tokio_postgres::types::ToSql + Sync)],
+) -> Result<BindingCapsule, AdapterError> {
+    let statement = client.prepare(sql).await?;
+    let row = client.query_one(&statement, parameters).await?;
+    let bytes: Vec<u8> = row.get(0);
+    Ok(BindingCapsule::decode(&bytes)?)
+}
+
+pub async fn binding_object_activity_count(
+    client: &Client,
+    dataset_id: i64,
+    tenant_id: i64,
+    object_type: &str,
+    activity: &str,
+    minimum: i32,
+    maximum: i32,
+) -> Result<BindingCapsule, AdapterError> {
+    binding_capsule(
+        client,
+        BINDING_OBJECT_ACTIVITY_COUNT_SQL,
+        &[
+            &dataset_id,
+            &tenant_id,
+            &object_type,
+            &activity,
+            &minimum,
+            &maximum,
+        ],
+    )
+    .await
+}
+
+pub async fn binding_requires_activity(
+    client: &Client,
+    dataset_id: i64,
+    tenant_id: i64,
+    object_type: &str,
+    source_activity: &str,
+    required_activity: &str,
+) -> Result<BindingCapsule, AdapterError> {
+    binding_capsule(
+        client,
+        BINDING_REQUIRES_ACTIVITY_SQL,
+        &[
+            &dataset_id,
+            &tenant_id,
+            &object_type,
+            &source_activity,
+            &required_activity,
+        ],
+    )
+    .await
+}
+
+pub async fn binding_event_object_count(
+    client: &Client,
+    dataset_id: i64,
+    tenant_id: i64,
+    object_type: &str,
+    activity: &str,
+    minimum: i32,
+    maximum: i32,
+) -> Result<BindingCapsule, AdapterError> {
+    binding_capsule(
+        client,
+        BINDING_EVENT_OBJECT_COUNT_SQL,
+        &[
+            &dataset_id,
+            &tenant_id,
+            &object_type,
+            &activity,
+            &minimum,
+            &maximum,
+        ],
+    )
+    .await
+}
+
+pub async fn binding_neighbor_eventually(
+    client: &Client,
+    dataset_id: i64,
+    tenant_id: i64,
+    source_object_type: &str,
+    source_activity: &str,
+    target_object_type: &str,
+    target_activity: &str,
+) -> Result<BindingCapsule, AdapterError> {
+    binding_capsule(
+        client,
+        BINDING_NEIGHBOR_EVENTUALLY_SQL,
+        &[
+            &dataset_id,
+            &tenant_id,
+            &source_object_type,
+            &source_activity,
+            &target_object_type,
+            &target_activity,
+        ],
+    )
+    .await
+}
+
+pub async fn binding_neighbor_actor_equal(
+    client: &Client,
+    dataset_id: i64,
+    tenant_id: i64,
+    source_object_type: &str,
+    source_activity: &str,
+    target_object_type: &str,
+    target_activity: &str,
+) -> Result<BindingCapsule, AdapterError> {
+    binding_capsule(
+        client,
+        BINDING_NEIGHBOR_ACTOR_EQUAL_SQL,
+        &[
+            &dataset_id,
+            &tenant_id,
+            &source_object_type,
+            &source_activity,
+            &target_object_type,
+            &target_activity,
+        ],
+    )
+    .await
+}
+
+pub async fn binding_max_activity_delay(
+    client: &Client,
+    dataset_id: i64,
+    tenant_id: i64,
+    object_type: &str,
+    source_activity: &str,
+    target_activity: &str,
+) -> Result<BindingCapsule, AdapterError> {
+    binding_capsule(
+        client,
+        BINDING_MAX_ACTIVITY_DELAY_SQL,
+        &[
+            &dataset_id,
+            &tenant_id,
+            &object_type,
+            &source_activity,
+            &target_activity,
+        ],
+    )
+    .await
+}
+
+pub async fn binding_neighbor_pairs(
+    client: &Client,
+    dataset_id: i64,
+    tenant_id: i64,
+    source_object_type: &str,
+    target_object_type: &str,
+    activity: &str,
+) -> Result<BindingCapsule, AdapterError> {
+    binding_capsule(
+        client,
+        BINDING_NEIGHBOR_PAIRS_SQL,
+        &[
+            &dataset_id,
+            &tenant_id,
+            &source_object_type,
+            &target_object_type,
+            &activity,
+        ],
+    )
+    .await
 }
 
 #[derive(Clone, Debug, PartialEq)]

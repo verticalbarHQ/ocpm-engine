@@ -1,0 +1,22 @@
+FROM rust:1.86.0 AS builder
+
+ARG OCPQ_COMMIT=80457e561edd7bb9e142d959dd7e0f96e6b03f2f
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /source
+RUN git clone https://github.com/aarkue/OCPQ.git \
+    && cd OCPQ \
+    && git checkout "${OCPQ_COMMIT}" \
+    && cargo build --release --locked --package ocpq_cli
+
+FROM debian:bookworm-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates libsqlite3-0 \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /benchmark /queries /root/Downloads
+COPY --from=builder /source/OCPQ/target/release/ocpq_cli /usr/local/bin/ocpq_cli
+
+WORKDIR /benchmark
+ENTRYPOINT ["/usr/local/bin/ocpq_cli"]

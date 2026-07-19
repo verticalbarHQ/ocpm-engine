@@ -291,7 +291,7 @@ dependencies = [
 
 [[package]]
 name = "ocpm-core"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "serde",
  "thiserror",
@@ -299,7 +299,7 @@ dependencies = [
 
 [[package]]
 name = "ocpm-postgres"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "ocpm-core",
  "thiserror",
@@ -309,7 +309,7 @@ dependencies = [
 
 [[package]]
 name = "ocpm-python"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "ocpm-core",
  "pyo3",

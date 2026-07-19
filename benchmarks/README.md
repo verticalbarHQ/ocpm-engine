@@ -1,5 +1,9 @@
 # Performance regression suites
 
+The public suite also includes the BPIC 2017-derived Q1-Q7 comparison with the
+results published by OCPQ. See [`ocpq/README.md`](ocpq/README.md). Validate its
+committed artifact with `make perf-ocpq-check`.
+
 ## Public SAP O2C/P2P release gate
 
 `public_fixture.py` downloads and checksum-verifies the CC BY 4.0 SAP IDES O2C
