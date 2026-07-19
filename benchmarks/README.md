@@ -123,3 +123,10 @@ and `--report` paths, or run `make perf-public-concurrency` for the complete
 clean-database sequence. Run `make perf-public-preview-check` to revalidate the
 staged artifacts without rerunning Docker. Published release artifacts and their
 latency and storage gates retain pinned payload digests.
+
+Historical SAP regressions use the compact
+[`sap-pm4py-three-way-0.4.0-regression-baseline.json`](../docs/results/sap-pm4py-three-way-0.4.0-regression-baseline.json).
+It retains only comparable source, fixture, environment, method, answer/input
+shape, p50 latency, isolated incremental/total RSS, and index/total storage
+values. It contains no raw samples, historical concurrency measurements,
+generated summaries, or dependency-footprint claims.

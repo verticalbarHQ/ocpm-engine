@@ -148,6 +148,15 @@ async fn prepared_binding_query_reuses_a_plan_and_rejects_invalid_shapes() {
     let query = PreparedBindingQuery::prepare(&client, "SELECT decode('4f435042010400','hex')")
         .await
         .expect("prepare a valid binding query");
+    let borrowed = query
+        .execute_with(&client, &[], |bytes| {
+            assert_eq!(bytes, b"OCPB\x01\x04\x00");
+            bytes.len()
+        })
+        .await
+        .expect("consume a borrowed binding query result");
+    assert_eq!(borrowed.encoded_bytes, 7);
+    assert_eq!(borrowed.value, 7);
     for _ in 0..2 {
         let result = query
             .execute(&client, &[])

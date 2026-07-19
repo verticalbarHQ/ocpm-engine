@@ -3,7 +3,9 @@
 No `pg_ocpm 0.6.0` plus `ocpm-engine 0.5.0` PM4Py comparison is published in
 this source revision. Earlier staging values predated the final per-sample
 exactness, source-provenance, hash-locked dependency, concurrency-performance,
-and total peak-RSS gates and were removed rather than promoted.
+and total peak-RSS gates. The full staging artifact was removed rather than
+promoted; only a compact latency, memory, and storage regression baseline is
+retained, with no raw samples or historical concurrency evidence.
 
 The clean run compares three complete request paths on the checksum-pinned SAP
 IDES O2C and P2P OCEL 2.0 logs:

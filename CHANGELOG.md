@@ -9,6 +9,9 @@ All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
 - Added reusable prepared binding queries that validate a single non-null
   `bytea` result, reuse the PostgreSQL plan, decode compact capsules, and
   expose the encoded transfer size.
+- Removed the intermediate owned `bytea` copy from prepared binding queries;
+  callers can consume PostgreSQL's borrowed payload synchronously while the
+  existing decoded-capsule API remains source compatible.
 - Added decoding for three numeric identifiers plus a violation bit and a
   generic adapter for workload-declared, directed universal-equality relation
   constraints in `pg_ocpm 0.6.0`.
@@ -27,6 +30,10 @@ All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
 - Removed public common-PM artifacts produced by the obsolete short-request
   concurrency protocol. The 0.4 fixture, p50 latency, and storage regression
   limits now live in a compact baseline that contains no concurrency fields.
+- Replaced the full historical SAP PM4Py staging result with a compact 0.4
+  regression baseline containing only comparable p50 latency, isolated RSS,
+  fixture/environment identity, and index/total storage evidence; raw samples
+  and obsolete concurrency measurements are not retained.
 - Raised the minimum supported extension version to `pg_ocpm 0.6.0`.
 
 ## 0.4.0 - 2026-07-18

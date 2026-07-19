@@ -1,4 +1,4 @@
-"""Validate the SAP PM4Py artifact and historical regression gates."""
+"""Validate SAP PM4Py evidence against a compact regression baseline."""
 
 from __future__ import annotations
 
@@ -16,13 +16,18 @@ except ModuleNotFoundError:  # loaded through importlib by unit tests
     from benchmarks.benchmark_provenance import validate_recorded_public_provenance
 
 ROOT = Path(__file__).resolve().parents[1]
-PRIOR_ARTIFACT = ROOT / "docs/results/sap-pm4py-three-way-2026-07-18.json"
+REGRESSION_BASELINE = (
+    ROOT / "docs/results/sap-pm4py-three-way-0.4.0-regression-baseline.json"
+)
 EXPECTED_PAYLOAD_SHA256 = (
     "c96f53261f7c02c5d563dad51a2c875561e8c47ee114fe1b4016636aae50c9c2"
 )
-EXPECTED_PRIOR_PAYLOAD_SHA256 = (
-    "3e432c3c3a26d20159f4a008ead90dbc3ba222716b9d21f095d110f7ab029562"
+EXPECTED_BASELINE_PAYLOAD_SHA256 = (
+    "0b71b9bee489d0d5d39bc2e71f7a636bbe556c6333590ac21dd0235e24b57420"
 )
+CURRENT_RELEASE = {"ocpm_engine": "0.5.0", "pg_ocpm": "0.6.0"}
+BASELINE_RELEASE = {"ocpm_engine": "0.4.0", "pg_ocpm": "0.5.0"}
+BASELINE_ARTIFACT_TYPE = "sap_pm4py_latency_memory_storage_regression_baseline"
 EXPECTED_SOURCE = {
     "title": "Collection of Object-Centric Event Logs (OCEL 2.0 relational SQLite)",
     "doi": "10.5281/zenodo.8261133",
@@ -69,8 +74,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--baseline",
         type=Path,
-        default=PRIOR_ARTIFACT,
-        help="prior committed release artifact used only for regression gates",
+        default=REGRESSION_BASELINE,
+        help=(
+            "compact committed 0.4 latency/memory/storage baseline; contains "
+            "no historical samples or concurrency evidence"
+        ),
     )
     parser.add_argument(
         "--expected-payload-sha256",
@@ -122,8 +130,27 @@ def dataset_map(result: dict[str, Any]) -> dict[str, dict[str, Any]]:
 def comparable_environment(result: dict[str, Any]) -> dict[str, Any]:
     environment = json.loads(json.dumps(result["environment"]))
     environment["client"].pop("ocpm_engine_version", None)
+    environment["database"]["vanilla_pg"].pop("pg_ocpm_version", None)
     environment["database"]["pg_ocpm"].pop("pg_ocpm_version", None)
     return environment
+
+
+def baseline_dataset_map(
+    baseline: dict[str, Any],
+) -> dict[str, dict[str, Any]]:
+    datasets = baseline.get("datasets", [])
+    names = tuple(item.get("dataset") for item in datasets)
+    if names != EXPECTED_DATASETS:
+        fail("expected SAP O2C and P2P regression datasets in stable order")
+    return {item["dataset"]: item for item in datasets}
+
+
+def baseline_workload_map(dataset: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    rows = dataset.get("workloads", [])
+    names = tuple(row.get("workload") for row in rows)
+    if names != EXPECTED_WORKLOADS:
+        fail(f"{dataset['dataset']}: regression workload set or ordering changed")
+    return {row["workload"]: row for row in rows}
 
 
 def latency_map(dataset: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -153,6 +180,137 @@ def validate_latency_sample_counts(method: dict[str, Any]) -> None:
             f"{EXPECTED_LATENCY_WARMUPS} warmups and "
             f"{EXPECTED_LATENCY_RUNS} measured runs"
         )
+
+
+def validate_regression_baseline(baseline: dict[str, Any]) -> None:
+    expected_top_level = {
+        "schema_version",
+        "artifact_type",
+        "release",
+        "source",
+        "environment",
+        "method",
+        "datasets",
+        "storage",
+        "payload_sha256",
+    }
+    if set(baseline) != expected_top_level:
+        fail("SAP regression baseline contains unexpected fields")
+    if baseline.get("schema_version") != 1:
+        fail("unexpected SAP regression baseline schema version")
+    if baseline.get("artifact_type") != BASELINE_ARTIFACT_TYPE:
+        fail("unexpected SAP regression baseline artifact type")
+    if baseline.get("release") != BASELINE_RELEASE:
+        fail("unexpected SAP regression baseline release versions")
+    if baseline.get("source") != EXPECTED_SOURCE:
+        fail("SAP regression baseline source metadata changed")
+
+    environment = baseline.get("environment", {})
+    if set(environment) != {"client", "database"}:
+        fail("SAP regression baseline environment is incomplete")
+    if set(environment.get("client", {})) != {
+        "python",
+        "platform",
+        "machine",
+        "logical_cpus_visible",
+        "pm4py_version",
+    }:
+        fail("SAP regression baseline client environment changed")
+    databases = environment.get("database", {})
+    if set(databases) != {"vanilla_pg", "pg_ocpm"}:
+        fail("SAP regression baseline database environments changed")
+    expected_database_fields = {
+        "postgres_version",
+        "shared_buffers",
+        "effective_cache_size",
+        "work_mem",
+        "max_parallel_workers_per_gather",
+        "jit",
+    }
+    if any(
+        set(database) != expected_database_fields
+        for database in databases.values()
+    ):
+        fail("SAP regression baseline database settings changed")
+
+    if set(baseline.get("method", {})) != {
+        "random_seed",
+        "train_fraction",
+        "latency_scope",
+        "execution_order",
+        "correctness_gate",
+        "memory_model",
+        "vanilla_index_policy",
+        "result_cache_used",
+    }:
+        fail("SAP regression baseline method contains non-regression fields")
+
+    datasets = baseline_dataset_map(baseline)
+    for dataset in datasets.values():
+        if set(dataset) != {"dataset", "source_counts", "fixture", "workloads"}:
+            fail("SAP regression baseline dataset contains unexpected fields")
+        if set(dataset.get("source_counts", {})) != {
+            "events",
+            "objects",
+            "event_object_links",
+            "object_object_links",
+        }:
+            fail(f"{dataset['dataset']}: regression source counts changed")
+        rows = baseline_workload_map(dataset)
+        for row in rows.values():
+            if set(row) != {
+                "workload",
+                "answer_sha256",
+                "input",
+                "p50_ms",
+                "memory",
+            }:
+                fail("SAP regression workload contains unexpected fields")
+            answer_hash = row.get("answer_sha256")
+            if (
+                not isinstance(answer_hash, str)
+                or len(answer_hash) != 64
+                or any(
+                    character not in "0123456789abcdef"
+                    for character in answer_hash
+                )
+            ):
+                fail("SAP regression baseline contains an invalid answer hash")
+            if set(row.get("input", {})) != set(ENGINES):
+                fail("SAP regression baseline input engines changed")
+            p50 = row.get("p50_ms", {})
+            if set(p50) != set(ENGINES) or any(
+                type(value) not in {int, float}
+                or not math.isfinite(value)
+                or value <= 0
+                for value in p50.values()
+            ):
+                fail("SAP regression baseline contains invalid p50 latency")
+            memory = row.get("memory", {})
+            if set(memory) != set(ENGINES):
+                fail("SAP regression baseline memory engines changed")
+            for metrics in memory.values():
+                if set(metrics) != {"peak_rss_bytes", "incremental_peak_bytes"}:
+                    fail("SAP regression baseline retains non-regression memory fields")
+                peak = metrics.get("peak_rss_bytes")
+                incremental = metrics.get("incremental_peak_bytes")
+                if (
+                    type(peak) is not int
+                    or type(incremental) is not int
+                    or peak <= 0
+                    or incremental < 0
+                    or incremental > peak
+                ):
+                    fail("SAP regression baseline contains invalid RSS values")
+
+    storage = baseline.get("storage", {})
+    if set(storage) != {"vanilla_pg_pm4py", "shared_pg_ocpm"}:
+        fail("SAP regression baseline storage representations changed")
+    for metrics in storage.values():
+        if set(metrics) != {"index_bytes", "total_bytes"}:
+            fail("SAP regression baseline retains non-regression storage fields")
+        if any(type(value) is not int or value <= 0 for value in metrics.values()):
+            fail("SAP regression baseline contains invalid storage values")
 
 
 def validate_first_execution_counts(
@@ -309,10 +467,8 @@ def validate_contract(
     if result.get("source") != EXPECTED_SOURCE:
         fail("SAP source metadata changed")
     if result.get("source") != baseline.get("source"):
-        fail("SAP source differs from the prior committed fixture")
-    if latency_method(result.get("method", {})) != latency_method(
-        baseline.get("method", {})
-    ):
+        fail("SAP source differs from the compact regression baseline")
+    if latency_method(result.get("method", {})) != baseline.get("method", {}):
         fail("SAP measurement boundary or settings changed")
     validate_latency_sample_counts(result.get("method", {}))
     validate_concurrency_protocol(result)
@@ -320,7 +476,7 @@ def validate_contract(
         fail("expected ocpm-engine 0.5.0")
     if result["environment"]["database"]["pg_ocpm"].get("pg_ocpm_version") != "0.6.0":
         fail("expected pg_ocpm 0.6.0")
-    if comparable_environment(result) != comparable_environment(baseline):
+    if comparable_environment(result) != baseline.get("environment"):
         fail("SAP host, PostgreSQL, PM4Py, or database settings changed")
     try:
         validate_recorded_public_provenance(
@@ -330,7 +486,7 @@ def validate_contract(
         fail(str(error))
 
     datasets = dataset_map(result)
-    prior_datasets = dataset_map(baseline)
+    prior_datasets = baseline_dataset_map(baseline)
     latency_rows = 0
     for dataset_index, (name, dataset) in enumerate(datasets.items()):
         prior_dataset = prior_datasets[name]
@@ -339,7 +495,7 @@ def validate_contract(
         if dataset["fixture"] != prior_dataset["fixture"]:
             fail(f"{name}: fixture partition or filter settings changed")
         rows = latency_map(dataset)
-        prior_rows = latency_map(prior_dataset)
+        prior_rows = baseline_workload_map(prior_dataset)
         for workload, row in rows.items():
             latency_rows += 1
             prior_row = prior_rows[workload]
@@ -367,7 +523,7 @@ def validate_contract(
                 p95 = metrics.get("p95_ms", 0)
                 if not (0 < minimum <= p50 <= p95):
                     fail(f"{name}/{workload}/{engine}: invalid latency metrics")
-                if metrics.get("input") != prior_row[engine].get("input"):
+                if metrics.get("input") != prior_row["input"].get(engine):
                     fail(f"{name}/{workload}/{engine}: timed input shape changed")
             speedups = row["speedups"]
             expected = {
@@ -412,8 +568,7 @@ def validate_contract(
                     or incremental != peak_rss - baseline_rss
                 ):
                     fail(f"{name}/{workload}/{engine}: invalid RSS accounting")
-                prior_input = prior_dataset["memory"][workload][engine].get("input")
-                if metrics.get("input") != prior_input:
+                if metrics.get("input") != rows[workload][engine].get("input"):
                     fail(f"{name}/{workload}/{engine}: memory input shape changed")
         if tuple(dataset["memory"]) != EXPECTED_WORKLOADS:
             fail(f"{name}: memory workload set or ordering changed")
@@ -478,16 +633,16 @@ def validate_regressions(
     for name, dataset in datasets.items():
         prior_dataset = prior_datasets[name]
         rows = latency_map(dataset)
-        prior_rows = latency_map(prior_dataset)
+        prior_rows = baseline_workload_map(prior_dataset)
         for workload, row in rows.items():
             for engine in ENGINES:
                 current = row[engine]["p50_ms"]
-                prior = prior_rows[workload][engine]["p50_ms"]
+                prior = prior_rows[workload]["p50_ms"][engine]
                 if current > prior * LATENCY_CEILING:
                     fail(f"{name}/{workload}/{engine}: p50 regression")
 
         for workload, memory in dataset["memory"].items():
-            prior_memory = prior_dataset["memory"][workload]
+            prior_memory = prior_rows[workload]["memory"]
             for engine in ENGINES:
                 current = memory[engine]["incremental_peak_bytes"]
                 prior = prior_memory[engine]["incremental_peak_bytes"]
@@ -525,25 +680,6 @@ def validate_regressions(
             if current > prior * STORAGE_CEILING:
                 fail(f"{representation}/{metric}: storage regression")
 
-    old_indexes = {
-        item["name"]: (item["table"], item["definition"])
-        for item in baseline["storage"]["shared_pg_ocpm"]["indexes"]
-    }
-    new_indexes = {
-        item["name"]: (item["table"], item["definition"])
-        for item in result["storage"]["shared_pg_ocpm"]["indexes"]
-    }
-    if set(old_indexes) - set(new_indexes):
-        fail("an existing pg_ocpm index disappeared")
-    if {
-        name: new_indexes[name]
-        for name in old_indexes
-        if new_indexes[name] != old_indexes[name]
-    }:
-        fail("an existing pg_ocpm index definition changed")
-    if set(new_indexes) - set(old_indexes) != {"binding_relation_summary_pkey"}:
-        fail("unexpected pg_ocpm index additions")
-
 
 def main() -> None:
     args = parse_args()
@@ -555,7 +691,8 @@ def main() -> None:
         else args.expected_payload_sha256 or EXPECTED_PAYLOAD_SHA256
     )
     result = load_verified(Path(args.result), expected_digest)
-    baseline = load_verified(args.baseline, EXPECTED_PRIOR_PAYLOAD_SHA256)
+    baseline = load_verified(args.baseline, EXPECTED_BASELINE_PAYLOAD_SHA256)
+    validate_regression_baseline(baseline)
     datasets, prior_datasets = validate_contract(
         result, baseline, allow_dirty=args.preview
     )

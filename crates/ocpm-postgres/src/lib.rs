@@ -88,6 +88,14 @@ pub struct BindingQueryResult {
     pub encoded_bytes: usize,
 }
 
+/// An owned caller result produced while the PostgreSQL `bytea` value was
+/// borrowed from its result row.
+#[derive(Clone, Debug, PartialEq)]
+pub struct BindingQueryOutput<T> {
+    pub value: T,
+    pub encoded_bytes: usize,
+}
+
 /// A connection-specific prepared query that returns one pg_ocpm binding capsule.
 #[derive(Clone, Debug)]
 pub struct PreparedBindingQuery {
@@ -104,21 +112,40 @@ impl PreparedBindingQuery {
         Ok(Self { statement })
     }
 
+    /// Execute the prepared query and process its sole `bytea` value without
+    /// first copying it into an owned `Vec<u8>`.
+    ///
+    /// The borrowed bytes are valid only for the duration of `consume`; the
+    /// returned value must own anything it retains.
+    pub async fn execute_with<T>(
+        &self,
+        client: &Client,
+        parameters: &[&(dyn ToSql + Sync)],
+        consume: impl FnOnce(&[u8]) -> T,
+    ) -> Result<BindingQueryOutput<T>, AdapterError> {
+        let row = client.query_one(&self.statement, parameters).await?;
+        let bytes = row
+            .try_get::<_, Option<&[u8]>>(0)?
+            .ok_or(AdapterError::NullBindingCapsule)?;
+        Ok(BindingQueryOutput {
+            encoded_bytes: bytes.len(),
+            value: consume(bytes),
+        })
+    }
+
     /// Execute the prepared query, fetch its sole row, and decode its capsule.
     pub async fn execute(
         &self,
         client: &Client,
         parameters: &[&(dyn ToSql + Sync)],
     ) -> Result<BindingQueryResult, AdapterError> {
-        let row = client.query_one(&self.statement, parameters).await?;
-        let bytes = row
-            .try_get::<_, Option<Vec<u8>>>(0)?
-            .ok_or(AdapterError::NullBindingCapsule)?;
-        let encoded_bytes = bytes.len();
-        let capsule = BindingCapsule::decode(&bytes)?;
+        let output = self
+            .execute_with(client, parameters, BindingCapsule::decode)
+            .await?;
+        let capsule = output.value?;
         Ok(BindingQueryResult {
             capsule,
-            encoded_bytes,
+            encoded_bytes: output.encoded_bytes,
         })
     }
 }

@@ -1,0 +1,437 @@
+{
+  "schema_version": 1,
+  "artifact_type": "sap_pm4py_latency_memory_storage_regression_baseline",
+  "release": {
+    "ocpm_engine": "0.4.0",
+    "pg_ocpm": "0.5.0"
+  },
+  "source": {
+    "title": "Collection of Object-Centric Event Logs (OCEL 2.0 relational SQLite)",
+    "doi": "10.5281/zenodo.8261133",
+    "license": "CC BY 4.0",
+    "datasets": [
+      "sap_o2c",
+      "sap_p2p"
+    ]
+  },
+  "environment": {
+    "client": {
+      "python": "3.11.15",
+      "platform": "Linux-7.0.11-orbstack-00360-gc9bc4d96ac70-aarch64-with-glibc2.36",
+      "machine": "aarch64",
+      "logical_cpus_visible": 18,
+      "pm4py_version": "2.7.23.3"
+    },
+    "database": {
+      "vanilla_pg": {
+        "postgres_version": "16.14 (Debian 16.14-1.pgdg13+1)",
+        "shared_buffers": "1GB",
+        "effective_cache_size": "4GB",
+        "work_mem": "16MB",
+        "max_parallel_workers_per_gather": "4",
+        "jit": "off"
+      },
+      "pg_ocpm": {
+        "postgres_version": "16.14 (Debian 16.14-1.pgdg13+1)",
+        "shared_buffers": "1GB",
+        "effective_cache_size": "4GB",
+        "work_mem": "16MB",
+        "max_parallel_workers_per_gather": "4",
+        "jit": "off"
+      }
+    }
+  },
+  "method": {
+    "random_seed": 20260718,
+    "train_fraction": 0.8,
+    "latency_scope": "database extraction plus client materialization, model construction, and scoring",
+    "execution_order": "randomized per measured three-way comparison",
+    "correctness_gate": "three-way canonical answer equality before sample acceptance",
+    "memory_model": "fresh process baseline and peak RSS including engine import and one request",
+    "vanilla_index_policy": "relational integrity indexes plus one workload secondary B-tree, ocel_e2o_object",
+    "result_cache_used": false
+  },
+  "datasets": [
+    {
+      "dataset": "sap_o2c",
+      "source_counts": {
+        "events": 98350,
+        "objects": 107767,
+        "event_object_links": 236265,
+        "object_object_links": 0
+      },
+      "fixture": {
+        "dataset_name": "sap_o2c",
+        "baseline_dataset_id": 1,
+        "ocpm_dataset_id": 1,
+        "tenant_id": 1,
+        "object_type": "MATERIAL",
+        "from_time": "1992-06-23T23:59:59.999999+00:00",
+        "train_to": "2015-04-28T00:00:00+00:00",
+        "test_from": "2015-04-28T00:00:00.000001+00:00",
+        "to_time": "2020-04-28T00:00:00.000001+00:00",
+        "cases": 4198,
+        "train_cases": 3987,
+        "test_cases": 139
+      },
+      "workloads": [
+        {
+          "workload": "dfg_conformance_95pct",
+          "answer_sha256": "1aed0c4b1b87355a88d662c1dcffb0b87290bddda11f67a1facac9c40b77e6f2",
+          "input": {
+            "vanilla_pg_pm4py": {
+              "source": "vanilla_pg",
+              "event_rows": 47899,
+              "dataframe_bytes": 7765500,
+              "aggregate_rows": 59
+            },
+            "pg_ocpm_pm4py": {
+              "source": "pg_ocpm",
+              "event_rows": 47899,
+              "dataframe_bytes": 7765500,
+              "aggregate_rows": 59
+            },
+            "pg_ocpm_ocpm_engine": {
+              "aggregate_rows": 59
+            }
+          },
+          "p50_ms": {
+            "vanilla_pg_pm4py": 142.585,
+            "pg_ocpm_pm4py": 104.214,
+            "pg_ocpm_ocpm_engine": 12.057
+          },
+          "memory": {
+            "vanilla_pg_pm4py": {
+              "peak_rss_bytes": 198598656,
+              "incremental_peak_bytes": 161275904
+            },
+            "pg_ocpm_pm4py": {
+              "peak_rss_bytes": 198590464,
+              "incremental_peak_bytes": 161292288
+            },
+            "pg_ocpm_ocpm_engine": {
+              "peak_rss_bytes": 38170624,
+              "incremental_peak_bytes": 864256
+            }
+          }
+        },
+        {
+          "workload": "variant_conformance_95pct",
+          "answer_sha256": "3007f996860dd92b1ab63dac59871de67c40bcf547d05a43336bb5cba7d2b07e",
+          "input": {
+            "vanilla_pg_pm4py": {
+              "source": "vanilla_pg",
+              "event_rows": 47899,
+              "dataframe_bytes": 7765500,
+              "aggregate_rows": 798
+            },
+            "pg_ocpm_pm4py": {
+              "source": "pg_ocpm",
+              "event_rows": 47899,
+              "dataframe_bytes": 7765500,
+              "aggregate_rows": 798
+            },
+            "pg_ocpm_ocpm_engine": {
+              "aggregate_rows": 798
+            }
+          },
+          "p50_ms": {
+            "vanilla_pg_pm4py": 130.367,
+            "pg_ocpm_pm4py": 92.296,
+            "pg_ocpm_ocpm_engine": 16.334
+          },
+          "memory": {
+            "vanilla_pg_pm4py": {
+              "peak_rss_bytes": 193744896,
+              "incremental_peak_bytes": 156426240
+            },
+            "pg_ocpm_pm4py": {
+              "peak_rss_bytes": 193818624,
+              "incremental_peak_bytes": 156520448
+            },
+            "pg_ocpm_ocpm_engine": {
+              "peak_rss_bytes": 41074688,
+              "incremental_peak_bytes": 3796992
+            }
+          }
+        },
+        {
+          "workload": "next_activity_prediction",
+          "answer_sha256": "7bf7c8546f7612532ff1003f0899d4f69cfa4e94b01dbcf7f0ac32cf1fd54628",
+          "input": {
+            "vanilla_pg_pm4py": {
+              "source": "vanilla_pg",
+              "event_rows": 47899,
+              "dataframe_bytes": 7765500,
+              "aggregate_rows": 59
+            },
+            "pg_ocpm_pm4py": {
+              "source": "pg_ocpm",
+              "event_rows": 47899,
+              "dataframe_bytes": 7765500,
+              "aggregate_rows": 59
+            },
+            "pg_ocpm_ocpm_engine": {
+              "aggregate_rows": 59
+            }
+          },
+          "p50_ms": {
+            "vanilla_pg_pm4py": 140.007,
+            "pg_ocpm_pm4py": 101.932,
+            "pg_ocpm_ocpm_engine": 11.808
+          },
+          "memory": {
+            "vanilla_pg_pm4py": {
+              "peak_rss_bytes": 198561792,
+              "incremental_peak_bytes": 161251328
+            },
+            "pg_ocpm_pm4py": {
+              "peak_rss_bytes": 198606848,
+              "incremental_peak_bytes": 161304576
+            },
+            "pg_ocpm_ocpm_engine": {
+              "peak_rss_bytes": 38166528,
+              "incremental_peak_bytes": 864256
+            }
+          }
+        },
+        {
+          "workload": "edge_bottleneck_ranking",
+          "answer_sha256": "ff1ce26ec456b25a54344923c7976cdb12c97365966eaaa0d5c423d855610661",
+          "input": {
+            "vanilla_pg_pm4py": {
+              "source": "vanilla_pg",
+              "event_rows": 72919,
+              "dataframe_bytes": 11690470,
+              "aggregate_rows": 60
+            },
+            "pg_ocpm_pm4py": {
+              "source": "pg_ocpm",
+              "event_rows": 72919,
+              "dataframe_bytes": 11690470,
+              "aggregate_rows": 60
+            },
+            "pg_ocpm_ocpm_engine": {
+              "aggregate_rows": 60
+            }
+          },
+          "p50_ms": {
+            "vanilla_pg_pm4py": 193.568,
+            "pg_ocpm_pm4py": 147.809,
+            "pg_ocpm_ocpm_engine": 3.326
+          },
+          "memory": {
+            "vanilla_pg_pm4py": {
+              "peak_rss_bytes": 211140608,
+              "incremental_peak_bytes": 173838336
+            },
+            "pg_ocpm_pm4py": {
+              "peak_rss_bytes": 210944000,
+              "incremental_peak_bytes": 173629440
+            },
+            "pg_ocpm_ocpm_engine": {
+              "peak_rss_bytes": 38154240,
+              "incremental_peak_bytes": 860160
+            }
+          }
+        }
+      ]
+    },
+    {
+      "dataset": "sap_p2p",
+      "source_counts": {
+        "events": 24854,
+        "objects": 74489,
+        "event_object_links": 105039,
+        "object_object_links": 0
+      },
+      "fixture": {
+        "dataset_name": "sap_p2p",
+        "baseline_dataset_id": 2,
+        "ocpm_dataset_id": 2,
+        "tenant_id": 1,
+        "object_type": "EBELN_EBELP",
+        "from_time": "1994-11-10T23:59:59.999999+00:00",
+        "train_to": "2004-07-13T21:27:36+00:00",
+        "test_from": "2004-07-13T21:27:36.000001+00:00",
+        "to_time": "2020-06-04T00:00:00.000001+00:00",
+        "cases": 31143,
+        "train_cases": 24915,
+        "test_cases": 6221
+      },
+      "workloads": [
+        {
+          "workload": "dfg_conformance_95pct",
+          "answer_sha256": "50a406a22c92fbc5f72258d9ef43760254fd7b325c619a66926d6c1660eb926a",
+          "input": {
+            "vanilla_pg_pm4py": {
+              "source": "vanilla_pg",
+              "event_rows": 42015,
+              "dataframe_bytes": 6889800,
+              "aggregate_rows": 19
+            },
+            "pg_ocpm_pm4py": {
+              "source": "pg_ocpm",
+              "event_rows": 42015,
+              "dataframe_bytes": 6889800,
+              "aggregate_rows": 19
+            },
+            "pg_ocpm_ocpm_engine": {
+              "aggregate_rows": 19
+            }
+          },
+          "p50_ms": {
+            "vanilla_pg_pm4py": 126.297,
+            "pg_ocpm_pm4py": 98.569,
+            "pg_ocpm_ocpm_engine": 25.203
+          },
+          "memory": {
+            "vanilla_pg_pm4py": {
+              "peak_rss_bytes": 189579264,
+              "incremental_peak_bytes": 152293376
+            },
+            "pg_ocpm_pm4py": {
+              "peak_rss_bytes": 189571072,
+              "incremental_peak_bytes": 152276992
+            },
+            "pg_ocpm_ocpm_engine": {
+              "peak_rss_bytes": 38158336,
+              "incremental_peak_bytes": 864256
+            }
+          }
+        },
+        {
+          "workload": "variant_conformance_95pct",
+          "answer_sha256": "8cb49995e14727ac411a4d892ffc4347e504418c5a65dd107af29dcb53458fda",
+          "input": {
+            "vanilla_pg_pm4py": {
+              "source": "vanilla_pg",
+              "event_rows": 42015,
+              "dataframe_bytes": 6889800,
+              "aggregate_rows": 38
+            },
+            "pg_ocpm_pm4py": {
+              "source": "pg_ocpm",
+              "event_rows": 42015,
+              "dataframe_bytes": 6889800,
+              "aggregate_rows": 38
+            },
+            "pg_ocpm_ocpm_engine": {
+              "aggregate_rows": 38
+            }
+          },
+          "p50_ms": {
+            "vanilla_pg_pm4py": 120.356,
+            "pg_ocpm_pm4py": 92.724,
+            "pg_ocpm_ocpm_engine": 0.702
+          },
+          "memory": {
+            "vanilla_pg_pm4py": {
+              "peak_rss_bytes": 188739584,
+              "incremental_peak_bytes": 151441408
+            },
+            "pg_ocpm_pm4py": {
+              "peak_rss_bytes": 188837888,
+              "incremental_peak_bytes": 151519232
+            },
+            "pg_ocpm_ocpm_engine": {
+              "peak_rss_bytes": 38227968,
+              "incremental_peak_bytes": 946176
+            }
+          }
+        },
+        {
+          "workload": "next_activity_prediction",
+          "answer_sha256": "87e62d4dc306d84193ee6f22a4a086aab4d2af2771ad05715c5ff03ac50bef0d",
+          "input": {
+            "vanilla_pg_pm4py": {
+              "source": "vanilla_pg",
+              "event_rows": 42015,
+              "dataframe_bytes": 6889800,
+              "aggregate_rows": 19
+            },
+            "pg_ocpm_pm4py": {
+              "source": "pg_ocpm",
+              "event_rows": 42015,
+              "dataframe_bytes": 6889800,
+              "aggregate_rows": 19
+            },
+            "pg_ocpm_ocpm_engine": {
+              "aggregate_rows": 19
+            }
+          },
+          "p50_ms": {
+            "vanilla_pg_pm4py": 122.921,
+            "pg_ocpm_pm4py": 95.851,
+            "pg_ocpm_ocpm_engine": 24.858
+          },
+          "memory": {
+            "vanilla_pg_pm4py": {
+              "peak_rss_bytes": 189566976,
+              "incremental_peak_bytes": 152260608
+            },
+            "pg_ocpm_pm4py": {
+              "peak_rss_bytes": 189587456,
+              "incremental_peak_bytes": 152297472
+            },
+            "pg_ocpm_ocpm_engine": {
+              "peak_rss_bytes": 38170624,
+              "incremental_peak_bytes": 876544
+            }
+          }
+        },
+        {
+          "workload": "edge_bottleneck_ranking",
+          "answer_sha256": "60d4081643f87c47b8b64cad58f234d23e22795ebfe2f2ee696984163fd41827",
+          "input": {
+            "vanilla_pg_pm4py": {
+              "source": "vanilla_pg",
+              "event_rows": 42029,
+              "dataframe_bytes": 6891972,
+              "aggregate_rows": 19
+            },
+            "pg_ocpm_pm4py": {
+              "source": "pg_ocpm",
+              "event_rows": 42029,
+              "dataframe_bytes": 6891972,
+              "aggregate_rows": 19
+            },
+            "pg_ocpm_ocpm_engine": {
+              "aggregate_rows": 19
+            }
+          },
+          "p50_ms": {
+            "vanilla_pg_pm4py": 127.011,
+            "pg_ocpm_pm4py": 102.769,
+            "pg_ocpm_ocpm_engine": 0.932
+          },
+          "memory": {
+            "vanilla_pg_pm4py": {
+              "peak_rss_bytes": 192684032,
+              "incremental_peak_bytes": 155381760
+            },
+            "pg_ocpm_pm4py": {
+              "peak_rss_bytes": 192651264,
+              "incremental_peak_bytes": 155377664
+            },
+            "pg_ocpm_ocpm_engine": {
+              "peak_rss_bytes": 38174720,
+              "incremental_peak_bytes": 876544
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "vanilla_pg_pm4py": {
+      "index_bytes": 69115904,
+      "total_bytes": 131350528
+    },
+    "shared_pg_ocpm": {
+      "index_bytes": 20668416,
+      "total_bytes": 107257856
+    }
+  },
+  "payload_sha256": "0b71b9bee489d0d5d39bc2e71f7a636bbe556c6333590ac21dd0235e24b57420"
+}
