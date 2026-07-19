@@ -1,6 +1,6 @@
 use std::{
+    collections::BTreeMap,
     fs::File,
-    hint::black_box,
     io::BufWriter,
     path::PathBuf,
     time::Instant,
@@ -30,9 +30,9 @@ struct Args {
     bbox_tree: PathBuf,
     #[arg(long)]
     query: String,
-    #[arg(long, default_value_t = 10)]
+    #[arg(long, default_value_t = 0)]
     warmups: usize,
-    #[arg(long, default_value_t = 30)]
+    #[arg(long, default_value_t = 10)]
     runs: usize,
     #[arg(long)]
     output: PathBuf,
@@ -49,20 +49,32 @@ struct ReferenceOutput {
     warmups: usize,
     measured_runs: usize,
     runs_ms: Vec<f64>,
-    root_rows: usize,
-    root_violations: Option<usize>,
+    root_node: usize,
     all_node_situations: usize,
-    duration_microseconds: Option<i64>,
-    canonical_rows: Vec<Vec<Value>>,
+    q6_root_label: Option<Value>,
+    q6_duration_microseconds: Option<i64>,
+    nodes: Vec<CanonicalNode>,
+}
+
+#[derive(Serialize)]
+struct CanonicalNode {
+    node_index: usize,
+    object_variables: Vec<usize>,
+    event_variables: Vec<usize>,
+    label_names: Vec<String>,
+    situation_count: usize,
+    situation_violated_count: usize,
+    violation_reason_counts: BTreeMap<String, usize>,
+    canonical_rows: Vec<Value>,
     canonical_json_bytes: usize,
 }
 
 struct Evaluation {
-    canonical_rows: Vec<Vec<Value>>,
+    nodes: Vec<CanonicalNode>,
     canonical_json: Vec<u8>,
-    root_violations: Option<usize>,
     all_node_situations: usize,
-    duration_microseconds: Option<i64>,
+    q6_root_label: Option<Value>,
+    q6_duration_microseconds: Option<i64>,
 }
 
 fn object_id(binding: &Binding, variable: usize, ocel: &IndexLinkedOCEL) -> String {
@@ -81,76 +93,112 @@ fn event_id(binding: &Binding, variable: usize, ocel: &IndexLinkedOCEL) -> Strin
         .clone()
 }
 
-fn canonical_root_rows(
-    query: &str,
-    results: &[EvaluationResultWithCount],
+fn canonical_node(
+    node_index: usize,
+    result: &EvaluationResultWithCount,
     ocel: &IndexLinkedOCEL,
-) -> (Vec<Vec<Value>>, Option<usize>, Option<i64>) {
-    let root = results.first().expect("OCPQ tree must contain a root node");
-    let with_violations = matches!(query, "Q1" | "Q2" | "Q3" | "Q4" | "Q5");
-    let (mut rows, duration_microseconds) = if query == "Q6" {
-        let children = results.get(1).expect("Q6 must contain its child node");
-        let maximum = children
-            .situations
-            .iter()
-            .map(|(binding, _)| {
-                let created = binding
-                    .get_ev(&EventVariable(0), ocel)
-                    .expect("Q6 child is missing O_Created");
-                let accepted = binding
-                    .get_ev(&EventVariable(1), ocel)
-                    .expect("Q6 child is missing O_Accepted");
-                (accepted.time - created.time)
-                    .num_microseconds()
-                    .expect("Q6 duration exceeds microsecond range")
-            })
-            .max()
-            .expect("Q6 requires at least one qualifying child binding");
-        (vec![vec![json!(maximum)]], Some(maximum))
-    } else {
-        let rows = root
-            .situations
-            .iter()
-            .map(|(binding, violation)| match query {
-                "Q1" => vec![
-                    json!(object_id(binding, 0, ocel)),
-                    json!(violation.is_some()),
-                ],
-                "Q2" => vec![
-                    json!(object_id(binding, 0, ocel)),
-                    json!(event_id(binding, 0, ocel)),
-                    json!(violation.is_some()),
-                ],
-                "Q3" => vec![
-                    json!(event_id(binding, 0, ocel)),
-                    json!(violation.is_some()),
-                ],
-                "Q4" => vec![
-                    json!(object_id(binding, 0, ocel)),
-                    json!(event_id(binding, 0, ocel)),
-                    json!(violation.is_some()),
-                ],
-                "Q5" => vec![
-                    json!(object_id(binding, 0, ocel)),
-                    json!(object_id(binding, 1, ocel)),
-                    json!(event_id(binding, 0, ocel)),
-                    json!(violation.is_some()),
-                ],
-                "Q7" => vec![
-                    json!(object_id(binding, 0, ocel)),
-                    json!(object_id(binding, 1, ocel)),
-                    json!(object_id(binding, 2, ocel)),
-                    json!(event_id(binding, 1, ocel)),
-                    json!(event_id(binding, 2, ocel)),
-                ],
-                _ => panic!("unsupported OCPQ evaluation query: {query}"),
-            })
-            .collect::<Vec<_>>();
-        (rows, None)
-    };
-    rows.sort_by_cached_key(|row| serde_json::to_string(row).unwrap());
-    let violations = with_violations.then_some(root.situation_violated_count);
-    (rows, violations, duration_microseconds)
+) -> CanonicalNode {
+    assert_eq!(
+        result.situation_count,
+        result.situations.len(),
+        "node {node_index} situation count differs from its materialized rows"
+    );
+    let mut expected_object_variables: Option<Vec<usize>> = None;
+    let mut expected_event_variables: Option<Vec<usize>> = None;
+    let mut expected_label_names: Option<Vec<String>> = None;
+    let mut violation_reason_counts = BTreeMap::new();
+    let mut observed_violations = 0_usize;
+    let mut rows = result
+        .situations
+        .iter()
+        .map(|(binding, violation)| {
+            let object_variables = binding
+                .object_map
+                .keys()
+                .map(|variable| variable.0)
+                .collect::<Vec<_>>();
+            let event_variables = binding
+                .event_map
+                .keys()
+                .map(|variable| variable.0)
+                .collect::<Vec<_>>();
+            let label_names = binding.label_map.keys().cloned().collect::<Vec<_>>();
+            match &expected_object_variables {
+                Some(expected) => assert_eq!(
+                    expected, &object_variables,
+                    "node {node_index} object-variable shape changed between rows"
+                ),
+                None => expected_object_variables = Some(object_variables.clone()),
+            }
+            match &expected_event_variables {
+                Some(expected) => assert_eq!(
+                    expected, &event_variables,
+                    "node {node_index} event-variable shape changed between rows"
+                ),
+                None => expected_event_variables = Some(event_variables.clone()),
+            }
+            match &expected_label_names {
+                Some(expected) => assert_eq!(
+                    expected, &label_names,
+                    "node {node_index} label shape changed between rows"
+                ),
+                None => expected_label_names = Some(label_names.clone()),
+            }
+
+            let objects = binding
+                .object_map
+                .keys()
+                .map(|variable| json!([variable.0, object_id(binding, variable.0, ocel)]))
+                .collect::<Vec<_>>();
+            let events = binding
+                .event_map
+                .keys()
+                .map(|variable| json!([variable.0, event_id(binding, variable.0, ocel)]))
+                .collect::<Vec<_>>();
+            let labels = binding
+                .label_map
+                .iter()
+                .map(|(name, value)| {
+                    json!([
+                        name,
+                        serde_json::to_value(value)
+                            .expect("OCPQ label value must be serializable")
+                    ])
+                })
+                .collect::<Vec<_>>();
+            let violation = violation.as_ref().map(|reason| {
+                observed_violations += 1;
+                let value = serde_json::to_value(reason)
+                    .expect("OCPQ violation reason must be serializable");
+                let key = serde_json::to_string(&value)
+                    .expect("OCPQ violation reason JSON must be serializable");
+                *violation_reason_counts.entry(key).or_insert(0) += 1;
+                value
+            });
+            json!([objects, events, labels, violation])
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        observed_violations, result.situation_violated_count,
+        "node {node_index} violated count differs from its materialized rows"
+    );
+    rows.sort_by_cached_key(|row| {
+        serde_json::to_string(row).expect("canonical node row must be serializable")
+    });
+    let canonical_json_bytes = serde_json::to_vec(&rows)
+        .expect("canonical node rows must be serializable")
+        .len();
+    CanonicalNode {
+        node_index,
+        object_variables: expected_object_variables.unwrap_or_default(),
+        event_variables: expected_event_variables.unwrap_or_default(),
+        label_names: expected_label_names.unwrap_or_default(),
+        situation_count: result.situation_count,
+        situation_violated_count: result.situation_violated_count,
+        violation_reason_counts,
+        canonical_rows: rows,
+        canonical_json_bytes,
+    }
 }
 
 fn evaluate_results(
@@ -178,13 +226,6 @@ fn evaluate_results(
         result.situations.push((binding, violation));
     }
 
-    // Make every fully collected node result observable before the measured
-    // region ends. Correctness canonicalization intentionally happens later.
-    for result in &results {
-        black_box(&result.situations);
-        black_box(result.situation_count);
-        black_box(result.situation_violated_count);
-    }
     results
 }
 
@@ -194,21 +235,61 @@ fn canonicalize_results(
     ocel: &IndexLinkedOCEL,
 ) -> Evaluation {
     let all_node_situations = results.iter().map(|item| item.situation_count).sum();
-    let (canonical_rows, root_violations, duration_microseconds) =
-        canonical_root_rows(query, results, ocel);
-    let canonical_json = serde_json::to_vec(&canonical_rows).unwrap();
+    let nodes = results
+        .iter()
+        .enumerate()
+        .map(|(node_index, result)| canonical_node(node_index, result, ocel))
+        .collect::<Vec<_>>();
+    let canonical_json = serde_json::to_vec(&nodes).unwrap();
+    let (q6_root_label, q6_duration_microseconds) = if query == "Q6" {
+        let root = results.first().expect("Q6 must contain a root node");
+        assert_eq!(root.situations.len(), 1, "Q6 root must contain one row");
+        let label = root.situations[0]
+            .0
+            .label_map
+            .get("max_dur")
+            .expect("Q6 root must contain max_dur")
+            .to_owned();
+        let children = results.get(1).expect("Q6 must contain its child node");
+        let maximum = children
+            .situations
+            .iter()
+            .map(|(binding, _)| {
+                let created = binding
+                    .get_ev(&EventVariable(0), ocel)
+                    .expect("Q6 child is missing O_Created");
+                let accepted = binding
+                    .get_ev(&EventVariable(1), ocel)
+                    .expect("Q6 child is missing O_Accepted");
+                (accepted.time - created.time)
+                    .num_microseconds()
+                    .expect("Q6 duration exceeds microsecond range")
+            })
+            .max()
+            .expect("Q6 requires at least one qualifying child binding");
+        (
+            Some(
+                serde_json::to_value(label)
+                    .expect("Q6 root label must be serializable"),
+            ),
+            Some(maximum),
+        )
+    } else {
+        (None, None)
+    };
     Evaluation {
-        canonical_rows,
+        nodes,
         canonical_json,
-        root_violations,
         all_node_situations,
-        duration_microseconds,
+        q6_root_label,
+        q6_duration_microseconds,
     }
 }
 
 fn main() {
     let args = Args::parse();
-    assert!(args.runs > 0, "measured runs must be positive");
+    assert_eq!(args.warmups, 0, "the upstream OCPQ protocol has no warmups");
+    assert_eq!(args.runs, 10, "the upstream OCPQ protocol measures ten runs");
     assert!(matches!(args.query.as_str(), "Q1" | "Q2" | "Q3" | "Q4" | "Q5" | "Q6" | "Q7"));
 
     let tree_started = Instant::now();
@@ -233,16 +314,6 @@ fn main() {
     let link_ms = link_started.elapsed().as_secs_f64() * 1000.0;
 
     let mut reference: Option<Vec<u8>> = None;
-    for _ in 0..args.warmups {
-        let results = evaluate_results(&tree, &linked);
-        let evaluation = canonicalize_results(&args.query, &results, &linked);
-        if let Some(expected) = &reference {
-            assert_eq!(expected, &evaluation.canonical_json, "warmup result changed");
-        } else {
-            reference = Some(evaluation.canonical_json);
-        }
-    }
-
     let mut runs_ms = Vec::with_capacity(args.runs);
     let mut final_evaluation = None;
     for _ in 0..args.runs {
@@ -260,7 +331,7 @@ fn main() {
     }
     let evaluation = final_evaluation.expect("at least one measured run is required");
     let output = ReferenceOutput {
-        schema_version: 1,
+        schema_version: 2,
         ocpq_commit: OCPQ_COMMIT,
         query: args.query,
         tree_parse_ms,
@@ -269,12 +340,11 @@ fn main() {
         warmups: args.warmups,
         measured_runs: args.runs,
         runs_ms,
-        root_rows: evaluation.canonical_rows.len(),
-        root_violations: evaluation.root_violations,
+        root_node: 0,
         all_node_situations: evaluation.all_node_situations,
-        duration_microseconds: evaluation.duration_microseconds,
-        canonical_json_bytes: evaluation.canonical_json.len(),
-        canonical_rows: evaluation.canonical_rows,
+        q6_root_label: evaluation.q6_root_label,
+        q6_duration_microseconds: evaluation.q6_duration_microseconds,
+        nodes: evaluation.nodes,
     };
     if let Some(parent) = args.output.parent() {
         std::fs::create_dir_all(parent).expect("could not create output directory");

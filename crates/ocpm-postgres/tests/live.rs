@@ -1,12 +1,13 @@
+use ocpm_core::binding::BindingSchema;
 use ocpm_postgres::{
-    ActivityProfileFilter, AdapterError, PreparedBindingQuery, RelationBindingSpec,
-    activity_profile, binding_relation_universal_equal, dfg_counts, dfg_window_counts,
-    variant_counts, variant_window_counts,
+    ActivityProfileFilter, AdapterError, PreparedBindingQuery, PreparedBindingTreeQuery,
+    RelationBindingSpec, activity_profile, binding_relation_universal_equal, dfg_counts,
+    dfg_window_counts, variant_counts, variant_window_counts,
 };
 use std::time::{Duration, SystemTime};
 
 #[tokio::test]
-async fn public_adapters_prepare_and_bind_against_pg_ocpm_0_6() {
+async fn public_adapters_prepare_and_bind_against_pg_ocpm_0_7() {
     let Ok(database_url) = std::env::var("OCPM_TEST_DATABASE_URL") else {
         return;
     };
@@ -89,12 +90,10 @@ async fn relation_adapter_distinguishes_empty_from_missing_summary() {
                 source_binding_count, target_binding_count, payload
             ) VALUES (
                 $1, 0, $2, $3, $4, $5, $6, 0, 0,
-                ocpm.binding_relation_universal_equal(
-                    ocpm.binding_relation_pack(
-                        ARRAY[]::bigint[], ARRAY[]::bigint[],
-                        ARRAY[]::bigint[], ARRAY[]::bigint[],
-                        ARRAY[]::bigint[]
-                    )
+                ocpm.binding_relation_pack(
+                    ARRAY[]::bigint[], ARRAY[]::bigint[],
+                    ARRAY[]::bigint[], ARRAY[]::bigint[],
+                    ARRAY[]::bigint[]
                 )
             )
             "#,
@@ -185,5 +184,69 @@ async fn prepared_binding_query_reuses_a_plan_and_rejects_invalid_shapes() {
     assert!(matches!(
         null_query.execute(&client, &[]).await,
         Err(AdapterError::NullBindingCapsule)
+    ));
+}
+
+#[tokio::test]
+async fn prepared_binding_tree_query_decodes_order_and_rejects_invalid_nodes() {
+    let Ok(database_url) = std::env::var("OCPM_TEST_DATABASE_URL") else {
+        return;
+    };
+    let (client, connection) = tokio_postgres::connect(&database_url, tokio_postgres::NoTls)
+        .await
+        .expect("connect to prepared binding-tree test database");
+    tokio::spawn(async move {
+        connection.await.expect("drive PostgreSQL connection");
+    });
+
+    const TWO_IDS_HEX: &str = "4f4350420108011428";
+    const FIVE_IDS_VIOLATION_HEX: &str = "4f435042010b01020406080a01";
+    let query = PreparedBindingTreeQuery::prepare(
+        &client,
+        &format!(
+            "SELECT decode('{TWO_IDS_HEX}', 'hex'), decode('{FIVE_IDS_VIOLATION_HEX}', 'hex')"
+        ),
+    )
+    .await
+    .expect("prepare a valid two-node binding-tree query");
+    assert_eq!(query.node_count(), 2);
+
+    let result = query
+        .execute(&client, &[])
+        .await
+        .expect("decode every prepared binding-tree node");
+    assert_eq!(
+        result.encoded_bytes,
+        TWO_IDS_HEX.len() / 2 + FIVE_IDS_VIOLATION_HEX.len() / 2
+    );
+    assert_eq!(result.capsules[0].schema(), BindingSchema::TwoIds);
+    assert_eq!(result.capsules[1].schema(), BindingSchema::FiveIdsViolation);
+    assert_eq!(result.capsules[0].rows().next().unwrap().ids(), &[10, 20]);
+    let violation = result.capsules[1].rows().next().unwrap();
+    assert_eq!(violation.ids(), &[1, 2, 3, 4, 5]);
+    assert_eq!(violation.violated, Some(true));
+
+    assert!(matches!(
+        PreparedBindingTreeQuery::prepare(&client, "SELECT 1::integer").await,
+        Err(AdapterError::InvalidBindingTreeResultShape)
+    ));
+    assert!(matches!(
+        PreparedBindingTreeQuery::prepare(
+            &client,
+            &format!("SELECT decode('{TWO_IDS_HEX}', 'hex'), 1::integer"),
+        )
+        .await,
+        Err(AdapterError::InvalidBindingTreeResultShape)
+    ));
+
+    let null_query = PreparedBindingTreeQuery::prepare(
+        &client,
+        &format!("SELECT decode('{TWO_IDS_HEX}', 'hex'), NULL::bytea"),
+    )
+    .await
+    .expect("prepare a nullable binding-tree node");
+    assert!(matches!(
+        null_query.execute(&client, &[]).await,
+        Err(AdapterError::NullBindingTreeCapsule(1))
     ));
 }

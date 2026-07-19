@@ -83,23 +83,11 @@ fi
 arguments=(
   --reference /benchmark/reference.json
   --output "/output/$output_name"
-  --warmups 10
-  --runs 30
-  --concurrency "${OCPM_CONCURRENCY:-1,4,8,16}"
-  --requests-per-client "${OCPM_REQUESTS_PER_CLIENT:-32}"
-  --concurrency-epochs "${OCPM_CONCURRENCY_EPOCHS:-3}"
-  --concurrency-minimum-seconds "${OCPM_CONCURRENCY_MINIMUM_SECONDS:-5}"
 )
 mounts=(
   --volume "$reference:/benchmark/reference.json:ro"
   --volume "$output_dir:/output"
 )
-if [[ -n "${OCPM_Q5_SQL_FILE:-}" ]]; then
-  q5_sql="$(cd "$(dirname "$OCPM_Q5_SQL_FILE")" && pwd)/$(basename "$OCPM_Q5_SQL_FILE")"
-  mounts+=(--volume "$q5_sql:/benchmark/q5.sql:ro")
-  arguments+=(--q5-sql-file /benchmark/q5.sql)
-fi
-
 docker run --rm \
   --network "$network" \
   --env OCPM_DATABASE_URL \

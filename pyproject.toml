@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "ocpm-engine"
-version = "0.5.0"
+version = "0.6.0"
 description = "Rust-first process-mining companion library for pg_ocpm"
 readme = "README.md"
 requires-python = ">=3.11"

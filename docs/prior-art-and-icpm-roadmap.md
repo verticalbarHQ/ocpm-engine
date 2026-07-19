@@ -39,7 +39,7 @@ benchmark harness executes version-pinned PM4Py and can locally compile a
 pinned OCPQ reference without redistributing either project. Their concepts
 define the comparison and novelty boundary.
 
-### Database-execution research evaluated for 0.5.0
+### Database-execution research evaluated for 0.6.0
 
 - [Factorized databases](https://arxiv.org/abs/1104.0867) motivate keeping
   repeated bindings compact and expanding only at the client boundary. The
@@ -48,8 +48,9 @@ define the comparison and novelty boundary.
 - [Yannakakis+](https://arxiv.org/abs/2504.03279) and
   [Predicate Transfer](https://vldb.org/cidrdb/papers/2024/p22-yang.pdf)
   reinforce reducing acyclic relation inputs before materialization. The
-  release performs the declared relation reduction during rebuild and persists
-  the final constraint capsule rather than reconstructing a join per request.
+  implementation persists reusable factorized relation summaries, then applies
+  the requested constraint and materializes every result-tree node at request
+  time. It does not store a benchmark query's finished answer.
 - [Free Join](https://arxiv.org/abs/2301.10841) and worst-case-optimal join
   research informed the boundary between fixed native kernels and a future
   generic constraint planner. No third-party join engine was embedded.
@@ -102,11 +103,11 @@ boundary, but it did sharpen the next scale ablations:
 
 This refresh used documentation and papers as design evidence only. It did not
 copy, link, translate, or depend on DuckDB or ClickHouse implementation code.
-The high-impact moonshot already evaluated in this release is factorized,
-duplicate-preserving result capsules with late full-row materialization. Their
-effect is covered by exact OCPQ parity plus latency, memory, storage, and
-multi-epoch concurrency gates; the next ideas above require larger-scale causal
-ablations rather than another benchmark-specific index.
+The current high-impact experiment is factorized, duplicate-preserving result
+capsules with late full-row materialization. Its effect is not a release claim
+until the strict all-node OCPQ artifacts pass latency, memory, storage,
+multi-epoch concurrency, and provenance gates. The next ideas above require
+larger-scale causal ablations rather than another benchmark-specific index.
 
 ## Candidate contribution hypotheses
 
@@ -139,8 +140,8 @@ tradeoff, not any individual process-mining algorithm.
 
 ## Required ablations
 
-The current release benchmark compares end-to-end systems. A research paper
-needs causal evidence:
+The corrected benchmark is designed to compare end-to-end systems after exact
+all-node parity is established. A research paper still needs causal evidence:
 
 | Ablation | Question |
 |---|---|

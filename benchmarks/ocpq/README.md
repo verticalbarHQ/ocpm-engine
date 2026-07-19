@@ -1,13 +1,19 @@
 # OCPQ comparison benchmark
 
 This directory contains the correctness-gated, same-host comparison between
-OCPQ 0.6.7 and `pg_ocpm 0.6.0` plus `ocpm-engine 0.5.0`. The workload is Q1-Q7
-from the public BPIC 2017-derived OCEL 2.0 evaluation dataset.
+OCPQ 0.6.7 and `pg_ocpm` plus `ocpm-engine`. The workload is Q1-Q7 from the
+public BPIC 2017-derived OCEL 2.0 evaluation dataset.
 
-The ten timings published by the OCPQ authors are preserved as source context
-only. They were collected on a different host, so neither the runner, checker,
-nor report calculates a ratio from them. Every reported speedup uses the pinned
-same-host OCPQ reproduction.
+The previous root-only comparison is obsolete. The strict protocol measures
+and verifies the complete result tree for each query. No replacement latency
+numbers are published until the strict reference, candidate, memory, storage,
+concurrency, and provenance checks all pass and the resulting preview has been
+reviewed.
+
+The timings published by the OCPQ authors are retained as source context only.
+They were collected on a different host, so neither the runner nor the report
+derives a speedup from them. Comparative ratios use only the pinned same-host
+OCPQ reproduction.
 
 ## Source pins
 
@@ -30,6 +36,20 @@ The OCPQ lockfile no longer resolves on its historical Rust 1.76 image because
 transitive dependency metadata raised the minimum Rust version. The Dockerfile
 uses Rust 1.86 while preserving the pinned OCPQ source and lockfile.
 
+## Strict output contract
+
+For each query, the reference and candidate must produce the same ordered list
+of evaluation-tree nodes. Every node is compared as a duplicate-preserving
+multiset of canonical situations containing:
+
+- every bound object and event variable, normalized to the same external IDs;
+- every typed label value;
+- the exact violation reason, including null for non-violations; and
+- the exact node manifest, logical-row count, and canonical SHA-256 digest.
+
+Q6 additionally verifies its typed duration label and the duration recomputed
+from the child node. A root-only hash or row count cannot satisfy this contract.
+
 ## Build the same-host reference
 
 Obtain the public Git LFS dataset and run each query in a fresh container:
@@ -51,173 +71,74 @@ uv run --extra benchmark python benchmarks/ocpq/run_local_ocpq.py \
   --image ocpq:0.6.7-corrected-harness \
   --sqlite .benchmarks/ocpq-data/bpic2017.sqlite \
   --eval .benchmarks/ocpq-eval \
-  --warmups 10 \
-  --runs 30 \
-  --output .benchmarks/ocpq-reproduced-0.6.7-preview.json
+  --warmups 0 \
+  --runs 10 \
+  --output .benchmarks/ocpq-reproduced-strict-all-node-preview.json
 ```
 
-The reference timer includes `tree.evaluate` and construction and collection
-of every node's `EvaluationResultWithCount`. Import, linking, external-ID
-canonicalization, sorting, JSON serialization, and hashing are reported or
-performed outside the query timer.
+The reference uses exactly zero warmups and ten measured runs per query, with a
+fresh OCPQ container for each query. Its timer includes `tree.evaluate` plus
+construction and collection of every node's `EvaluationResultWithCount` into
+owned output. Import, linking, external-ID canonicalization, sorting, JSON
+serialization, and hashing remain outside the query timer.
 
-A regenerated reference has new same-host samples and a new artifact digest.
-Pin that reference first, then begin the release candidate run from a clean
-checkout so its recorded source revision describes the code actually built.
+## Run the strict candidate gates
 
-## Clean candidate rerun
+Load the same SQLite fixture into a clean PostgreSQL instance built from the
+candidate `pg_ocpm` source, including `ocpm.finish_load(...)` and
+`ocpm.rebuild_binding_index(...)`. Those preprocessing operations are recorded
+but excluded from request latency. Then run:
 
-Run the following from a clean `ocpm-engine` checkout using the pinned reference
-artifact. It installs the loader dependency, explicitly builds the
-sibling `pg_ocpm` source as a PostgreSQL 16 image, creates the network only when
-needed, waits for database readiness, and removes the benchmark container and
-any network it created on completion or exit.
-
-```bash
-uv sync --extra benchmark
-
-PG_OCPM_SOURCE="${PG_OCPM_SOURCE:-../pg_ocpm}"
-OCPM_CONTAINER="postgres_ocpq_pg_ocpm"
-export OCPM_DOCKER_NETWORK="pg-ocpm-ocpq-bench"
-export OCPM_DATABASE_IMAGE="pg_ocpm:0.6.0"
-export OCPM_CANDIDATE_IMAGE="ocpm-engine:ocpq-candidate"
-export OCPM_DATABASE_URL="postgres://postgres:pg@${OCPM_CONTAINER}/postgres"
-export OCPM_SOURCE_REVISION="$(git rev-parse HEAD)"
-
-if [[ -n "$(git status --porcelain --untracked-files=all)" ]]; then
-  echo "release reruns require a clean ocpm-engine checkout" >&2
-  exit 1
-fi
-export OCPM_SOURCE_TREE_CLEAN=true
-
-if [[ -n "$(git -C "$PG_OCPM_SOURCE" status --porcelain --untracked-files=all)" ]]; then
-  echo "release reruns require a clean pg_ocpm checkout" >&2
-  exit 1
-fi
-export OCPM_PG_OCPM_SOURCE_REVISION="$(git -C "$PG_OCPM_SOURCE" rev-parse HEAD)"
+```sh
+export OCPM_DATABASE_URL='postgres://postgres:pg@postgres_ocpq_pg_ocpm/postgres'
+export OCPM_DATABASE_CONTAINER='postgres_ocpq_pg_ocpm'
+export OCPM_DOCKER_NETWORK='pg-ocpm-ocpq-bench'
+export OCPM_DATABASE_IMAGE='pg_ocpm:release-candidate'
+export OCPM_PG_OCPM_SOURCE_REVISION="$(git -C ../pg_ocpm rev-parse HEAD)"
 export OCPM_PG_OCPM_SOURCE_TREE_CLEAN=true
 
-network_created=false
-cleanup() {
-  docker rm --force "$OCPM_CONTAINER" >/dev/null 2>&1 || true
-  if [[ "$network_created" == true ]]; then
-    docker network rm "$OCPM_DOCKER_NETWORK" >/dev/null 2>&1 || true
-  fi
-}
-trap cleanup EXIT INT TERM
-
-docker build --build-arg PG_MAJOR=16 \
-  --build-arg SOURCE_REVISION="$OCPM_PG_OCPM_SOURCE_REVISION" \
-  --tag "$OCPM_DATABASE_IMAGE" "$PG_OCPM_SOURCE"
-docker rm --force "$OCPM_CONTAINER" >/dev/null 2>&1 || true
-if ! docker network inspect "$OCPM_DOCKER_NETWORK" >/dev/null 2>&1; then
-  docker network create "$OCPM_DOCKER_NETWORK" >/dev/null
-  network_created=true
-fi
-docker run --detach --name "$OCPM_CONTAINER" \
-  --network "$OCPM_DOCKER_NETWORK" \
-  --publish 55436:5432 \
-  --env POSTGRES_PASSWORD=pg \
-  "$OCPM_DATABASE_IMAGE" >/dev/null
-
-ready=false
-for attempt in $(seq 1 60); do
-  if docker exec "$OCPM_CONTAINER" \
-    pg_isready --username postgres --dbname postgres >/dev/null 2>&1; then
-    ready=true
-    break
-  fi
-  sleep 1
-done
-if [[ "$ready" != true ]]; then
-  echo "PostgreSQL did not become ready within 60 seconds" >&2
-  exit 1
-fi
-
-uv run --extra benchmark python benchmarks/ocpq/prepare.py \
-  --sqlite .benchmarks/ocpq-data/bpic2017.sqlite \
-  --host localhost \
-  --port 55436
-
-benchmarks/ocpq/run_candidate_docker.sh \
-  .benchmarks/ocpq-reproduced-0.6.7-preview.json \
-  .benchmarks/ocpq-bpic2017-0.5.0-host-provenance-preview.json
-
-benchmarks/ocpq/run_candidate_memory_docker.sh \
-  .benchmarks/ocpq-reproduced-0.6.7-preview.json \
-  .benchmarks/ocpq-bpic2017-0.5.0-host-provenance-memory-preview.json
-
-candidate_sha="$(
-  shasum -a 256 .benchmarks/ocpq-bpic2017-0.5.0-host-provenance-preview.json | awk '{print $1}'
-)"
-memory_sha="$(
-  shasum -a 256 .benchmarks/ocpq-bpic2017-0.5.0-host-provenance-memory-preview.json | awk '{print $1}'
-)"
-reference_sha="$(
-  shasum -a 256 .benchmarks/ocpq-reproduced-0.6.7-preview.json | awk '{print $1}'
-)"
-uv run --extra benchmark python benchmarks/check_ocpq_result.py \
-  --reference .benchmarks/ocpq-reproduced-0.6.7-preview.json \
-  --candidate .benchmarks/ocpq-bpic2017-0.5.0-host-provenance-preview.json \
-  --memory .benchmarks/ocpq-bpic2017-0.5.0-host-provenance-memory-preview.json \
-  --expected-reference-sha256 "$reference_sha" \
-  --expected-candidate-sha256 "$candidate_sha" \
-  --expected-memory-sha256 "$memory_sha"
-
-cleanup
-trap - EXIT INT TERM
+benchmarks/ocpq/run_strict_publication_gates.sh \
+  .benchmarks/ocpq-reproduced-strict-all-node-preview.json \
+  .benchmarks/ocpq-strict-publication-preview.json
 ```
 
-The loader preserves directed object-object relations and builds only the
-generic object, activity, typed-neighbor, and relation summaries needed by
-Q1-Q7. Loading, `ocpm.finish_load`, and `ocpm.rebuild_binding_index` are
-preprocessing costs and are not part of lookup latency.
+Clean-state environment values accept only the lowercase literals `true` and
+`false`. The generated evidence uses native JSON booleans; quoted strings such
+as `"true"` are rejected. A claimed `provenance_complete: true` never overrides
+an explicit dirty engine, reference, or `pg_ocpm` source-tree flag.
 
-The candidate timer covers a persistent prepared PostgreSQL query, fetching one
-binary capsule, native Rust decoding, and complete expansion into owned logical
-root rows. Every warmup and measured query is canonicalized and checked exactly
-after its timer. In each concurrency epoch, every client performs one exact
-canonical Q1-Q7 check before entering the timed barrier and another after all
-timed requests finish. Timed requests enforce the reference logical-row count
-and persist per-client and per-query counts; they do not canonicalize and hash
-each response inside the serving clock.
+The latency arm starts a fresh single-worker candidate container for each query
+and uses exactly zero warmups and ten measured runs. The timer covers the
+prepared PostgreSQL request, fetching all node capsules, native decoding, and
+complete owned materialization of every node. External-ID canonicalization,
+sorting, JSON serialization, and hashing occur outside the timer, but exact
+all-node parity is required for every measured run.
 
-The normal run is fixed at ten warmups and 30 measured samples. Its concurrency
-sweep uses levels 1/4/8/16, persistent prepared connections, and three epochs
-per level. Every epoch runs for at least five seconds and completes at least 32
-mixed Q1-Q7 requests per client. The memory runner starts one
-fresh, single-worker container per query. It samples Linux RSS and VmHWM while
-decoded rows remain live, then performs exact canonical parity after the sample
-so the external-ID maps do not contaminate the memory boundary.
+The same command also records fresh-process peak memory per query, complete
+serving storage, and 1/4/8/16-client concurrency. Each concurrency client uses
+a persistent prepared connection, rotates through Q1-Q7, and proves exact
+all-node parity before and after every timed epoch. Every request retains a
+positive integer-nanosecond latency under its client ID and zero-based request
+ID; this identity determines the Q1-Q7 rotation, allowing the release checker
+to reconstruct query counts and recompute p50, p95, and p99 independently.
 
-For an intentionally dirty working-tree run, regenerate the reference, set
-`OCPM_SOURCE_REVISION` to the current 40-hex `HEAD`, set both source-tree-clean
-flags to `false`, and pass `--allow-preview` plus all three explicitly computed
-SHA-256 values to the checker. Preview mode never bypasses artifact digest
-verification. The default checker mode requires matching clean harness
-provenance on the OCPQ reference and candidate, a clean 40-hex `pg_ocpm`
-revision, one hashed Docker-daemon identity, and immutable reference,
-candidate, and database Docker image IDs.
+## Publication gates
 
-## Release gates
+The strict artifact is not publication-ready unless all of these conditions
+hold:
 
-The checker rejects an artifact unless all of these conditions hold:
-
-- exact Q1-Q7 row-multiset, duplicate, violation/value, and SHA-256 parity;
-- exactly ten warmups and 30 same-host samples per query;
-- at least 10x same-host speedup for every query (with 5x as the hard design
-  floor) and a 10x geometric-mean target;
-- no speedup or ratio derived from author-published cross-host timings;
+- exact duplicate-preserving parity for every node of Q1-Q7;
+- zero warmups and ten same-host measured runs per query on both engines;
+- at least 5x same-host speedup for every query and at least 10x geometric-mean
+  speedup;
+- no ratio derived from author-published cross-host timings;
 - no more than 128 MiB serving storage, 16 MiB indexes, or 8 MiB binding data;
-- no more than 8 MiB fresh-process peak RSS over baseline;
-- complete, parity-checked 1/4/8/16-client sweeps with three five-second epochs,
-  at least 32 requests per client per epoch, throughput CV no greater than 15%,
-  16-to-1 median-throughput scaling of at least 5x, and median epoch p95 latency
-  below 10 ms at every level;
-- exact Q1-Q7 aggregate counts, per-client request counts, and pre/post parity
-  evidence for every concurrency epoch;
-- clean 40-hex source provenance and immutable candidate and database image IDs
-  in default release mode.
+- fresh-process memory evidence while the complete owned tree remains live;
+- complete, parity-checked 1/4/8/16-client sweeps with three epochs per level,
+  at least five seconds and 32 requests per client in each epoch; and
+- matching source-tree, Docker-host, candidate-image, and database-image
+  provenance.
 
-See [`docs/ocpq-performance.md`](../../docs/ocpq-performance.md) for the recorded
-results and limitations.
+See [`docs/ocpq-performance.md`](../../docs/ocpq-performance.md) for publication
+status. Preview artifacts remain ignored and must be shown for review before
+any result is committed or pushed.

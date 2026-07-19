@@ -9,7 +9,7 @@ This package does not install another PostgreSQL extension or create database
 objects. PostgreSQL must already have `pg_ocpm` installed and the target dataset
 must already be finalized with `ocpm.finish_load(...)`.
 
-Required extension version: `pg_ocpm >= 0.6.0`. See the
+Required extension version: `pg_ocpm >= 0.7.0`. See the
 [release notes](CHANGELOG.md) for every library version.
 
 ## Native analytics
@@ -51,9 +51,11 @@ concurrency, correctness gates, and published context, see
 For the three-way comparison of lightly indexed PostgreSQL with PM4Py,
 `pg_ocpm` with PM4Py, and `pg_ocpm` with ocpm-engine, see
 [SAP PM4Py three-way performance](docs/sap-pm4py-three-way-performance.md).
-For the seven-query same-host OCPQ comparison, with author-published timings
-retained only as source context, see
-[OCPQ comparison](docs/ocpq-performance.md).
+The previous seven-query OCPQ result was withdrawn because it compared only
+root output with OCPQ's complete evaluation tree. Its replacement uses zero
+warmups, ten same-host measured runs per query, and exact duplicate-preserving
+parity for every node. No corrected numbers are published until all resource
+and provenance gates pass; see [OCPQ benchmark status](docs/ocpq-performance.md).
 For the detailed application read-path design and code references, see
 [Application query performance improvements](docs/technical-performance-improvements.md).
 For the open-source capability survey, license boundary, research review, and

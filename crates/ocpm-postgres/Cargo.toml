@@ -20,4 +20,4 @@ tokio = { version = "1.53.0", features = ["macros", "rt-multi-thread", "sync"] }
 
 [[example]]
 name = "ocpq_candidate_benchmark"
-path = "../../benchmarks/ocpq/pg_ocpm_candidate_benchmark.rs"
+path = "../../benchmarks/ocpq/strict_candidate_benchmark.rs"

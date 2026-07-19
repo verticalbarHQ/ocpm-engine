@@ -1,6 +1,6 @@
 # SAP O2C and P2P three-way benchmark status
 
-No `pg_ocpm 0.6.0` plus `ocpm-engine 0.5.0` PM4Py comparison is published in
+No `pg_ocpm 0.7.0` plus `ocpm-engine 0.6.0` PM4Py comparison is published in
 this source revision. Earlier staging values predated the final per-sample
 exactness, source-provenance, hash-locked dependency, concurrency-performance,
 and total peak-RSS gates. The full staging artifact was removed rather than
@@ -14,11 +14,14 @@ IDES O2C and P2P OCEL 2.0 logs:
 2. `pg_ocpm` plus PM4Py; and
 3. `pg_ocpm` plus `ocpm-engine`.
 
-Every timed sample must return the same canonical answer. The release checker
-also requires randomized latency arms, three duration-bounded concurrency
-epochs, at least a 3x engine-throughput ratio at every worker level, bounded
-total and incremental peak RSS, storage regression limits, clean source/image
-provenance, and exact benchmark package versions.
+Every timed sample must return the same canonical answer. Serial latency uses
+three epochs of 30 randomized rounds per arm and retains all 90 integer-
+nanosecond samples plus realized arm-order codes. The report shows pooled p95
+with the range of the three epoch p95s, and the release checker independently
+recomputes all pooled and epoch metrics. It also requires three duration-bounded
+concurrency epochs, at least a 3x engine-throughput ratio at every worker level,
+bounded total and incremental peak RSS, storage regression limits, clean
+source/image provenance, and exact benchmark package versions.
 
 Run `make perf-public`, inspect the ignored staging artifact and generated
 report, and then run `make perf-public-preview-check`. Results will be shown for

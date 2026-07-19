@@ -7,13 +7,13 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.5.0"
+version = "0.6.0"
 edition = "2024"
 rust-version = "1.85"
 authors = ["ocpm-engine contributors"]
 
 [workspace.dependencies]
-ocpm-core = { path = "crates/ocpm-core", version = "0.5.0" }
+ocpm-core = { path = "crates/ocpm-core", version = "0.6.0" }
 serde = { version = "1.0.228", features = ["derive"] }
 thiserror = "2.0.17"
 

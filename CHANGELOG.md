@@ -2,10 +2,35 @@
 
 All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
 
+## 0.6.0 - 2026-07-19
+
+- Replaced the withdrawn root-only OCPQ comparison with a strict all-node
+  Q1-Q7 harness using OCPQ's primary zero-warmup, ten-evaluation protocol.
+- Added prepared binding-tree requests that fetch, decode, and fully own every
+  node from one PostgreSQL round trip, including duplicate bindings, exact
+  violation reasons, and typed labels.
+- Added generic two- through five-ID binding schemas for the complete
+  `pg_ocpm 0.7.0` relation, temporal-pair, neighbor, and event-universe outputs.
+- Added fresh-container-per-query latency, fresh-process peak-memory,
+  relation-level storage, empty-result-cache, and exact pre/post 1/4/8/16-client
+  concurrency evidence with fail-closed source and image provenance. Every
+  concurrency request retains its integer-nanosecond latency and deterministic
+  client/request/query identity so the checker independently recomputes tail
+  percentiles.
+- Corrected the even-sample p50 estimator to average the two middle samples and
+  labels ten-sample nearest-rank p95 as the maximum observation.
+- Replaced single-batch SAP tail latency with three 30-round epochs, retaining
+  every integer-nanosecond sample and realized arm-order code so release
+  checkers can recompute pooled p50/p95 and report the epoch-p95 range.
+- Removed the obsolete root-only runner and certification paths so withdrawn
+  artifacts cannot satisfy current preview or release gates.
+- Raised the minimum supported extension version to `pg_ocpm 0.7.0`.
+
 ## 0.5.0 - 2026-07-19
 
-- Prepared the corrected public SAP O2C/P2P and OCPQ protocols for clean
-  `ocpm-engine 0.5.0` and `pg_ocpm 0.6.0` release measurements.
+- Prepared public SAP O2C/P2P release protocols and an initial OCPQ protocol;
+  the latter was subsequently withdrawn because it materialized only root
+  output while OCPQ materialized every evaluation-tree node.
 - Added reusable prepared binding queries that validate a single non-null
   `bytea` result, reuse the PostgreSQL plan, decode compact capsules, and
   expose the encoded transfer size.
@@ -15,14 +40,12 @@ All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
 - Added decoding for three numeric identifiers plus a violation bit and a
   generic adapter for workload-declared, directed universal-equality relation
   constraints in `pg_ocpm 0.6.0`.
-- Replaced the invalid OCPQ comparison with a same-host Q1-Q7 harness that uses
-  OCPQ's evaluation boundary, performs complete owned-row materialization,
-  requires exact external-ID output parity, and records latency, storage,
-  fresh-process memory, and 1/4/8/16-client concurrency.
-- Added repeatable public OCPQ and SAP release gates.
-- Raised every public headline latency comparison to ten warmups and 30
-  randomized, exactness-checked samples while retaining the historical p50
-  values only as regression baselines.
+- Added an initial same-host OCPQ Q1-Q7 harness, superseded by the strict
+  all-node protocol in 0.6.0.
+- Added repeatable public SAP release gates; strict OCPQ gates arrive in 0.6.0.
+- Raised SAP headline latency comparisons to ten warmups and 30 randomized,
+  exactness-checked samples while retaining historical p50 values only as
+  regression baselines.
 - Hardened public Python concurrency gates with persistent per-worker
   connections, verified worker warmups, three duration-bounded epochs,
   per-worker request floors, exact request parity, and concurrency-only artifact
@@ -46,8 +69,8 @@ All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
 - Added Python capsule metadata and row-decoding APIs that release the GIL
   during native decoding.
 - Raised the minimum supported extension version to `pg_ocpm 0.5.0`.
-- Added the initial OCPQ benchmark integration, superseded by the corrected
-  measurement and exact-output harness in 0.5.0.
+- Added the initial OCPQ benchmark integration, later withdrawn and replaced by
+  the strict all-node measurement and exact-output harness in 0.6.0.
 
 ## 0.3.0 - 2026-07-18
 

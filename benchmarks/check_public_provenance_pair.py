@@ -18,12 +18,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--common",
         type=Path,
-        default=Path("docs/results/public-common-pm-0.5.0.json"),
+        default=Path("docs/results/public-common-pm-0.6.0.json"),
     )
     parser.add_argument(
         "--sap",
         type=Path,
-        default=Path("docs/results/sap-pm4py-three-way-0.5.0.json"),
+        default=Path("docs/results/sap-pm4py-three-way-0.6.0.json"),
     )
     parser.add_argument("--preview", action="store_true")
     return parser.parse_args()
@@ -43,8 +43,8 @@ def main() -> None:
     args = parse_args()
     common = load(args.common)
     sap = load(args.sap)
-    if common.get("schema_version") != 3 or sap.get("schema_version") != 3:
-        raise SystemExit("paired public artifacts must use schema version 3")
+    if common.get("schema_version") != 4 or sap.get("schema_version") != 4:
+        raise SystemExit("paired public artifacts must use schema version 4")
     try:
         common_provenance = validate_recorded_public_provenance(
             common.get("provenance"), allow_dirty=args.preview

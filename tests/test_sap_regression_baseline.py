@@ -59,9 +59,9 @@ def test_sap_baseline_contract_rejects_historical_concurrency() -> None:
 
 def test_sap_baseline_contract_rejects_extra_memory_metrics() -> None:
     baseline = copy.deepcopy(load_baseline())
-    baseline["datasets"][0]["workloads"][0]["memory"][
-        "pg_ocpm_ocpm_engine"
-    ]["elapsed_ms"] = 1.0
+    baseline["datasets"][0]["workloads"][0]["memory"]["pg_ocpm_ocpm_engine"][
+        "elapsed_ms"
+    ] = 1.0
 
     with pytest.raises(SystemExit, match="non-regression memory fields"):
         CHECKER.validate_regression_baseline(baseline)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import importlib.util
 import multiprocessing
 import random
@@ -152,15 +153,31 @@ def test_public_and_sap_protocols_share_release_floors() -> None:
 
 
 @pytest.mark.parametrize(
-    ("checker", "historical_warmups", "historical_runs"),
-    ((PUBLIC_CHECK, 2, 9), (SAP_CHECK, 1, 5)),
+    ("runner", "checker", "engines", "historical_warmups", "historical_runs"),
+    (
+        (
+            PUBLIC,
+            PUBLIC_CHECK,
+            PUBLIC_CHECK.EXPECTED_CONCURRENCY_ENGINES,
+            2,
+            9,
+        ),
+        (SAP, SAP_CHECK, SAP_CHECK.ENGINES, 1, 5),
+    ),
 )
-def test_release_latency_protocol_requires_ten_warmups_and_thirty_runs(
+def test_release_latency_protocol_requires_three_epochs_of_thirty_runs(
+    runner,
     checker,
+    engines,
     historical_warmups,
     historical_runs,
 ) -> None:
-    current = {"warmups": 10, "measured_runs": 30, "latency_scope": "same"}
+    current = {
+        "warmups": 10,
+        "measured_runs": 90,
+        "serial_latency": runner.serial_latency_method(10, 30, 3, engines),
+        "latency_scope": "same",
+    }
     historical = {
         "warmups": historical_warmups,
         "measured_runs": historical_runs,
@@ -169,7 +186,7 @@ def test_release_latency_protocol_requires_ten_warmups_and_thirty_runs(
 
     checker.validate_latency_sample_counts(current)
     assert checker.latency_method(current) == checker.latency_method(historical)
-    with pytest.raises(SystemExit, match="10 warmups and 30 measured runs"):
+    with pytest.raises(SystemExit, match="three epochs of 30"):
         checker.validate_latency_sample_counts(historical)
 
 
@@ -182,15 +199,16 @@ def test_release_latency_runner_defaults_are_ten_and_thirty(
 
     assert args.warmups == 10
     assert args.runs == 30
+    assert args.latency_epochs == 3
 
 
-def test_sap_first_execution_counts_require_thirty_nonnegative_integers() -> None:
+def test_sap_first_execution_counts_require_ninety_nonnegative_integers() -> None:
     valid = {
-        "vanilla_pg_pm4py": 10,
-        "pg_ocpm_pm4py": 9,
-        "pg_ocpm_ocpm_engine": 11,
+        "vanilla_pg_pm4py": 30,
+        "pg_ocpm_pm4py": 29,
+        "pg_ocpm_ocpm_engine": 31,
     }
-    SAP_CHECK.validate_first_execution_counts("sap_o2c", "dfg", valid, 30)
+    SAP_CHECK.validate_first_execution_counts("sap_o2c", "dfg", valid, 90)
 
     for invalid in (
         {**valid, "pg_ocpm_ocpm_engine": -1},
@@ -198,7 +216,7 @@ def test_sap_first_execution_counts_require_thirty_nonnegative_integers() -> Non
         {**valid, "pg_ocpm_ocpm_engine": 5},
     ):
         with pytest.raises(SystemExit, match="randomized execution counts"):
-            SAP_CHECK.validate_first_execution_counts("sap_o2c", "dfg", invalid, 30)
+            SAP_CHECK.validate_first_execution_counts("sap_o2c", "dfg", invalid, 90)
 
 
 def test_public_latency_rejects_an_early_incorrect_timed_sample() -> None:
@@ -211,6 +229,7 @@ def test_public_latency_rejects_an_early_incorrect_timed_sample() -> None:
             warmups=0,
             runs=2,
             rng=random.Random(1),
+            latency_epochs=1,
         )
 
 
@@ -226,7 +245,86 @@ def test_sap_latency_rejects_an_early_incorrect_timed_sample() -> None:
 
     calls = {name: call(name) for name in SAP.ENGINES}
     with pytest.raises(AssertionError, match="measured"):
-        SAP.timed_comparison(calls, 0, 2, random.Random(1))
+        SAP.timed_comparison(calls, 0, 2, random.Random(1), latency_epochs=1)
+
+
+def advancing_nanosecond_clock():
+    current = 0
+
+    def read() -> int:
+        nonlocal current
+        current += 1_000_000
+        return current
+
+    return read
+
+
+def retained_serial_rows(monkeypatch):
+    monkeypatch.setattr(PUBLIC.time, "perf_counter_ns", advancing_nanosecond_clock())
+    public, _answer = PUBLIC.timed_pair(
+        lambda: ["exact"],
+        lambda: ["exact"],
+        warmups=0,
+        runs=30,
+        rng=random.Random(7),
+        latency_epochs=3,
+    )
+
+    monkeypatch.setattr(SAP.time, "perf_counter_ns", advancing_nanosecond_clock())
+    sap = SAP.timed_comparison(
+        {
+            engine: (lambda: {"answer": "exact", "input": {"rows": 1}})
+            for engine in SAP.ENGINES
+        },
+        warmups=0,
+        runs=30,
+        rng=random.Random(7),
+        latency_epochs=3,
+    )
+    return (
+        (
+            PUBLIC_CHECK,
+            public,
+            PUBLIC_CHECK.EXPECTED_CONCURRENCY_ENGINES[0],
+        ),
+        (SAP_CHECK, sap, SAP_CHECK.ENGINES[0]),
+    )
+
+
+def test_serial_latency_retains_three_recomputable_epochs(monkeypatch) -> None:
+    for checker, row, _engine in retained_serial_rows(monkeypatch):
+        checker.validate_serial_latency_row("sap_o2c", "dfg", row)
+        assert len(row["serial_epochs"]) == 3
+        assert all(len(epoch["order_codes"]) == 30 for epoch in row["serial_epochs"])
+        assert all(
+            metrics["runs"] == 90
+            for metrics in (
+                row[name]
+                for name in (
+                    checker.EXPECTED_CONCURRENCY_ENGINES
+                    if checker is PUBLIC_CHECK
+                    else checker.ENGINES
+                )
+            )
+        )
+
+
+@pytest.mark.parametrize("mutation", ("sample", "order", "count", "p95_range"))
+def test_serial_latency_checker_rejects_tampered_raw_evidence(
+    monkeypatch, mutation
+) -> None:
+    for checker, source, engine in retained_serial_rows(monkeypatch):
+        row = copy.deepcopy(source)
+        if mutation == "sample":
+            row["serial_epochs"][0]["arms"][engine]["samples_ns"][0] += 1_000_000
+        elif mutation == "order":
+            row["serial_epochs"][0]["order_codes"][0] = 999
+        elif mutation == "count":
+            row["serial_epochs"][0]["arms"][engine]["samples_ns"].pop()
+        else:
+            row[engine]["epoch_p95_range_ms"] = [0.0, 0.0]
+        with pytest.raises(SystemExit):
+            checker.validate_serial_latency_row("sap_o2c", "dfg", row)
 
 
 def test_epoch_aggregation_uses_medians_and_retains_evidence() -> None:

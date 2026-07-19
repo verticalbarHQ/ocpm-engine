@@ -24,24 +24,127 @@ EXPECTED_DATASET_SHA256 = (
 EXPECTED_QUERY_FILES_SHA256 = (
     "387aeb31398d86ef8e7b15393649cbabe75be56185fd67d27021744025873466"
 )
-CANONICAL_TUPLES = {
-    "Q1": ["application_external_id", "violated"],
-    "Q2": ["offer_external_id", "created_event_external_id", "violated"],
-    "Q3": ["returned_event_external_id", "violated"],
-    "Q4": ["application_external_id", "accepted_event_external_id", "violated"],
-    "Q5": [
-        "application_external_id",
-        "case_r_external_id",
-        "accepted_event_external_id",
-        "violated",
+CONSTRAINT_ZERO_REASON = '{"ConstraintNotSatisfied":0}'
+EXPECTED_Q6_ROOT_LABEL = {"type": "string", "value": "3140h7m38s"}
+EXPECTED_Q6_DURATION_MICROSECONDS = 11_304_458_000_000
+EXPECTED_NODE_MANIFESTS = {
+    "Q1": [
+        {
+            "rows": 31_509,
+            "violations": 11_086,
+            "reasons": {CONSTRAINT_ZERO_REASON: 11_086},
+            "objects": [0],
+            "events": [],
+            "labels": [],
+        },
+        {
+            "rows": 20_423,
+            "violations": 0,
+            "reasons": {},
+            "objects": [0],
+            "events": [0],
+            "labels": [],
+        },
     ],
-    "Q6": ["duration_microseconds"],
+    "Q2": [
+        {
+            "rows": 42_995,
+            "violations": 19_690,
+            "reasons": {CONSTRAINT_ZERO_REASON: 19_690},
+            "objects": [0],
+            "events": [0],
+            "labels": [],
+        },
+        {
+            "rows": 23_305,
+            "violations": 0,
+            "reasons": {},
+            "objects": [0],
+            "events": [0, 1],
+            "labels": [],
+        },
+    ],
+    "Q3": [
+        {
+            "rows": 23_305,
+            "violations": 0,
+            "reasons": {},
+            "objects": [],
+            "events": [0],
+            "labels": [],
+        },
+        {
+            "rows": 23_305,
+            "violations": 0,
+            "reasons": {},
+            "objects": [1],
+            "events": [0],
+            "labels": [],
+        },
+    ],
+    "Q4": [
+        {
+            "rows": 31_509,
+            "violations": 14_281,
+            "reasons": {CONSTRAINT_ZERO_REASON: 14_281},
+            "objects": [0],
+            "events": [0],
+            "labels": [],
+        },
+        {
+            "rows": 17_228,
+            "violations": 0,
+            "reasons": {},
+            "objects": [0, 1],
+            "events": [0, 1],
+            "labels": [],
+        },
+    ],
+    "Q5": [
+        {
+            "rows": 31_509,
+            "violations": 6_429,
+            "reasons": {CONSTRAINT_ZERO_REASON: 6_429},
+            "objects": [0, 1],
+            "events": [0],
+            "labels": [],
+        },
+        {
+            "rows": 42_995,
+            "violations": 8_100,
+            "reasons": {CONSTRAINT_ZERO_REASON: 8_100},
+            "objects": [0, 1, 2],
+            "events": [0, 1],
+            "labels": [],
+        },
+    ],
+    "Q6": [
+        {
+            "rows": 1,
+            "violations": 0,
+            "reasons": {},
+            "objects": [],
+            "events": [],
+            "labels": ["max_dur"],
+        },
+        {
+            "rows": 17_228,
+            "violations": 0,
+            "reasons": {},
+            "objects": [0],
+            "events": [0, 1],
+            "labels": [],
+        },
+    ],
     "Q7": [
-        "application_external_id",
-        "offer_1_external_id",
-        "offer_2_external_id",
-        "created_event_1_external_id",
-        "created_event_2_external_id",
+        {
+            "rows": 74_771,
+            "violations": 0,
+            "reasons": {},
+            "objects": [0, 1, 2],
+            "events": [1, 2],
+            "labels": [],
+        }
     ],
 }
 
@@ -52,8 +155,8 @@ def arguments() -> argparse.Namespace:
     parser.add_argument("--sqlite", required=True, type=Path)
     parser.add_argument("--eval", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
-    parser.add_argument("--warmups", type=int, default=10)
-    parser.add_argument("--runs", type=int, default=30)
+    parser.add_argument("--warmups", type=int, default=0)
+    parser.add_argument("--runs", type=int, default=10)
     return parser.parse_args()
 
 
@@ -117,23 +220,92 @@ def percentile(samples: list[float], fraction: float) -> float:
     return ordered[min(len(ordered) - 1, math.ceil(len(ordered) * fraction) - 1)]
 
 
-def canonical_output(payload: dict) -> dict:
-    rows = sorted(
-        payload.pop("canonical_rows"),
-        key=lambda row: json.dumps(row, sort_keys=True, default=str),
+def compact_json(value: object) -> str:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
     )
-    encoded = json.dumps(rows, separators=(",", ":"), default=str).encode()
-    if len(rows) != payload["root_rows"]:
-        raise RuntimeError(f"{payload['query']}: canonical row count changed")
-    result = {
-        "rows": len(rows),
-        "sha256": hashlib.sha256(encoded).hexdigest(),
-    }
-    if payload["root_violations"] is not None:
-        result["violations"] = payload["root_violations"]
-    if payload["duration_microseconds"] is not None:
-        result["duration_microseconds"] = payload["duration_microseconds"]
-    return result
+
+
+def canonical_nodes(payload: dict) -> list[dict]:
+    query = payload["query"]
+    expected_nodes = EXPECTED_NODE_MANIFESTS[query]
+    raw_nodes = payload.pop("nodes")
+    if not isinstance(raw_nodes, list) or len(raw_nodes) != len(expected_nodes):
+        raise RuntimeError(
+            f"{query}: expected {len(expected_nodes)} result nodes, "
+            f"found {len(raw_nodes) if isinstance(raw_nodes, list) else 'invalid'}"
+        )
+    outputs = []
+    for index, (node, expected) in enumerate(
+        zip(raw_nodes, expected_nodes, strict=True)
+    ):
+        if not isinstance(node, dict):
+            raise RuntimeError(f"{query} node {index}: output must be an object")
+        canonical_rows = node.pop("canonical_rows", None)
+        if not isinstance(canonical_rows, list):
+            raise RuntimeError(f"{query} node {index}: canonical rows are missing")
+        rows = sorted(canonical_rows, key=compact_json)
+        encoded = compact_json(rows).encode()
+        if node.get("node_index") != index:
+            raise RuntimeError(f"{query} node {index}: node index changed")
+        if (
+            node.get("situation_count") != expected["rows"]
+            or len(rows) != expected["rows"]
+        ):
+            raise RuntimeError(
+                f"{query} node {index}: expected {expected['rows']} rows, "
+                f"found {node.get('situation_count')} / {len(rows)}"
+            )
+        if node.get("object_variables") != expected["objects"]:
+            raise RuntimeError(
+                f"{query} node {index}: object-variable manifest changed"
+            )
+        if node.get("event_variables") != expected["events"]:
+            raise RuntimeError(f"{query} node {index}: event-variable manifest changed")
+        if node.get("label_names") != expected["labels"]:
+            raise RuntimeError(f"{query} node {index}: label manifest changed")
+        violations = node.get("situation_violated_count")
+        if violations != expected["violations"]:
+            raise RuntimeError(
+                f"{query} node {index}: expected {expected['violations']} violations, "
+                f"found {violations}"
+            )
+        reason_counts = node.get("violation_reason_counts")
+        if reason_counts != expected["reasons"]:
+            raise RuntimeError(f"{query} node {index}: violation reasons changed")
+        if node.get("canonical_json_bytes") != len(encoded):
+            raise RuntimeError(f"{query} node {index}: canonical byte count changed")
+        if query == "Q6" and index == 0:
+            expected_root = [
+                [],
+                [],
+                [["max_dur", payload.get("q6_root_label")]],
+                None,
+            ]
+            if rows != [expected_root]:
+                raise RuntimeError("Q6 node 0: canonical root label row changed")
+        outputs.append(
+            {
+                "node_index": index,
+                "object_variables": node["object_variables"],
+                "event_variables": node["event_variables"],
+                "label_names": node["label_names"],
+                "situation_count": len(rows),
+                "situation_violated_count": violations,
+                "violation_reason_counts": reason_counts,
+                "canonical_json_bytes": len(encoded),
+                "canonical_sha256": hashlib.sha256(encoded).hexdigest(),
+            }
+        )
+    if (
+        sum(node["situation_count"] for node in outputs)
+        != payload["all_node_situations"]
+    ):
+        raise RuntimeError(f"{query}: all-node situation count changed")
+    return outputs
 
 
 def run_query(args: argparse.Namespace, query: str) -> dict:
@@ -178,7 +350,7 @@ def run_query(args: argparse.Namespace, query: str) -> dict:
         if not helper_output.exists():
             raise RuntimeError(f"{query}: OCPQ helper did not create its output")
         payload = json.loads(helper_output.read_text())
-    if payload.get("schema_version") != 1:
+    if payload.get("schema_version") != 2:
         raise RuntimeError(f"{query}: unexpected helper schema")
     if payload.get("ocpq_commit") != EXPECTED_OCPQ_COMMIT:
         raise RuntimeError(f"{query}: unexpected helper OCPQ commit")
@@ -189,7 +361,18 @@ def run_query(args: argparse.Namespace, query: str) -> dict:
     samples = payload.get("runs_ms", [])
     if payload.get("measured_runs") != args.runs or len(samples) != args.runs:
         raise RuntimeError(f"{query}: helper measured-run count mismatch")
-    canonical = canonical_output(payload)
+    nodes = canonical_nodes(payload)
+    if payload.get("root_node") != 0:
+        raise RuntimeError(f"{query}: root node changed")
+    q6_root_label = payload.get("q6_root_label")
+    q6_duration_microseconds = payload.get("q6_duration_microseconds")
+    if query == "Q6":
+        if q6_root_label != EXPECTED_Q6_ROOT_LABEL:
+            raise RuntimeError("Q6: root max_dur label changed")
+        if q6_duration_microseconds != EXPECTED_Q6_DURATION_MICROSECONDS:
+            raise RuntimeError("Q6: normalized duration changed")
+    elif q6_root_label is not None or q6_duration_microseconds is not None:
+        raise RuntimeError(f"{query}: unexpected Q6 label diagnostics")
     published_seconds = json.loads((args.eval / query / "ocpq-res.json").read_text())
     if (
         not isinstance(published_seconds, list)
@@ -212,15 +395,19 @@ def run_query(args: argparse.Namespace, query: str) -> dict:
         "p50_ms": statistics.median(samples),
         "p95_ms": percentile(samples, 0.95),
         "all_node_situations": payload["all_node_situations"],
-        "canonical_json_bytes": payload["canonical_json_bytes"],
-        "canonical_output": canonical,
+        "root_node": payload["root_node"],
+        "q6_root_label": q6_root_label,
+        "q6_duration_microseconds": q6_duration_microseconds,
+        "nodes": nodes,
     }
 
 
 def main() -> None:
     args = arguments()
-    if args.warmups < 0 or args.runs <= 0:
-        raise ValueError("warmups must be nonnegative and runs must be positive")
+    if args.warmups != 0 or args.runs != 10:
+        raise ValueError(
+            "the upstream OCPQ protocol requires zero warmups and ten runs"
+        )
     eval_commit = subprocess.run(
         ["git", "-C", str(args.eval.resolve()), "rev-parse", "HEAD"],
         check=True,
@@ -255,7 +442,7 @@ def main() -> None:
 
     queries = {f"Q{index}": run_query(args, f"Q{index}") for index in range(1, 8)}
     artifact = {
-        "schema_version": 3,
+        "schema_version": 4,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "source": {
             "ocpq_eval_commit": eval_commit,
@@ -274,21 +461,40 @@ def main() -> None:
             "import_and_link_timed_separately": True,
             "author_published_samples_per_query": 10,
             "author_published_results_are_cross_host_only": True,
+            "upstream_backend_measure_performance_iterations": 10,
+            "upstream_backend_warmups": 0,
             "timing_boundary": (
                 "OCPQ tree.evaluate plus construction and collection of every "
                 "node's EvaluationResultWithCount structures"
             ),
             "correctness_boundary": (
-                "root external-ID canonicalization, sorting, compact-JSON "
+                "every node's complete object/event bindings, typed labels, exact "
+                "violation reason, external-ID canonicalization, sorting, compact-JSON "
                 "serialization, and SHA-256 outside the timed region"
             ),
             "canonicalization": {
-                "scope": "root node situations",
+                "scope": "every query-tree node and every materialized situation",
                 "identifiers": "OCEL external object and event IDs",
-                "violation": "violation reason normalized to boolean",
-                "q6": "maximum child duration normalized to integer microseconds",
+                "variables": "object/event variable indexes retained in every row",
+                "labels": (
+                    "label names and exact serialized OCPQ label value types retained"
+                ),
+                "violation": (
+                    "exact serialized OCPQ ViolationReason retained; null means "
+                    "satisfied"
+                ),
+                "q6": (
+                    "root max_dur typed label retained exactly and independently "
+                    "checked against the maximum child duration in integer microseconds"
+                ),
                 "ordering": "lexicographic compact-JSON row order; duplicates retained",
-                "tuples": CANONICAL_TUPLES,
+                "row_shape": [
+                    "[[object_variable_index, external_object_id], ...]",
+                    "[[event_variable_index, external_event_id], ...]",
+                    "[[label_name, typed_label_value], ...]",
+                    "serialized_violation_reason_or_null",
+                ],
+                "expected_node_manifests": EXPECTED_NODE_MANIFESTS,
             },
         },
         "environment": {

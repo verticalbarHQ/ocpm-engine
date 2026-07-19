@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import itertools
 import json
 import math
 import statistics
@@ -25,7 +26,7 @@ EXPECTED_PAYLOAD_SHA256 = (
 EXPECTED_BASELINE_PAYLOAD_SHA256 = (
     "2f4d7aa425444bbde420547bbda7b0a4839c38e0294e6e9a9f43954f9d19a331"
 )
-CURRENT_RELEASE = {"ocpm_engine": "0.5.0", "pg_ocpm": "0.6.0"}
+CURRENT_RELEASE = {"ocpm_engine": "0.6.0", "pg_ocpm": "0.7.0"}
 BASELINE_RELEASE = {"ocpm_engine": "0.4.0", "pg_ocpm": "0.5.0"}
 BASELINE_ARTIFACT_TYPE = "public_common_pm_latency_storage_regression_baseline"
 EXPECTED_SOURCE = {
@@ -57,7 +58,9 @@ MAXIMUM_CONCURRENCY_THROUGHPUT_CV = 0.15
 MINIMUM_CANDIDATE_THROUGHPUT_RATIO = 10.0
 MAXIMUM_CANDIDATE_CONCURRENCY_P95_MS = 15.0
 EXPECTED_LATENCY_WARMUPS = 10
-EXPECTED_LATENCY_RUNS = 30
+EXPECTED_LATENCY_EPOCHS = 3
+EXPECTED_LATENCY_SAMPLES_PER_EPOCH = 30
+EXPECTED_LATENCY_RUNS = EXPECTED_LATENCY_EPOCHS * EXPECTED_LATENCY_SAMPLES_PER_EPOCH
 
 
 def parse_args() -> argparse.Namespace:
@@ -65,7 +68,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "result",
         nargs="?",
-        default="docs/results/public-common-pm-0.5.0.json",
+        default="docs/results/public-common-pm-0.6.0.json",
     )
     parser.add_argument(
         "--regression-baseline",
@@ -144,19 +147,146 @@ def latency_method(method: dict[str, Any]) -> dict[str, Any]:
     stable.pop("concurrency_model", None)
     stable.pop("warmups", None)
     stable.pop("measured_runs", None)
+    stable.pop("serial_latency", None)
     return stable
 
 
 def validate_latency_sample_counts(method: dict[str, Any]) -> None:
+    expected_orders = [
+        list(order) for order in itertools.permutations(EXPECTED_CONCURRENCY_ENGINES)
+    ]
+    expected_serial = {
+        "epochs": EXPECTED_LATENCY_EPOCHS,
+        "samples_per_epoch": EXPECTED_LATENCY_SAMPLES_PER_EPOCH,
+        "total_samples_per_arm": EXPECTED_LATENCY_RUNS,
+        "warmups": EXPECTED_LATENCY_WARMUPS,
+        "clock": "time.perf_counter_ns",
+        "percentile": "nearest-rank",
+        "aggregation": (
+            "pooled p50/p95 with retained per-epoch p50/p95/min/max and "
+            "epoch p95 median/range"
+        ),
+        "raw_evidence": (
+            "positive integer nanosecond samples and realized randomized "
+            "arm-order codes"
+        ),
+        "arm_order_dictionary": expected_orders,
+    }
     if (
         method.get("warmups") != EXPECTED_LATENCY_WARMUPS
         or method.get("measured_runs") != EXPECTED_LATENCY_RUNS
+        or method.get("serial_latency") != expected_serial
     ):
         fail(
-            "public release latency protocol requires exactly "
-            f"{EXPECTED_LATENCY_WARMUPS} warmups and "
-            f"{EXPECTED_LATENCY_RUNS} measured runs"
+            "public release latency protocol requires 10 warmups and three "
+            "epochs of 30 retained nanosecond samples per arm"
         )
+
+
+def serial_metrics_ns(samples_ns: list[int]) -> dict[str, Any]:
+    ordered = sorted(samples_ns)
+    p95_index = math.ceil(len(ordered) * 0.95) - 1
+    return {
+        "p50_ms": round(statistics.median(ordered) / 1_000_000, 3),
+        "p95_ms": round(ordered[p95_index] / 1_000_000, 3),
+        "minimum_ms": round(ordered[0] / 1_000_000, 3),
+        "maximum_ms": round(ordered[-1] / 1_000_000, 3),
+        "runs": len(ordered),
+    }
+
+
+def validate_serial_latency_row(
+    dataset: str,
+    workload: str,
+    row: dict[str, Any],
+) -> None:
+    label = f"{dataset}/{workload}"
+    order_dictionary = [
+        list(order) for order in itertools.permutations(EXPECTED_CONCURRENCY_ENGINES)
+    ]
+    epochs = row.get("serial_epochs", [])
+    if len(epochs) != EXPECTED_LATENCY_EPOCHS:
+        fail(f"{label}: expected three retained serial-latency epochs")
+
+    pooled = {engine: [] for engine in EXPECTED_CONCURRENCY_ENGINES}
+    epoch_p95 = {engine: [] for engine in EXPECTED_CONCURRENCY_ENGINES}
+    decoded_first_counts = {engine: 0 for engine in EXPECTED_CONCURRENCY_ENGINES}
+    epoch_metric_fields = {
+        "p50_ms",
+        "p95_ms",
+        "minimum_ms",
+        "maximum_ms",
+        "runs",
+        "samples_ns",
+    }
+    for epoch_index, epoch in enumerate(epochs, start=1):
+        if set(epoch) != {"epoch", "order_codes", "arms"}:
+            fail(f"{label}: serial epoch contains unexpected fields")
+        codes = epoch.get("order_codes", [])
+        if (
+            epoch.get("epoch") != epoch_index
+            or len(codes) != EXPECTED_LATENCY_SAMPLES_PER_EPOCH
+            or any(
+                type(code) is not int or not 0 <= code < len(order_dictionary)
+                for code in codes
+            )
+        ):
+            fail(f"{label}: invalid retained serial arm-order codes")
+        for code in codes:
+            decoded_first_counts[order_dictionary[code][0]] += 1
+
+        arms = epoch.get("arms", {})
+        if set(arms) != set(EXPECTED_CONCURRENCY_ENGINES):
+            fail(f"{label}: serial epoch arm set changed")
+        for engine in EXPECTED_CONCURRENCY_ENGINES:
+            evidence = arms[engine]
+            if set(evidence) != epoch_metric_fields:
+                fail(f"{label}/{engine}: serial epoch fields changed")
+            samples = evidence.get("samples_ns", [])
+            if len(samples) != EXPECTED_LATENCY_SAMPLES_PER_EPOCH or any(
+                type(sample) is not int or sample <= 0 for sample in samples
+            ):
+                fail(f"{label}/{engine}: invalid raw nanosecond samples")
+            recomputed = serial_metrics_ns(samples)
+            if any(evidence.get(key) != value for key, value in recomputed.items()):
+                fail(f"{label}/{engine}: serial epoch metrics do not match raw samples")
+            pooled[engine].extend(samples)
+            epoch_p95[engine].append(recomputed["p95_ms"])
+
+    counts = row.get("first_execution_counts", {})
+    if (
+        set(counts) != set(EXPECTED_CONCURRENCY_ENGINES)
+        or any(type(value) is not int or value <= 0 for value in counts.values())
+        or counts != decoded_first_counts
+    ):
+        fail(f"{label}: randomized serial execution counts changed")
+
+    aggregate_fields = {
+        "p50_ms",
+        "p95_ms",
+        "minimum_ms",
+        "maximum_ms",
+        "runs",
+        "exact_samples",
+        "epoch_count",
+        "epoch_p95_median_ms",
+        "epoch_p95_range_ms",
+    }
+    for engine in EXPECTED_CONCURRENCY_ENGINES:
+        evidence = row.get(engine, {})
+        if set(evidence) != aggregate_fields:
+            fail(f"{label}/{engine}: pooled serial fields changed")
+        recomputed = serial_metrics_ns(pooled[engine])
+        p95_values = epoch_p95[engine]
+        expected = {
+            **recomputed,
+            "exact_samples": EXPECTED_LATENCY_RUNS,
+            "epoch_count": EXPECTED_LATENCY_EPOCHS,
+            "epoch_p95_median_ms": round(statistics.median(p95_values), 3),
+            "epoch_p95_range_ms": [min(p95_values), max(p95_values)],
+        }
+        if evidence != expected:
+            fail(f"{label}/{engine}: pooled metrics do not match raw samples")
 
 
 def validate_regression_baseline(baseline: dict[str, Any]) -> None:
@@ -374,7 +504,7 @@ def validate_concurrency_section(section_name: str, section: dict[str, Any]) -> 
 def validate_contract(
     result: dict[str, Any], baseline: dict[str, Any], *, allow_dirty: bool
 ) -> dict[tuple[str, str], dict[str, Any]]:
-    if result.get("schema_version") != 3:
+    if result.get("schema_version") != 4:
         fail("unexpected public benchmark schema version")
     if result.get("release") != CURRENT_RELEASE:
         fail("unexpected public benchmark release versions")
@@ -418,6 +548,7 @@ def validate_contract(
         for row in dataset["workloads"]:
             if row.get("correct") is not True:
                 fail(f"{name}/{row['workload']}: correctness gate failed")
+            validate_serial_latency_row(name, row["workload"], row)
             for engine in ("vanilla_postgres_python", "pg_ocpm_rust"):
                 metrics = row[engine]
                 if metrics.get("runs") != result["method"]["measured_runs"]:

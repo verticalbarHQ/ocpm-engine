@@ -191,6 +191,7 @@ SELECT ocpm.rebuild_binding_index(
     ARRAY[
         'A_Submitted','O_Created','O_Returned','A_Accepted','O_Accepted'
     ]::text[],
+    ARRAY['O_Returned']::text[],
     '[{"source_object_type":"Application",'
     '"target_object_type":"Offer",'
     '"activities":["O_Accepted","O_Created"]}]'::jsonb,

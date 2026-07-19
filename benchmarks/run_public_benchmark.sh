@@ -7,6 +7,11 @@ python="${PYTHON:-python3}"
 pg_ocpm_source="${PG_OCPM_SOURCE:-}"
 pg_ocpm_repository="${PG_OCPM_REPOSITORY:-}"
 concurrency_only=false
+engine_release="0.6.0"
+pg_ocpm_release="0.7.0"
+public_result_name="public-common-pm-${engine_release}.json"
+sap_result_name="sap-pm4py-three-way-${engine_release}.json"
+sap_report_name="sap-pm4py-three-way-${engine_release}.md"
 
 if [[ "${1:-}" == "--concurrency-only" ]]; then
     concurrency_only=true
@@ -19,8 +24,8 @@ if [[ "$concurrency_only" == true ]]; then
         exit 2
     fi
     for artifact in \
-        "$root/.benchmarks/public-common-pm-0.5.0.json" \
-        "$root/.benchmarks/sap-pm4py-three-way-0.5.0.json"; do
+        "$root/.benchmarks/$public_result_name" \
+        "$root/.benchmarks/$sap_result_name"; do
         if [[ ! -f "$artifact" ]]; then
             echo "Concurrency-only mode requires existing artifact: $artifact" >&2
             exit 2
@@ -30,7 +35,7 @@ fi
 
 if [[ -z "$pg_ocpm_source" ]]; then
     sibling="$(cd "$root/.." && pwd)/pg_ocpm"
-    checkout="$root/.benchmarks/pg_ocpm-0.6.0"
+    checkout="$root/.benchmarks/pg_ocpm-${pg_ocpm_release}"
     if [[ -f "$sibling/pg_ocpm.control" ]]; then
         pg_ocpm_source="$sibling"
     else
@@ -41,7 +46,7 @@ if [[ -z "$pg_ocpm_source" ]]; then
         fi
         if [[ ! -d "$checkout/.git" ]]; then
             mkdir -p "$root/.benchmarks"
-            git clone --branch v0.6.0 --depth 1 \
+            git clone --branch "v${pg_ocpm_release}" --depth 1 \
                 "$pg_ocpm_repository" "$checkout"
         fi
         pg_ocpm_source="$checkout"
@@ -136,7 +141,7 @@ if [[ "$concurrency_only" == true ]]; then
         --extension-host postgres_ocpm \
         --baseline-db ocel_benchmark \
         --extension-db ocel_benchmark \
-        --output /results/public-common-pm-0.5.0.json \
+        --output "/results/$public_result_name" \
         --concurrency-only
 else
     benchmark_exec \
@@ -145,9 +150,10 @@ else
         --extension-host postgres_ocpm \
         --baseline-db ocel_benchmark \
         --extension-db ocel_benchmark \
-        --output /results/public-common-pm-0.5.0.json \
+        --output "/results/$public_result_name" \
         --warmups 10 \
         --runs 30 \
+        --latency-epochs 3 \
         "$@"
 fi
 
@@ -160,8 +166,8 @@ if [[ "$concurrency_only" == true ]]; then
         --baseline-host postgres_vanilla \
         --extension-host postgres_ocpm \
         --database ocel_benchmark \
-        --output /results/sap-pm4py-three-way-0.5.0.json \
-        --report /results/sap-pm4py-three-way-0.5.0.md \
+        --output "/results/$sap_result_name" \
+        --report "/results/$sap_report_name" \
         --concurrency-only
 else
     benchmark_exec \
@@ -169,24 +175,23 @@ else
         --baseline-host postgres_vanilla \
         --extension-host postgres_ocpm \
         --database ocel_benchmark \
-        --output /results/sap-pm4py-three-way-0.5.0.json \
-        --report /results/sap-pm4py-three-way-0.5.0.md \
+        --output "/results/$sap_result_name" \
+        --report "/results/$sap_report_name" \
         --warmups 10 \
-        --runs 30
+        --runs 30 \
+        --latency-epochs 3
 fi
 
-public_result="$root/.benchmarks/public-common-pm-0.5.0.json"
-sap_result="$root/.benchmarks/sap-pm4py-three-way-0.5.0.json"
+public_result="$root/.benchmarks/$public_result_name"
+sap_result="$root/.benchmarks/$sap_result_name"
 
-if [[ "$concurrency_only" == true ]]; then
-    "$python" "$root/benchmarks/check_public_result.py" \
-        "$public_result" --preview
-    "$python" "$root/benchmarks/check_sap_pm4py_result.py" \
-        "$sap_result" --preview
-    "$python" "$root/benchmarks/check_public_provenance_pair.py" \
-        --common "$public_result" --sap "$sap_result" --preview
-    echo "Validated schema-3 concurrency preview; published docs/results unchanged."
-fi
+"$python" "$root/benchmarks/check_public_result.py" \
+    "$public_result" --preview
+"$python" "$root/benchmarks/check_sap_pm4py_result.py" \
+    "$sap_result" --preview
+"$python" "$root/benchmarks/check_public_provenance_pair.py" \
+    --common "$public_result" --sap "$sap_result" --preview
+echo "Validated staged schema-4 preview; published docs/results unchanged."
 
 echo "staged result: $public_result"
 echo "staged result: $sap_result"

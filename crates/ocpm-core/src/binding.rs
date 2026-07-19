@@ -17,6 +17,10 @@ pub enum BindingSchema {
     FiveIds = 5,
     PairGroups = 6,
     ThreeIdsViolation = 7,
+    TwoIds = 8,
+    ThreeIds = 9,
+    FourIds = 10,
+    FiveIdsViolation = 11,
 }
 
 impl TryFrom<u8> for BindingSchema {
@@ -31,6 +35,10 @@ impl TryFrom<u8> for BindingSchema {
             5 => Ok(Self::FiveIds),
             6 => Ok(Self::PairGroups),
             7 => Ok(Self::ThreeIdsViolation),
+            8 => Ok(Self::TwoIds),
+            9 => Ok(Self::ThreeIds),
+            10 => Ok(Self::FourIds),
+            11 => Ok(Self::FiveIdsViolation),
             other => Err(BindingDecodeError::UnknownSchema(other)),
         }
     }
@@ -254,6 +262,10 @@ fn decode_materialized(
         BindingSchema::FiveIds => (5, false, false, false),
         BindingSchema::PairGroups => unreachable!(),
         BindingSchema::ThreeIdsViolation => (3, false, true, false),
+        BindingSchema::TwoIds => (2, false, false, false),
+        BindingSchema::ThreeIds => (3, false, false, false),
+        BindingSchema::FourIds => (4, false, false, false),
+        BindingSchema::FiveIdsViolation => (5, false, true, false),
     };
     let mut minimum_bytes = row_count
         .checked_mul(id_count)
@@ -504,6 +516,103 @@ mod tests {
         output.extend([VERSION, schema as u8]);
         varint(rows as u64, &mut output);
         output
+    }
+
+    fn materialized_ids(
+        schema: BindingSchema,
+        columns: &[&[i64]],
+        violations: Option<&[bool]>,
+    ) -> Vec<u8> {
+        let row_count = columns.first().map_or_else(
+            || violations.map_or(0, |values| values.len()),
+            |column| column.len(),
+        );
+        assert!(columns.iter().all(|column| column.len() == row_count));
+        assert!(violations.is_none_or(|values| values.len() == row_count));
+
+        let mut bytes = header(schema, row_count);
+        for column in columns {
+            let mut previous = 0_i64;
+            for &value in *column {
+                signed(value.checked_sub(previous).unwrap(), &mut bytes);
+                previous = value;
+            }
+        }
+        if let Some(values) = violations {
+            for chunk in values.chunks(8) {
+                let mut packed = 0_u8;
+                for (index, value) in chunk.iter().enumerate() {
+                    packed |= u8::from(*value) << index;
+                }
+                bytes.push(packed);
+            }
+        }
+        bytes
+    }
+
+    #[test]
+    fn decodes_two_three_and_four_id_schemas() {
+        let cases = [
+            (BindingSchema::TwoIds, vec![vec![10, 12], vec![100, 95]]),
+            (
+                BindingSchema::ThreeIds,
+                vec![vec![20, 21], vec![200, 205], vec![2_000, 1_999]],
+            ),
+            (
+                BindingSchema::FourIds,
+                vec![
+                    vec![30, 29],
+                    vec![300, 301],
+                    vec![3_000, 3_010],
+                    vec![30_000, 29_000],
+                ],
+            ),
+        ];
+
+        for (schema, columns) in cases {
+            let column_slices = columns.iter().map(Vec::as_slice).collect::<Vec<_>>();
+            let bytes = materialized_ids(schema, &column_slices, None);
+            let capsule = BindingCapsule::decode(&bytes).unwrap();
+            assert_eq!(capsule.schema(), schema);
+            assert_eq!(capsule.row_count(), 2);
+            assert_eq!(
+                capsule
+                    .rows()
+                    .map(|row| row.ids().to_vec())
+                    .collect::<Vec<_>>(),
+                (0..2)
+                    .map(|row| columns.iter().map(|column| column[row]).collect())
+                    .collect::<Vec<Vec<_>>>()
+            );
+            assert!(capsule.rows().all(|row| row.violated.is_none()));
+        }
+    }
+
+    #[test]
+    fn decodes_five_id_schema_with_violation_rows() {
+        let columns = [
+            &[1, 2, 4][..],
+            &[10, 20, 10][..],
+            &[100, 101, 102][..],
+            &[1_000, 999, 998][..],
+            &[10_000, 10_100, 10_200][..],
+        ];
+        let violations = [false, true, true];
+        let bytes = materialized_ids(BindingSchema::FiveIdsViolation, &columns, Some(&violations));
+
+        let capsule = BindingCapsule::decode(&bytes).unwrap();
+        assert_eq!(capsule.schema(), BindingSchema::FiveIdsViolation);
+        assert_eq!(
+            capsule
+                .rows()
+                .map(|row| (row.ids().to_vec(), row.violated))
+                .collect::<Vec<_>>(),
+            [
+                (vec![1, 10, 100, 1_000, 10_000], Some(false)),
+                (vec![2, 20, 101, 999, 10_100], Some(true)),
+                (vec![4, 10, 102, 998, 10_200], Some(true)),
+            ]
+        );
     }
 
     #[test]

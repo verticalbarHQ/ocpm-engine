@@ -172,10 +172,10 @@ class FakeCursor:
 
 def test_execute_and_version_check_use_cursor_protocol() -> None:
     engine = OcpmEngine(9, 12)
-    version_cursor = FakeCursor(("0.6.0",))
+    version_cursor = FakeCursor(("0.7.0",))
     query_cursor = FakeCursor(({"nodes": []},))
 
-    assert engine.verify_pg_ocpm(version_cursor) == "0.6.0"
+    assert engine.verify_pg_ocpm(version_cursor) == "0.7.0"
     assert engine.execute(query_cursor, request("entire_process_map")) == {"nodes": []}
     assert version_cursor.executed == ("SELECT ocpm.version()", None)
     assert query_cursor.executed and query_cursor.executed[1] == {
@@ -186,5 +186,5 @@ def test_execute_and_version_check_use_cursor_protocol() -> None:
 
 
 def test_version_check_rejects_older_pg_ocpm() -> None:
-    with pytest.raises(RuntimeError, match="0.6.0 or later"):
-        OcpmEngine.verify_pg_ocpm(FakeCursor(("0.5.0",)))
+    with pytest.raises(RuntimeError, match="0.7.0 or later"):
+        OcpmEngine.verify_pg_ocpm(FakeCursor(("0.6.0",)))

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import itertools
 import json
 import math
 import multiprocessing
@@ -16,7 +17,7 @@ import subprocess
 import sys
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -96,7 +97,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--datasets", default=",".join(DATASETS))
     parser.add_argument("--train-fraction", type=float, default=0.8)
     parser.add_argument("--warmups", type=int, default=10)
-    parser.add_argument("--runs", type=int, default=30)
+    parser.add_argument(
+        "--runs",
+        type=int,
+        default=30,
+        help="measured rounds in each serial-latency epoch",
+    )
+    parser.add_argument("--latency-epochs", type=int, default=3)
     parser.add_argument("--seed", type=int, default=20260718)
     parser.add_argument("--timeout-seconds", type=int, default=120)
     parser.add_argument("--concurrency", default="1,2,4,8")
@@ -117,11 +124,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--output",
-        default=".benchmarks/sap-pm4py-three-way.json",
+        default=".benchmarks/sap-pm4py-three-way-0.6.0.json",
     )
     parser.add_argument(
         "--report",
-        default=".benchmarks/sap-pm4py-three-way.md",
+        default=".benchmarks/sap-pm4py-three-way-0.6.0.md",
     )
     parser.add_argument("--memory-worker", choices=ENGINES)
     parser.add_argument("--memory-dataset", choices=tuple(DATASETS))
@@ -135,6 +142,8 @@ def parse_args() -> argparse.Namespace:
         parser.error("--train-fraction must be between zero and one")
     if args.warmups < 0 or args.runs < 1:
         parser.error("--warmups must be nonnegative and --runs must be positive")
+    if args.latency_epochs < 1:
+        parser.error("--latency-epochs must be positive")
     if args.memory_worker and not (args.memory_dataset and args.memory_workload):
         parser.error("--memory-worker requires dataset and workload")
     levels = [int(value) for value in args.concurrency.split(",") if value]
@@ -703,12 +712,45 @@ def percentile(samples: list[float], percentile_value: float) -> float:
     return ordered[index]
 
 
-def metrics(samples: list[float]) -> dict[str, Any]:
+def serial_order_dictionary(engines: Iterable[str]) -> list[list[str]]:
+    return [list(order) for order in itertools.permutations(tuple(engines))]
+
+
+def serial_latency_method(
+    warmups: int,
+    samples_per_epoch: int,
+    epochs: int,
+    engines: Iterable[str],
+) -> dict[str, Any]:
     return {
-        "p50_ms": round(statistics.median(samples) * 1000, 3),
-        "p95_ms": round(percentile(samples, 0.95) * 1000, 3),
-        "minimum_ms": round(min(samples) * 1000, 3),
-        "runs": len(samples),
+        "epochs": epochs,
+        "samples_per_epoch": samples_per_epoch,
+        "total_samples_per_arm": samples_per_epoch * epochs,
+        "warmups": warmups,
+        "clock": "time.perf_counter_ns",
+        "percentile": "nearest-rank",
+        "aggregation": (
+            "pooled p50/p95 with retained per-epoch p50/p95/min/max and "
+            "epoch p95 median/range"
+        ),
+        "raw_evidence": (
+            "positive integer nanosecond samples and realized randomized "
+            "arm-order codes"
+        ),
+        "arm_order_dictionary": serial_order_dictionary(engines),
+    }
+
+
+def serial_metrics_ns(samples_ns: list[int]) -> dict[str, Any]:
+    if not samples_ns:
+        raise ValueError("serial latency requires at least one sample")
+    ordered = sorted(samples_ns)
+    return {
+        "p50_ms": round(statistics.median(ordered) / 1_000_000, 3),
+        "p95_ms": round(percentile(ordered, 0.95) / 1_000_000, 3),
+        "minimum_ms": round(ordered[0] / 1_000_000, 3),
+        "maximum_ms": round(ordered[-1] / 1_000_000, 3),
+        "runs": len(ordered),
     }
 
 
@@ -717,6 +759,7 @@ def timed_comparison(
     warmups: int,
     runs: int,
     rng: random.Random,
+    latency_epochs: int = 3,
 ) -> dict[str, Any]:
     if tuple(calls) != ENGINES:
         raise ValueError("calls must follow ENGINES ordering")
@@ -736,23 +779,56 @@ def timed_comparison(
                 raise AssertionError(
                     f"three-way correctness mismatch during {name} warmup"
                 )
-    samples = {name: [] for name in calls}
+    order_dictionary = serial_order_dictionary(calls)
+    order_codes = {tuple(order): code for code, order in enumerate(order_dictionary)}
+    samples: dict[str, list[int]] = {name: [] for name in calls}
     exact_samples = {name: 0 for name in calls}
     first_counts = {name: 0 for name in calls}
-    for _ in range(runs):
-        order = list(calls)
-        rng.shuffle(order)
-        first_counts[order[0]] += 1
-        for name in order:
-            started = time.perf_counter()
-            answers[name] = calls[name]()
-            samples[name].append(time.perf_counter() - started)
-            if canonical(answers[name]["answer"]) != expected:
-                raise AssertionError(
-                    f"three-way correctness mismatch during measured {name} sample"
-                )
-            exact_samples[name] += 1
-    measured = {name: metrics(values) for name, values in samples.items()}
+    serial_epochs = []
+    for epoch_index in range(latency_epochs):
+        epoch_samples: dict[str, list[int]] = {name: [] for name in calls}
+        epoch_order_codes = []
+        for _ in range(runs):
+            order = list(calls)
+            rng.shuffle(order)
+            epoch_order_codes.append(order_codes[tuple(order)])
+            first_counts[order[0]] += 1
+            for name in order:
+                started_ns = time.perf_counter_ns()
+                answers[name] = calls[name]()
+                elapsed_ns = time.perf_counter_ns() - started_ns
+                if elapsed_ns <= 0:
+                    raise RuntimeError("serial latency clock did not advance")
+                epoch_samples[name].append(elapsed_ns)
+                samples[name].append(elapsed_ns)
+                if canonical(answers[name]["answer"]) != expected:
+                    raise AssertionError(
+                        f"three-way correctness mismatch during measured {name} sample"
+                    )
+                exact_samples[name] += 1
+        serial_epochs.append(
+            {
+                "epoch": epoch_index + 1,
+                "order_codes": epoch_order_codes,
+                "arms": {
+                    name: {
+                        **serial_metrics_ns(values),
+                        "samples_ns": values,
+                    }
+                    for name, values in epoch_samples.items()
+                },
+            }
+        )
+    measured = {}
+    for name, values in samples.items():
+        epoch_p95 = [epoch["arms"][name]["p95_ms"] for epoch in serial_epochs]
+        measured[name] = {
+            **serial_metrics_ns(values),
+            "exact_samples": exact_samples[name],
+            "epoch_count": latency_epochs,
+            "epoch_p95_median_ms": round(statistics.median(epoch_p95), 3),
+            "epoch_p95_range_ms": [min(epoch_p95), max(epoch_p95)],
+        }
     vanilla = measured["vanilla_pg_pm4py"]["p50_ms"]
     pg_pm4py = measured["pg_ocpm_pm4py"]["p50_ms"]
     engine = measured["pg_ocpm_ocpm_engine"]["p50_ms"]
@@ -761,7 +837,6 @@ def timed_comparison(
         **{
             name: {
                 **measured[name],
-                "exact_samples": exact_samples[name],
                 "input": answers[name]["input"],
             }
             for name in ENGINES
@@ -774,6 +849,7 @@ def timed_comparison(
             ),
         },
         "first_execution_counts": first_counts,
+        "serial_epochs": serial_epochs,
         "answer_sha256": hashlib.sha256(expected.encode()).hexdigest(),
     }
 
@@ -1362,6 +1438,14 @@ def preserved_concurrency_only_payload(result: dict[str, Any]) -> dict[str, Any]
     return preserved
 
 
+def render_latency(metrics: dict[str, Any]) -> str:
+    p95_range = metrics["epoch_p95_range_ms"]
+    return (
+        f"{metrics['p50_ms']:,.2f} / {metrics['p95_ms']:,.2f} ms "
+        f"({p95_range[0]:,.2f}-{p95_range[1]:,.2f})"
+    )
+
+
 def render(result: dict[str, Any]) -> str:
     lines = [
         "# SAP O2C and P2P three-way process-mining benchmark",
@@ -1391,8 +1475,10 @@ def render(result: dict[str, Any]) -> str:
             ),
             "",
             (
-                "| Workload | Vanilla PG + PM4Py | pg_ocpm + PM4Py | "
-                "pg_ocpm + ocpm-engine | pg_ocpm PM4Py vs vanilla | "
+                "| Workload | Vanilla PG + PM4Py p50/p95 (epoch range) | "
+                "pg_ocpm + PM4Py p50/p95 (epoch range) | "
+                "pg_ocpm + ocpm-engine p50/p95 (epoch range) | "
+                "pg_ocpm PM4Py vs vanilla | "
                 "Engine vs vanilla |"
             ),
             "|---|---:|---:|---:|---:|---:|",
@@ -1400,9 +1486,9 @@ def render(result: dict[str, Any]) -> str:
         for row in dataset["latency"]:
             lines.append(
                 f"| {row['workload']} | "
-                f"{row['vanilla_pg_pm4py']['p50_ms']:,.2f} ms | "
-                f"{row['pg_ocpm_pm4py']['p50_ms']:,.2f} ms | "
-                f"{row['pg_ocpm_ocpm_engine']['p50_ms']:,.2f} ms | "
+                f"{render_latency(row['vanilla_pg_pm4py'])} | "
+                f"{render_latency(row['pg_ocpm_pm4py'])} | "
+                f"{render_latency(row['pg_ocpm_ocpm_engine'])} | "
                 f"{row['speedups']['pg_ocpm_pm4py_vs_vanilla']:,.2f}x | "
                 f"{row['speedups']['pg_ocpm_ocpm_engine_vs_vanilla']:,.2f}x |"
             )
@@ -1500,8 +1586,13 @@ def render(result: dict[str, Any]) -> str:
         "",
         (
             f"- {result['method']['warmups']} warmups and "
-            f"{result['method']['measured_runs']} randomized measured runs per "
-            "latency comparison."
+            f"{result['method']['serial_latency']['epochs']} serial epochs of "
+            f"{result['method']['serial_latency']['samples_per_epoch']} randomized "
+            "measured rounds per latency comparison."
+        ),
+        (
+            "- Serial p50 and p95 use all retained nanosecond samples; each p95 "
+            "is shown with the minimum-to-maximum range of the three epoch p95s."
         ),
         (
             "- Latency includes database extraction, client materialization, model "
@@ -1532,6 +1623,13 @@ def update_concurrency_only(args: argparse.Namespace) -> dict[str, Any]:
     output = Path(args.output)
     report = Path(args.report)
     result = load_verified_artifact(output)
+    if result.get("schema_version") != 4 or "serial_latency" not in result.get(
+        "method", {}
+    ):
+        raise SystemExit(
+            "concurrency-only refresh requires a schema-4 artifact with raw "
+            "three-epoch serial latency evidence"
+        )
     preserved_before = preserved_concurrency_only_payload(result)
     if result.get("source", {}).get("datasets") != args.datasets:
         raise SystemExit("concurrency-only dataset selection changed")
@@ -1576,7 +1674,7 @@ def update_concurrency_only(args: argparse.Namespace) -> dict[str, Any]:
                 args, fixture, expected, dataset_index
             )
         original_generated_at = result["generated_at"]
-        result["schema_version"] = 3
+        result["schema_version"] = 4
         result["generated_at"] = datetime.now(timezone.utc).isoformat()
         result["section_generated_at"] = {
             "latency_storage_and_memory": result.get("section_generated_at", {}).get(
@@ -1647,6 +1745,7 @@ def benchmark(args: argparse.Namespace) -> dict[str, Any]:
                 args.warmups,
                 args.runs,
                 rng,
+                args.latency_epochs,
             )
             latency.append({"workload": workload, **measured})
             for name, value in measured["speedups"].items():
@@ -1735,7 +1834,7 @@ def benchmark(args: argparse.Namespace) -> dict[str, Any]:
     extension.close()
 
     result = {
-        "schema_version": 3,
+        "schema_version": 4,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "source": {
             "title": (
@@ -1749,7 +1848,13 @@ def benchmark(args: argparse.Namespace) -> dict[str, Any]:
         "provenance": public_benchmark_provenance(),
         "method": {
             "warmups": args.warmups,
-            "measured_runs": args.runs,
+            "measured_runs": args.runs * args.latency_epochs,
+            "serial_latency": serial_latency_method(
+                args.warmups,
+                args.runs,
+                args.latency_epochs,
+                ENGINES,
+            ),
             "random_seed": args.seed,
             "train_fraction": args.train_fraction,
             "latency_scope": (

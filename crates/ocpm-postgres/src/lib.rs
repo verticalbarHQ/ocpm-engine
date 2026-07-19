@@ -1,4 +1,4 @@
-//! Thin asynchronous adapter over pg_ocpm 0.6 aggregate and binding interfaces.
+//! Thin asynchronous adapter over pg_ocpm 0.7 aggregate and binding interfaces.
 
 use ocpm_core::{
     TransitionKey,
@@ -77,6 +77,10 @@ pub enum AdapterError {
     InvalidBindingResultShape,
     #[error("binding query returned a NULL capsule")]
     NullBindingCapsule,
+    #[error("binding-tree query must return one or more bytea columns")]
+    InvalidBindingTreeResultShape,
+    #[error("binding-tree query returned a NULL capsule at node {0}")]
+    NullBindingTreeCapsule(usize),
     #[error("the requested materialized relation summary has not been declared or rebuilt")]
     MissingRelationSummary,
 }
@@ -85,6 +89,13 @@ pub enum AdapterError {
 #[derive(Clone, Debug, PartialEq)]
 pub struct BindingQueryResult {
     pub capsule: BindingCapsule,
+    pub encoded_bytes: usize,
+}
+
+/// Fully decoded node capsules from one binding-tree request.
+#[derive(Clone, Debug, PartialEq)]
+pub struct BindingTreeQueryResult {
+    pub capsules: Vec<BindingCapsule>,
     pub encoded_bytes: usize,
 }
 
@@ -100,6 +111,139 @@ pub struct BindingQueryOutput<T> {
 #[derive(Clone, Debug)]
 pub struct PreparedBindingQuery {
     statement: Statement,
+}
+
+/// A connection-specific prepared query whose bytea columns are binding-tree
+/// nodes in root-first order. One PostgreSQL round trip produces every node.
+#[derive(Clone, Debug)]
+pub struct PreparedBindingTreeQuery {
+    statement: Statement,
+    node_count: usize,
+}
+
+fn validate_binding_tree_result_shape<'a>(
+    column_types: impl IntoIterator<Item = &'a Type>,
+) -> Result<usize, AdapterError> {
+    let mut node_count = 0_usize;
+    for column_type in column_types {
+        if *column_type != Type::BYTEA {
+            return Err(AdapterError::InvalidBindingTreeResultShape);
+        }
+        node_count += 1;
+    }
+    if node_count == 0 {
+        return Err(AdapterError::InvalidBindingTreeResultShape);
+    }
+    Ok(node_count)
+}
+
+fn decode_binding_tree_capsules<'a>(
+    node_count: usize,
+    mut encoded_node: impl FnMut(usize) -> Result<Option<&'a [u8]>, AdapterError>,
+) -> Result<BindingTreeQueryResult, AdapterError> {
+    let mut capsules = Vec::new();
+    capsules
+        .try_reserve_exact(node_count)
+        .map_err(|_| BindingDecodeError::AllocationFailed)?;
+    let mut encoded_bytes = 0_usize;
+    for node in 0..node_count {
+        let bytes = encoded_node(node)?.ok_or(AdapterError::NullBindingTreeCapsule(node))?;
+        encoded_bytes = encoded_bytes
+            .checked_add(bytes.len())
+            .ok_or(BindingDecodeError::CountOverflow)?;
+        capsules.push(BindingCapsule::decode(bytes)?);
+    }
+    Ok(BindingTreeQueryResult {
+        capsules,
+        encoded_bytes,
+    })
+}
+
+impl PreparedBindingTreeQuery {
+    pub async fn prepare(client: &Client, sql: &str) -> Result<Self, AdapterError> {
+        let statement = client.prepare(sql).await?;
+        let node_count = validate_binding_tree_result_shape(
+            statement.columns().iter().map(|column| column.type_()),
+        )?;
+        Ok(Self {
+            statement,
+            node_count,
+        })
+    }
+
+    pub fn node_count(&self) -> usize {
+        self.node_count
+    }
+
+    /// Execute one request and decode every node while the PostgreSQL row is
+    /// still borrowed. The result owns all decoded columns.
+    pub async fn execute(
+        &self,
+        client: &Client,
+        parameters: &[&(dyn ToSql + Sync)],
+    ) -> Result<BindingTreeQueryResult, AdapterError> {
+        let row = client.query_one(&self.statement, parameters).await?;
+        decode_binding_tree_capsules(self.node_count, |node| {
+            row.try_get::<_, Option<&[u8]>>(node)
+                .map_err(AdapterError::from)
+        })
+    }
+}
+
+#[cfg(test)]
+mod binding_tree_tests {
+    use super::*;
+
+    const TWO_IDS: &[u8] = b"OCPB\x01\x08\x01\x14\x28";
+    const FIVE_IDS_VIOLATION: &[u8] = b"OCPB\x01\x0b\x01\x02\x04\x06\x08\x0a\x01";
+
+    #[test]
+    fn binding_tree_shape_requires_one_or_more_bytea_columns() {
+        assert_eq!(
+            validate_binding_tree_result_shape([&Type::BYTEA, &Type::BYTEA]).unwrap(),
+            2
+        );
+        assert!(matches!(
+            validate_binding_tree_result_shape(std::iter::empty::<&Type>()),
+            Err(AdapterError::InvalidBindingTreeResultShape)
+        ));
+        assert!(matches!(
+            validate_binding_tree_result_shape([&Type::BYTEA, &Type::INT4]),
+            Err(AdapterError::InvalidBindingTreeResultShape)
+        ));
+    }
+
+    #[test]
+    fn binding_tree_decode_preserves_order_and_accounts_for_encoded_bytes() {
+        let nodes: [Option<&[u8]>; 2] = [Some(TWO_IDS), Some(FIVE_IDS_VIOLATION)];
+        let result = decode_binding_tree_capsules(nodes.len(), |node| Ok(nodes[node])).unwrap();
+
+        assert_eq!(
+            result.encoded_bytes,
+            TWO_IDS.len() + FIVE_IDS_VIOLATION.len()
+        );
+        assert_eq!(
+            result.capsules[0].schema(),
+            ocpm_core::binding::BindingSchema::TwoIds
+        );
+        assert_eq!(
+            result.capsules[1].schema(),
+            ocpm_core::binding::BindingSchema::FiveIdsViolation
+        );
+        assert_eq!(result.capsules[0].rows().next().unwrap().ids(), &[10, 20]);
+        let violation = result.capsules[1].rows().next().unwrap();
+        assert_eq!(violation.ids(), &[1, 2, 3, 4, 5]);
+        assert_eq!(violation.violated, Some(true));
+    }
+
+    #[test]
+    fn binding_tree_decode_reports_the_null_node_position() {
+        let nodes: [Option<&[u8]>; 2] = [Some(TWO_IDS), None];
+        assert!(matches!(
+            decode_binding_tree_capsules(nodes.len(), |node| Ok(nodes[node])),
+            Err(AdapterError::NullBindingTreeCapsule(1))
+        ));
+    }
 }
 
 impl PreparedBindingQuery {
