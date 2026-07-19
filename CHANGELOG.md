@@ -4,6 +4,9 @@ All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
 
 ## Unreleased
 
+- Refreshed the public SAP O2C/P2P benchmark artifacts and reports against
+  `ocpm-engine 0.4.0` and `pg_ocpm 0.5.0`.
+
 ## 0.4.0 - 2026-07-18
 
 - Added generic native decoding for `pg_ocpm 0.5.0` binding-result capsules,

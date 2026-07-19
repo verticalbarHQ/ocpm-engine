@@ -8,7 +8,7 @@ pg_ocpm_repository="${PG_OCPM_REPOSITORY:-}"
 
 if [[ -z "$pg_ocpm_source" ]]; then
     sibling="$(cd "$root/.." && pwd)/pg_ocpm"
-    checkout="$root/.benchmarks/pg_ocpm-0.4.0"
+    checkout="$root/.benchmarks/pg_ocpm-0.5.0"
     if [[ -f "$sibling/pg_ocpm.control" ]]; then
         pg_ocpm_source="$sibling"
     else
@@ -19,7 +19,7 @@ if [[ -z "$pg_ocpm_source" ]]; then
         fi
         if [[ ! -d "$checkout/.git" ]]; then
             mkdir -p "$root/.benchmarks"
-            git clone --branch v0.4.0 --depth 1 \
+            git clone --branch v0.5.0 --depth 1 \
                 "$pg_ocpm_repository" "$checkout"
         fi
         pg_ocpm_source="$checkout"
@@ -51,7 +51,7 @@ docker compose -f "$compose" exec -T benchmark \
     --extension-host postgres_ocpm \
     --baseline-db ocel_benchmark \
     --extension-db ocel_benchmark \
-    --output /results/public-common-pm-0.3.0.json \
+    --output /results/public-common-pm-0.4.0.json \
     "$@"
 
 docker compose -f "$compose" exec -T postgres_vanilla \
@@ -65,5 +65,5 @@ docker compose -f "$compose" exec -T benchmark \
     --output /results/sap-pm4py-three-way.json \
     --report /results/sap-pm4py-three-way.md
 
-echo "result: $root/.benchmarks/public-common-pm-0.3.0.json"
+echo "result: $root/.benchmarks/public-common-pm-0.4.0.json"
 echo "result: $root/.benchmarks/sap-pm4py-three-way.json"

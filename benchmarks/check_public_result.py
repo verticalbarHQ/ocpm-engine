@@ -13,7 +13,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "result",
         nargs="?",
-        default="docs/results/public-common-pm-0.3.0.json",
+        default="docs/results/public-common-pm-0.4.0.json",
     )
     return parser.parse_args()
 
@@ -21,6 +21,8 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     path = Path(parse_args().result)
     result = json.loads(path.read_text())
+    if result.get("release") != {"ocpm_engine": "0.4.0", "pg_ocpm": "0.5.0"}:
+        raise SystemExit("unexpected public benchmark release versions")
     recorded = result.pop("payload_sha256", None)
     encoded = json.dumps(result, indent=2, default=str) + "\n"
     computed = hashlib.sha256(encoded.encode()).hexdigest()

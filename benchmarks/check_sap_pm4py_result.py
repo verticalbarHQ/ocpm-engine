@@ -37,6 +37,10 @@ def main() -> None:
 
     if result["source"]["datasets"] != ["sap_o2c", "sap_p2p"]:
         raise SystemExit("expected SAP O2C and P2P datasets")
+    if result["environment"]["client"]["ocpm_engine_version"] != "0.4.0":
+        raise SystemExit("expected ocpm-engine 0.4.0")
+    if result["environment"]["database"]["pg_ocpm"]["pg_ocpm_version"] != "0.5.0":
+        raise SystemExit("expected pg_ocpm 0.5.0")
     datasets = result["datasets"]
     latency = [row for dataset in datasets for row in dataset["latency"]]
     summary = result["summary"]

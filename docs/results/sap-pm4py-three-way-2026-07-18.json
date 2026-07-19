@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-07-18T22:32:16.185726+00:00",
+  "generated_at": "2026-07-19T01:08:33.297738+00:00",
   "source": {
     "title": "Collection of Object-Centric Event Logs (OCEL 2.0 relational SQLite)",
     "doi": "10.5281/zenodo.8261133",
@@ -17,7 +17,7 @@
       "machine": "aarch64",
       "logical_cpus_visible": 18,
       "pm4py_version": "2.7.23.3",
-      "ocpm_engine_version": "0.3.0"
+      "ocpm_engine_version": "0.4.0"
     },
     "database": {
       "vanilla_pg": {
@@ -30,7 +30,7 @@
         "jit": "off"
       },
       "pg_ocpm": {
-        "pg_ocpm_version": "0.4.0",
+        "pg_ocpm_version": "0.5.0",
         "postgres_version": "16.14 (Debian 16.14-1.pgdg13+1)",
         "shared_buffers": "1GB",
         "effective_cache_size": "4GB",
@@ -56,9 +56,9 @@
   "summary": {
     "correct_workloads": 8,
     "total_workloads": 8,
-    "geometric_mean_pg_ocpm_pm4py_speedup_vs_vanilla": 1.317,
-    "geometric_mean_ocpm_engine_speedup_vs_vanilla": 20.514,
-    "geometric_mean_ocpm_engine_speedup_vs_pg_ocpm_pm4py": 15.574
+    "geometric_mean_pg_ocpm_pm4py_speedup_vs_vanilla": 1.319,
+    "geometric_mean_ocpm_engine_speedup_vs_vanilla": 20.992,
+    "geometric_mean_ocpm_engine_speedup_vs_pg_ocpm_pm4py": 15.915
   },
   "datasets": [
     {
@@ -86,18 +86,18 @@
       "summary": {
         "correct_workloads": 4,
         "total_workloads": 4,
-        "geometric_mean_pg_ocpm_pm4py_speedup_vs_vanilla": 1.37,
-        "geometric_mean_ocpm_engine_speedup_vs_vanilla": 15.857,
-        "geometric_mean_ocpm_engine_speedup_vs_pg_ocpm_pm4py": 11.58
+        "geometric_mean_pg_ocpm_pm4py_speedup_vs_vanilla": 1.366,
+        "geometric_mean_ocpm_engine_speedup_vs_vanilla": 15.975,
+        "geometric_mean_ocpm_engine_speedup_vs_pg_ocpm_pm4py": 11.7
       },
       "latency": [
         {
           "workload": "dfg_conformance_95pct",
           "correct": true,
           "vanilla_pg_pm4py": {
-            "p50_ms": 139.019,
-            "p95_ms": 141.407,
-            "minimum_ms": 138.458,
+            "p50_ms": 142.585,
+            "p95_ms": 142.843,
+            "minimum_ms": 142.409,
             "runs": 5,
             "input": {
               "source": "vanilla_pg",
@@ -107,9 +107,9 @@
             }
           },
           "pg_ocpm_pm4py": {
-            "p50_ms": 101.352,
-            "p95_ms": 102.777,
-            "minimum_ms": 100.825,
+            "p50_ms": 104.214,
+            "p95_ms": 105.882,
+            "minimum_ms": 103.385,
             "runs": 5,
             "input": {
               "source": "pg_ocpm",
@@ -119,18 +119,18 @@
             }
           },
           "pg_ocpm_ocpm_engine": {
-            "p50_ms": 12.07,
-            "p95_ms": 12.331,
-            "minimum_ms": 11.84,
+            "p50_ms": 12.057,
+            "p95_ms": 12.462,
+            "minimum_ms": 11.914,
             "runs": 5,
             "input": {
               "aggregate_rows": 59
             }
           },
           "speedups": {
-            "pg_ocpm_pm4py_vs_vanilla": 1.372,
-            "pg_ocpm_ocpm_engine_vs_vanilla": 11.518,
-            "pg_ocpm_ocpm_engine_vs_pg_ocpm_pm4py": 8.397
+            "pg_ocpm_pm4py_vs_vanilla": 1.368,
+            "pg_ocpm_ocpm_engine_vs_vanilla": 11.826,
+            "pg_ocpm_ocpm_engine_vs_pg_ocpm_pm4py": 8.643
           },
           "first_execution_counts": {
             "vanilla_pg_pm4py": 2,
@@ -143,9 +143,9 @@
           "workload": "variant_conformance_95pct",
           "correct": true,
           "vanilla_pg_pm4py": {
-            "p50_ms": 129.167,
-            "p95_ms": 131.235,
-            "minimum_ms": 128.712,
+            "p50_ms": 130.367,
+            "p95_ms": 131.033,
+            "minimum_ms": 129.796,
             "runs": 5,
             "input": {
               "source": "vanilla_pg",
@@ -155,9 +155,9 @@
             }
           },
           "pg_ocpm_pm4py": {
-            "p50_ms": 91.31,
-            "p95_ms": 92.148,
-            "minimum_ms": 91.017,
+            "p50_ms": 92.296,
+            "p95_ms": 92.535,
+            "minimum_ms": 91.482,
             "runs": 5,
             "input": {
               "source": "pg_ocpm",
@@ -167,18 +167,18 @@
             }
           },
           "pg_ocpm_ocpm_engine": {
-            "p50_ms": 16.113,
-            "p95_ms": 16.52,
-            "minimum_ms": 16.049,
+            "p50_ms": 16.334,
+            "p95_ms": 16.463,
+            "minimum_ms": 15.813,
             "runs": 5,
             "input": {
               "aggregate_rows": 798
             }
           },
           "speedups": {
-            "pg_ocpm_pm4py_vs_vanilla": 1.415,
-            "pg_ocpm_ocpm_engine_vs_vanilla": 8.016,
-            "pg_ocpm_ocpm_engine_vs_pg_ocpm_pm4py": 5.667
+            "pg_ocpm_pm4py_vs_vanilla": 1.412,
+            "pg_ocpm_ocpm_engine_vs_vanilla": 7.981,
+            "pg_ocpm_ocpm_engine_vs_pg_ocpm_pm4py": 5.651
           },
           "first_execution_counts": {
             "vanilla_pg_pm4py": 2,
@@ -191,9 +191,9 @@
           "workload": "next_activity_prediction",
           "correct": true,
           "vanilla_pg_pm4py": {
-            "p50_ms": 140.705,
-            "p95_ms": 145.55,
-            "minimum_ms": 139.606,
+            "p50_ms": 140.007,
+            "p95_ms": 140.645,
+            "minimum_ms": 139.552,
             "runs": 5,
             "input": {
               "source": "vanilla_pg",
@@ -203,9 +203,9 @@
             }
           },
           "pg_ocpm_pm4py": {
-            "p50_ms": 103.164,
-            "p95_ms": 107.537,
-            "minimum_ms": 102.649,
+            "p50_ms": 101.932,
+            "p95_ms": 103.261,
+            "minimum_ms": 101.6,
             "runs": 5,
             "input": {
               "source": "pg_ocpm",
@@ -215,18 +215,18 @@
             }
           },
           "pg_ocpm_ocpm_engine": {
-            "p50_ms": 12.061,
-            "p95_ms": 12.928,
-            "minimum_ms": 11.634,
+            "p50_ms": 11.808,
+            "p95_ms": 11.855,
+            "minimum_ms": 11.612,
             "runs": 5,
             "input": {
               "aggregate_rows": 59
             }
           },
           "speedups": {
-            "pg_ocpm_pm4py_vs_vanilla": 1.364,
-            "pg_ocpm_ocpm_engine_vs_vanilla": 11.666,
-            "pg_ocpm_ocpm_engine_vs_pg_ocpm_pm4py": 8.554
+            "pg_ocpm_pm4py_vs_vanilla": 1.374,
+            "pg_ocpm_ocpm_engine_vs_vanilla": 11.857,
+            "pg_ocpm_ocpm_engine_vs_pg_ocpm_pm4py": 8.632
           },
           "first_execution_counts": {
             "vanilla_pg_pm4py": 1,
@@ -239,9 +239,9 @@
           "workload": "edge_bottleneck_ranking",
           "correct": true,
           "vanilla_pg_pm4py": {
-            "p50_ms": 196.873,
-            "p95_ms": 206.37,
-            "minimum_ms": 192.989,
+            "p50_ms": 193.568,
+            "p95_ms": 194.18,
+            "minimum_ms": 193.001,
             "runs": 5,
             "input": {
               "source": "vanilla_pg",
@@ -251,9 +251,9 @@
             }
           },
           "pg_ocpm_pm4py": {
-            "p50_ms": 148.152,
-            "p95_ms": 159.319,
-            "minimum_ms": 147.879,
+            "p50_ms": 147.809,
+            "p95_ms": 149.38,
+            "minimum_ms": 147.413,
             "runs": 5,
             "input": {
               "source": "pg_ocpm",
@@ -263,18 +263,18 @@
             }
           },
           "pg_ocpm_ocpm_engine": {
-            "p50_ms": 3.354,
-            "p95_ms": 3.428,
-            "minimum_ms": 3.076,
+            "p50_ms": 3.326,
+            "p95_ms": 3.358,
+            "minimum_ms": 3.099,
             "runs": 5,
             "input": {
               "aggregate_rows": 60
             }
           },
           "speedups": {
-            "pg_ocpm_pm4py_vs_vanilla": 1.329,
-            "pg_ocpm_ocpm_engine_vs_vanilla": 58.698,
-            "pg_ocpm_ocpm_engine_vs_pg_ocpm_pm4py": 44.172
+            "pg_ocpm_pm4py_vs_vanilla": 1.31,
+            "pg_ocpm_ocpm_engine_vs_vanilla": 58.198,
+            "pg_ocpm_ocpm_engine_vs_pg_ocpm_pm4py": 44.44
           },
           "first_execution_counts": {
             "vanilla_pg_pm4py": 0,
@@ -294,127 +294,127 @@
         ],
         "vanilla_pg_pm4py": {
           "1": {
-            "p50_ms": 139.594,
-            "p95_ms": 143.508,
-            "minimum_ms": 139.241,
+            "p50_ms": 138.492,
+            "p95_ms": 142.61,
+            "minimum_ms": 137.513,
             "runs": 16,
             "requests": 16,
-            "wall_ms": 2243.684,
-            "throughput_qps": 7.131,
+            "wall_ms": 2225.909,
+            "throughput_qps": 7.188,
             "correct": true
           },
           "2": {
-            "p50_ms": 160.645,
-            "p95_ms": 171.66,
-            "minimum_ms": 154.271,
+            "p50_ms": 155.6,
+            "p95_ms": 163.297,
+            "minimum_ms": 150.079,
             "runs": 16,
             "requests": 16,
-            "wall_ms": 1301.422,
-            "throughput_qps": 12.294,
+            "wall_ms": 1255.12,
+            "throughput_qps": 12.748,
             "correct": true
           },
           "4": {
-            "p50_ms": 177.577,
-            "p95_ms": 180.625,
-            "minimum_ms": 172.417,
+            "p50_ms": 172.68,
+            "p95_ms": 174.068,
+            "minimum_ms": 165.734,
             "runs": 16,
             "requests": 16,
-            "wall_ms": 709.618,
-            "throughput_qps": 22.547,
+            "wall_ms": 693.267,
+            "throughput_qps": 23.079,
             "correct": true
           },
           "8": {
-            "p50_ms": 249.298,
-            "p95_ms": 257.575,
-            "minimum_ms": 239.332,
+            "p50_ms": 243.096,
+            "p95_ms": 245.968,
+            "minimum_ms": 237.474,
             "runs": 16,
             "requests": 16,
-            "wall_ms": 499.676,
-            "throughput_qps": 32.021,
+            "wall_ms": 490.369,
+            "throughput_qps": 32.628,
             "correct": true
           }
         },
         "pg_ocpm_pm4py": {
           "1": {
-            "p50_ms": 107.855,
-            "p95_ms": 138.155,
-            "minimum_ms": 103.017,
+            "p50_ms": 104.494,
+            "p95_ms": 108.326,
+            "minimum_ms": 103.776,
             "runs": 16,
             "requests": 16,
-            "wall_ms": 1779.708,
-            "throughput_qps": 8.99,
+            "wall_ms": 1676.488,
+            "throughput_qps": 9.544,
             "correct": true
           },
           "2": {
-            "p50_ms": 106.927,
-            "p95_ms": 110.148,
-            "minimum_ms": 105.12,
+            "p50_ms": 107.918,
+            "p95_ms": 109.073,
+            "minimum_ms": 107.019,
             "runs": 16,
             "requests": 16,
-            "wall_ms": 857.878,
-            "throughput_qps": 18.651,
+            "wall_ms": 865.95,
+            "throughput_qps": 18.477,
             "correct": true
           },
           "4": {
-            "p50_ms": 117.627,
-            "p95_ms": 122.32,
-            "minimum_ms": 116.524,
+            "p50_ms": 123.6,
+            "p95_ms": 125.535,
+            "minimum_ms": 119.046,
             "runs": 16,
             "requests": 16,
-            "wall_ms": 476.888,
-            "throughput_qps": 33.551,
+            "wall_ms": 496.897,
+            "throughput_qps": 32.2,
             "correct": true
           },
           "8": {
-            "p50_ms": 137.541,
-            "p95_ms": 146.529,
-            "minimum_ms": 135.014,
+            "p50_ms": 140.583,
+            "p95_ms": 148.445,
+            "minimum_ms": 136.052,
             "runs": 16,
             "requests": 16,
-            "wall_ms": 283.53,
-            "throughput_qps": 56.431,
+            "wall_ms": 290.852,
+            "throughput_qps": 55.011,
             "correct": true
           }
         },
         "pg_ocpm_ocpm_engine": {
           "1": {
-            "p50_ms": 12.345,
-            "p95_ms": 13.278,
-            "minimum_ms": 11.234,
+            "p50_ms": 11.885,
+            "p95_ms": 13.864,
+            "minimum_ms": 11.411,
             "runs": 16,
             "requests": 16,
-            "wall_ms": 196.965,
-            "throughput_qps": 81.233,
+            "wall_ms": 196.659,
+            "throughput_qps": 81.359,
             "correct": true
           },
           "2": {
-            "p50_ms": 12.33,
-            "p95_ms": 14.325,
-            "minimum_ms": 11.753,
+            "p50_ms": 12.311,
+            "p95_ms": 14.055,
+            "minimum_ms": 11.597,
             "runs": 16,
             "requests": 16,
-            "wall_ms": 103.403,
-            "throughput_qps": 154.735,
+            "wall_ms": 103.424,
+            "throughput_qps": 154.703,
             "correct": true
           },
           "4": {
-            "p50_ms": 14.138,
-            "p95_ms": 16.591,
-            "minimum_ms": 13.578,
+            "p50_ms": 14.021,
+            "p95_ms": 15.229,
+            "minimum_ms": 12.687,
             "runs": 16,
             "requests": 16,
-            "wall_ms": 61.41,
-            "throughput_qps": 260.543,
+            "wall_ms": 60.329,
+            "throughput_qps": 265.213,
             "correct": true
           },
           "8": {
-            "p50_ms": 16.278,
-            "p95_ms": 17.788,
-            "minimum_ms": 15.006,
+            "p50_ms": 15.354,
+            "p95_ms": 16.653,
+            "minimum_ms": 14.26,
             "runs": 16,
             "requests": 16,
-            "wall_ms": 40.57,
-            "throughput_qps": 394.378,
+            "wall_ms": 31.905,
+            "throughput_qps": 501.482,
             "correct": true
           }
         }
@@ -426,9 +426,9 @@
             "dataset": "sap_o2c",
             "workload": "dfg_conformance_95pct",
             "baseline_rss_bytes": 37322752,
-            "peak_rss_bytes": 198578176,
-            "incremental_peak_bytes": 161255424,
-            "elapsed_ms": 506.628,
+            "peak_rss_bytes": 198598656,
+            "incremental_peak_bytes": 161275904,
+            "elapsed_ms": 504.078,
             "input": {
               "source": "vanilla_pg",
               "event_rows": 47899,
@@ -441,10 +441,10 @@
             "engine": "pg_ocpm_pm4py",
             "dataset": "sap_o2c",
             "workload": "dfg_conformance_95pct",
-            "baseline_rss_bytes": 37326848,
-            "peak_rss_bytes": 197832704,
-            "incremental_peak_bytes": 160505856,
-            "elapsed_ms": 463.002,
+            "baseline_rss_bytes": 37298176,
+            "peak_rss_bytes": 198590464,
+            "incremental_peak_bytes": 161292288,
+            "elapsed_ms": 470.589,
             "input": {
               "source": "pg_ocpm",
               "event_rows": 47899,
@@ -457,10 +457,10 @@
             "engine": "pg_ocpm_ocpm_engine",
             "dataset": "sap_o2c",
             "workload": "dfg_conformance_95pct",
-            "baseline_rss_bytes": 37294080,
-            "peak_rss_bytes": 38125568,
-            "incremental_peak_bytes": 831488,
-            "elapsed_ms": 15.656,
+            "baseline_rss_bytes": 37306368,
+            "peak_rss_bytes": 38170624,
+            "incremental_peak_bytes": 864256,
+            "elapsed_ms": 16.297,
             "input": {
               "aggregate_rows": 59
             },
@@ -472,10 +472,10 @@
             "engine": "vanilla_pg_pm4py",
             "dataset": "sap_o2c",
             "workload": "variant_conformance_95pct",
-            "baseline_rss_bytes": 37314560,
-            "peak_rss_bytes": 193818624,
-            "incremental_peak_bytes": 156504064,
-            "elapsed_ms": 485.097,
+            "baseline_rss_bytes": 37318656,
+            "peak_rss_bytes": 193744896,
+            "incremental_peak_bytes": 156426240,
+            "elapsed_ms": 503.848,
             "input": {
               "source": "vanilla_pg",
               "event_rows": 47899,
@@ -488,10 +488,10 @@
             "engine": "pg_ocpm_pm4py",
             "dataset": "sap_o2c",
             "workload": "variant_conformance_95pct",
-            "baseline_rss_bytes": 37302272,
-            "peak_rss_bytes": 193839104,
-            "incremental_peak_bytes": 156536832,
-            "elapsed_ms": 444.425,
+            "baseline_rss_bytes": 37298176,
+            "peak_rss_bytes": 193818624,
+            "incremental_peak_bytes": 156520448,
+            "elapsed_ms": 450.414,
             "input": {
               "source": "pg_ocpm",
               "event_rows": 47899,
@@ -504,10 +504,10 @@
             "engine": "pg_ocpm_ocpm_engine",
             "dataset": "sap_o2c",
             "workload": "variant_conformance_95pct",
-            "baseline_rss_bytes": 37285888,
-            "peak_rss_bytes": 41050112,
-            "incremental_peak_bytes": 3764224,
-            "elapsed_ms": 20.514,
+            "baseline_rss_bytes": 37277696,
+            "peak_rss_bytes": 41074688,
+            "incremental_peak_bytes": 3796992,
+            "elapsed_ms": 20.404,
             "input": {
               "aggregate_rows": 798
             },
@@ -519,10 +519,10 @@
             "engine": "vanilla_pg_pm4py",
             "dataset": "sap_o2c",
             "workload": "next_activity_prediction",
-            "baseline_rss_bytes": 37330944,
-            "peak_rss_bytes": 197849088,
-            "incremental_peak_bytes": 160518144,
-            "elapsed_ms": 519.91,
+            "baseline_rss_bytes": 37310464,
+            "peak_rss_bytes": 198561792,
+            "incremental_peak_bytes": 161251328,
+            "elapsed_ms": 521.884,
             "input": {
               "source": "vanilla_pg",
               "event_rows": 47899,
@@ -535,10 +535,10 @@
             "engine": "pg_ocpm_pm4py",
             "dataset": "sap_o2c",
             "workload": "next_activity_prediction",
-            "baseline_rss_bytes": 37322752,
-            "peak_rss_bytes": 198590464,
-            "incremental_peak_bytes": 161267712,
-            "elapsed_ms": 455.176,
+            "baseline_rss_bytes": 37302272,
+            "peak_rss_bytes": 198606848,
+            "incremental_peak_bytes": 161304576,
+            "elapsed_ms": 464.766,
             "input": {
               "source": "pg_ocpm",
               "event_rows": 47899,
@@ -551,10 +551,10 @@
             "engine": "pg_ocpm_ocpm_engine",
             "dataset": "sap_o2c",
             "workload": "next_activity_prediction",
-            "baseline_rss_bytes": 37306368,
-            "peak_rss_bytes": 38121472,
-            "incremental_peak_bytes": 815104,
-            "elapsed_ms": 15.805,
+            "baseline_rss_bytes": 37302272,
+            "peak_rss_bytes": 38166528,
+            "incremental_peak_bytes": 864256,
+            "elapsed_ms": 16.456,
             "input": {
               "aggregate_rows": 59
             },
@@ -566,10 +566,10 @@
             "engine": "vanilla_pg_pm4py",
             "dataset": "sap_o2c",
             "workload": "edge_bottleneck_ranking",
-            "baseline_rss_bytes": 37335040,
-            "peak_rss_bytes": 210903040,
-            "incremental_peak_bytes": 173568000,
-            "elapsed_ms": 563.7,
+            "baseline_rss_bytes": 37302272,
+            "peak_rss_bytes": 211140608,
+            "incremental_peak_bytes": 173838336,
+            "elapsed_ms": 563.136,
             "input": {
               "source": "vanilla_pg",
               "event_rows": 72919,
@@ -582,10 +582,10 @@
             "engine": "pg_ocpm_pm4py",
             "dataset": "sap_o2c",
             "workload": "edge_bottleneck_ranking",
-            "baseline_rss_bytes": 37285888,
-            "peak_rss_bytes": 211148800,
-            "incremental_peak_bytes": 173862912,
-            "elapsed_ms": 511.462,
+            "baseline_rss_bytes": 37314560,
+            "peak_rss_bytes": 210944000,
+            "incremental_peak_bytes": 173629440,
+            "elapsed_ms": 596.121,
             "input": {
               "source": "pg_ocpm",
               "event_rows": 72919,
@@ -598,10 +598,10 @@
             "engine": "pg_ocpm_ocpm_engine",
             "dataset": "sap_o2c",
             "workload": "edge_bottleneck_ranking",
-            "baseline_rss_bytes": 37285888,
-            "peak_rss_bytes": 38117376,
-            "incremental_peak_bytes": 831488,
-            "elapsed_ms": 6.745,
+            "baseline_rss_bytes": 37294080,
+            "peak_rss_bytes": 38154240,
+            "incremental_peak_bytes": 860160,
+            "elapsed_ms": 7.695,
             "input": {
               "aggregate_rows": 60
             },
@@ -635,18 +635,18 @@
       "summary": {
         "correct_workloads": 4,
         "total_workloads": 4,
-        "geometric_mean_pg_ocpm_pm4py_speedup_vs_vanilla": 1.267,
-        "geometric_mean_ocpm_engine_speedup_vs_vanilla": 26.539,
-        "geometric_mean_ocpm_engine_speedup_vs_pg_ocpm_pm4py": 20.946
+        "geometric_mean_pg_ocpm_pm4py_speedup_vs_vanilla": 1.274,
+        "geometric_mean_ocpm_engine_speedup_vs_vanilla": 27.584,
+        "geometric_mean_ocpm_engine_speedup_vs_pg_ocpm_pm4py": 21.649
       },
       "latency": [
         {
           "workload": "dfg_conformance_95pct",
           "correct": true,
           "vanilla_pg_pm4py": {
-            "p50_ms": 123.22,
-            "p95_ms": 125.895,
-            "minimum_ms": 122.367,
+            "p50_ms": 126.297,
+            "p95_ms": 126.687,
+            "minimum_ms": 125.704,
             "runs": 5,
             "input": {
               "source": "vanilla_pg",
@@ -656,9 +656,9 @@
             }
           },
           "pg_ocpm_pm4py": {
-            "p50_ms": 96.8,
-            "p95_ms": 98.011,
-            "minimum_ms": 95.377,
+            "p50_ms": 98.569,
+            "p95_ms": 99.525,
+            "minimum_ms": 98.436,
             "runs": 5,
             "input": {
               "source": "pg_ocpm",
@@ -668,18 +668,18 @@
             }
           },
           "pg_ocpm_ocpm_engine": {
-            "p50_ms": 25.051,
-            "p95_ms": 25.561,
-            "minimum_ms": 24.808,
+            "p50_ms": 25.203,
+            "p95_ms": 25.384,
+            "minimum_ms": 25.139,
             "runs": 5,
             "input": {
               "aggregate_rows": 19
             }
           },
           "speedups": {
-            "pg_ocpm_pm4py_vs_vanilla": 1.273,
-            "pg_ocpm_ocpm_engine_vs_vanilla": 4.919,
-            "pg_ocpm_ocpm_engine_vs_pg_ocpm_pm4py": 3.864
+            "pg_ocpm_pm4py_vs_vanilla": 1.281,
+            "pg_ocpm_ocpm_engine_vs_vanilla": 5.011,
+            "pg_ocpm_ocpm_engine_vs_pg_ocpm_pm4py": 3.911
           },
           "first_execution_counts": {
             "vanilla_pg_pm4py": 1,
@@ -692,9 +692,9 @@
           "workload": "variant_conformance_95pct",
           "correct": true,
           "vanilla_pg_pm4py": {
-            "p50_ms": 116.464,
-            "p95_ms": 152.649,
-            "minimum_ms": 115.756,
+            "p50_ms": 120.356,
+            "p95_ms": 120.509,
+            "minimum_ms": 117.737,
             "runs": 5,
             "input": {
               "source": "vanilla_pg",
@@ -704,9 +704,9 @@
             }
           },
           "pg_ocpm_pm4py": {
-            "p50_ms": 90.126,
-            "p95_ms": 92.886,
-            "minimum_ms": 89.81,
+            "p50_ms": 92.724,
+            "p95_ms": 93.333,
+            "minimum_ms": 90.76,
             "runs": 5,
             "input": {
               "source": "pg_ocpm",
@@ -716,18 +716,18 @@
             }
           },
           "pg_ocpm_ocpm_engine": {
-            "p50_ms": 0.707,
-            "p95_ms": 0.744,
-            "minimum_ms": 0.388,
+            "p50_ms": 0.702,
+            "p95_ms": 0.737,
+            "minimum_ms": 0.38,
             "runs": 5,
             "input": {
               "aggregate_rows": 38
             }
           },
           "speedups": {
-            "pg_ocpm_pm4py_vs_vanilla": 1.292,
-            "pg_ocpm_ocpm_engine_vs_vanilla": 164.73,
-            "pg_ocpm_ocpm_engine_vs_pg_ocpm_pm4py": 127.477
+            "pg_ocpm_pm4py_vs_vanilla": 1.298,
+            "pg_ocpm_ocpm_engine_vs_vanilla": 171.447,
+            "pg_ocpm_ocpm_engine_vs_pg_ocpm_pm4py": 132.085
           },
           "first_execution_counts": {
             "vanilla_pg_pm4py": 1,
@@ -740,9 +740,9 @@
           "workload": "next_activity_prediction",
           "correct": true,
           "vanilla_pg_pm4py": {
-            "p50_ms": 122.021,
-            "p95_ms": 124.245,
-            "minimum_ms": 121.412,
+            "p50_ms": 122.921,
+            "p95_ms": 123.118,
+            "minimum_ms": 122.319,
             "runs": 5,
             "input": {
               "source": "vanilla_pg",
@@ -752,9 +752,9 @@
             }
           },
           "pg_ocpm_pm4py": {
-            "p50_ms": 95.515,
-            "p95_ms": 97.286,
-            "minimum_ms": 94.65,
+            "p50_ms": 95.851,
+            "p95_ms": 97.538,
+            "minimum_ms": 95.145,
             "runs": 5,
             "input": {
               "source": "pg_ocpm",
@@ -764,8 +764,8 @@
             }
           },
           "pg_ocpm_ocpm_engine": {
-            "p50_ms": 25.099,
-            "p95_ms": 25.153,
+            "p50_ms": 24.858,
+            "p95_ms": 24.918,
             "minimum_ms": 24.777,
             "runs": 5,
             "input": {
@@ -773,9 +773,9 @@
             }
           },
           "speedups": {
-            "pg_ocpm_pm4py_vs_vanilla": 1.278,
-            "pg_ocpm_ocpm_engine_vs_vanilla": 4.862,
-            "pg_ocpm_ocpm_engine_vs_pg_ocpm_pm4py": 3.806
+            "pg_ocpm_pm4py_vs_vanilla": 1.282,
+            "pg_ocpm_ocpm_engine_vs_vanilla": 4.945,
+            "pg_ocpm_ocpm_engine_vs_pg_ocpm_pm4py": 3.856
           },
           "first_execution_counts": {
             "vanilla_pg_pm4py": 0,
@@ -788,9 +788,9 @@
           "workload": "edge_bottleneck_ranking",
           "correct": true,
           "vanilla_pg_pm4py": {
-            "p50_ms": 127.306,
-            "p95_ms": 132.368,
-            "minimum_ms": 126.182,
+            "p50_ms": 127.011,
+            "p95_ms": 127.443,
+            "minimum_ms": 126.615,
             "runs": 5,
             "input": {
               "source": "vanilla_pg",
@@ -800,9 +800,9 @@
             }
           },
           "pg_ocpm_pm4py": {
-            "p50_ms": 103.805,
-            "p95_ms": 104.304,
-            "minimum_ms": 102.406,
+            "p50_ms": 102.769,
+            "p95_ms": 103.018,
+            "minimum_ms": 102.642,
             "runs": 5,
             "input": {
               "source": "pg_ocpm",
@@ -812,18 +812,18 @@
             }
           },
           "pg_ocpm_ocpm_engine": {
-            "p50_ms": 1.011,
-            "p95_ms": 1.024,
-            "minimum_ms": 0.714,
+            "p50_ms": 0.932,
+            "p95_ms": 0.996,
+            "minimum_ms": 0.647,
             "runs": 5,
             "input": {
               "aggregate_rows": 19
             }
           },
           "speedups": {
-            "pg_ocpm_pm4py_vs_vanilla": 1.226,
-            "pg_ocpm_ocpm_engine_vs_vanilla": 125.921,
-            "pg_ocpm_ocpm_engine_vs_pg_ocpm_pm4py": 102.676
+            "pg_ocpm_pm4py_vs_vanilla": 1.236,
+            "pg_ocpm_ocpm_engine_vs_vanilla": 136.278,
+            "pg_ocpm_ocpm_engine_vs_pg_ocpm_pm4py": 110.267
           },
           "first_execution_counts": {
             "vanilla_pg_pm4py": 2,
@@ -843,127 +843,127 @@
         ],
         "vanilla_pg_pm4py": {
           "1": {
-            "p50_ms": 123.492,
-            "p95_ms": 129.196,
-            "minimum_ms": 120.468,
+            "p50_ms": 124.446,
+            "p95_ms": 128.379,
+            "minimum_ms": 123.601,
             "runs": 16,
             "requests": 16,
-            "wall_ms": 1993.644,
-            "throughput_qps": 8.026,
+            "wall_ms": 2000.546,
+            "throughput_qps": 7.998,
             "correct": true
           },
           "2": {
-            "p50_ms": 134.054,
-            "p95_ms": 143.0,
-            "minimum_ms": 130.951,
+            "p50_ms": 130.401,
+            "p95_ms": 137.275,
+            "minimum_ms": 127.819,
             "runs": 16,
             "requests": 16,
-            "wall_ms": 1087.744,
-            "throughput_qps": 14.709,
+            "wall_ms": 1054.767,
+            "throughput_qps": 15.169,
             "correct": true
           },
           "4": {
-            "p50_ms": 150.034,
-            "p95_ms": 158.207,
-            "minimum_ms": 145.37,
+            "p50_ms": 153.882,
+            "p95_ms": 156.094,
+            "minimum_ms": 151.622,
             "runs": 16,
             "requests": 16,
-            "wall_ms": 603.614,
-            "throughput_qps": 26.507,
+            "wall_ms": 616.433,
+            "throughput_qps": 25.956,
             "correct": true
           },
           "8": {
-            "p50_ms": 214.187,
-            "p95_ms": 220.054,
-            "minimum_ms": 199.639,
+            "p50_ms": 220.042,
+            "p95_ms": 225.972,
+            "minimum_ms": 197.656,
             "runs": 16,
             "requests": 16,
-            "wall_ms": 434.339,
-            "throughput_qps": 36.838,
+            "wall_ms": 442.295,
+            "throughput_qps": 36.175,
             "correct": true
           }
         },
         "pg_ocpm_pm4py": {
           "1": {
-            "p50_ms": 99.95,
-            "p95_ms": 131.364,
-            "minimum_ms": 95.281,
+            "p50_ms": 96.489,
+            "p95_ms": 114.786,
+            "minimum_ms": 94.422,
             "runs": 16,
             "requests": 16,
-            "wall_ms": 1667.393,
-            "throughput_qps": 9.596,
+            "wall_ms": 1570.49,
+            "throughput_qps": 10.188,
             "correct": true
           },
           "2": {
-            "p50_ms": 106.947,
-            "p95_ms": 127.267,
-            "minimum_ms": 99.068,
+            "p50_ms": 100.003,
+            "p95_ms": 102.03,
+            "minimum_ms": 98.046,
             "runs": 16,
             "requests": 16,
-            "wall_ms": 876.566,
-            "throughput_qps": 18.253,
+            "wall_ms": 804.571,
+            "throughput_qps": 19.886,
             "correct": true
           },
           "4": {
-            "p50_ms": 111.384,
-            "p95_ms": 146.737,
-            "minimum_ms": 107.782,
+            "p50_ms": 111.941,
+            "p95_ms": 114.392,
+            "minimum_ms": 109.548,
             "runs": 16,
             "requests": 16,
-            "wall_ms": 479.934,
-            "throughput_qps": 33.338,
+            "wall_ms": 448.968,
+            "throughput_qps": 35.637,
             "correct": true
           },
           "8": {
-            "p50_ms": 130.365,
-            "p95_ms": 134.511,
-            "minimum_ms": 125.788,
+            "p50_ms": 131.273,
+            "p95_ms": 134.437,
+            "minimum_ms": 125.305,
             "runs": 16,
             "requests": 16,
-            "wall_ms": 263.885,
-            "throughput_qps": 60.633,
+            "wall_ms": 267.814,
+            "throughput_qps": 59.743,
             "correct": true
           }
         },
         "pg_ocpm_ocpm_engine": {
           "1": {
-            "p50_ms": 24.744,
-            "p95_ms": 26.699,
-            "minimum_ms": 24.422,
+            "p50_ms": 24.822,
+            "p95_ms": 25.294,
+            "minimum_ms": 24.591,
             "runs": 16,
             "requests": 16,
-            "wall_ms": 402.523,
-            "throughput_qps": 39.749,
+            "wall_ms": 398.96,
+            "throughput_qps": 40.104,
             "correct": true
           },
           "2": {
-            "p50_ms": 27.641,
-            "p95_ms": 33.598,
-            "minimum_ms": 25.217,
+            "p50_ms": 25.356,
+            "p95_ms": 26.62,
+            "minimum_ms": 24.943,
             "runs": 16,
             "requests": 16,
-            "wall_ms": 231.889,
-            "throughput_qps": 68.999,
+            "wall_ms": 204.936,
+            "throughput_qps": 78.073,
             "correct": true
           },
           "4": {
-            "p50_ms": 30.391,
-            "p95_ms": 35.176,
-            "minimum_ms": 26.888,
+            "p50_ms": 32.235,
+            "p95_ms": 34.441,
+            "minimum_ms": 27.338,
             "runs": 16,
             "requests": 16,
-            "wall_ms": 127.895,
-            "throughput_qps": 125.102,
+            "wall_ms": 130.166,
+            "throughput_qps": 122.92,
             "correct": true
           },
           "8": {
-            "p50_ms": 33.924,
-            "p95_ms": 37.116,
-            "minimum_ms": 32.374,
+            "p50_ms": 32.818,
+            "p95_ms": 33.862,
+            "minimum_ms": 29.683,
             "runs": 16,
             "requests": 16,
-            "wall_ms": 71.955,
-            "throughput_qps": 222.36,
+            "wall_ms": 70.006,
+            "throughput_qps": 228.551,
             "correct": true
           }
         }
@@ -974,10 +974,10 @@
             "engine": "vanilla_pg_pm4py",
             "dataset": "sap_p2p",
             "workload": "dfg_conformance_95pct",
-            "baseline_rss_bytes": 37310464,
-            "peak_rss_bytes": 189591552,
-            "incremental_peak_bytes": 152281088,
-            "elapsed_ms": 557.223,
+            "baseline_rss_bytes": 37285888,
+            "peak_rss_bytes": 189579264,
+            "incremental_peak_bytes": 152293376,
+            "elapsed_ms": 503.939,
             "input": {
               "source": "vanilla_pg",
               "event_rows": 42015,
@@ -990,10 +990,10 @@
             "engine": "pg_ocpm_pm4py",
             "dataset": "sap_p2p",
             "workload": "dfg_conformance_95pct",
-            "baseline_rss_bytes": 37306368,
-            "peak_rss_bytes": 189566976,
-            "incremental_peak_bytes": 152260608,
-            "elapsed_ms": 461.1,
+            "baseline_rss_bytes": 37294080,
+            "peak_rss_bytes": 189571072,
+            "incremental_peak_bytes": 152276992,
+            "elapsed_ms": 453.563,
             "input": {
               "source": "pg_ocpm",
               "event_rows": 42015,
@@ -1006,10 +1006,10 @@
             "engine": "pg_ocpm_ocpm_engine",
             "dataset": "sap_p2p",
             "workload": "dfg_conformance_95pct",
-            "baseline_rss_bytes": 37281792,
-            "peak_rss_bytes": 38105088,
-            "incremental_peak_bytes": 823296,
-            "elapsed_ms": 28.89,
+            "baseline_rss_bytes": 37294080,
+            "peak_rss_bytes": 38158336,
+            "incremental_peak_bytes": 864256,
+            "elapsed_ms": 29.299,
             "input": {
               "aggregate_rows": 19
             },
@@ -1021,10 +1021,10 @@
             "engine": "vanilla_pg_pm4py",
             "dataset": "sap_p2p",
             "workload": "variant_conformance_95pct",
-            "baseline_rss_bytes": 37302272,
-            "peak_rss_bytes": 188731392,
-            "incremental_peak_bytes": 151429120,
-            "elapsed_ms": 481.044,
+            "baseline_rss_bytes": 37298176,
+            "peak_rss_bytes": 188739584,
+            "incremental_peak_bytes": 151441408,
+            "elapsed_ms": 484.237,
             "input": {
               "source": "vanilla_pg",
               "event_rows": 42015,
@@ -1037,10 +1037,10 @@
             "engine": "pg_ocpm_pm4py",
             "dataset": "sap_p2p",
             "workload": "variant_conformance_95pct",
-            "baseline_rss_bytes": 37326848,
-            "peak_rss_bytes": 188829696,
-            "incremental_peak_bytes": 151502848,
-            "elapsed_ms": 454.387,
+            "baseline_rss_bytes": 37318656,
+            "peak_rss_bytes": 188837888,
+            "incremental_peak_bytes": 151519232,
+            "elapsed_ms": 457.099,
             "input": {
               "source": "pg_ocpm",
               "event_rows": 42015,
@@ -1053,10 +1053,10 @@
             "engine": "pg_ocpm_ocpm_engine",
             "dataset": "sap_p2p",
             "workload": "variant_conformance_95pct",
-            "baseline_rss_bytes": 37277696,
-            "peak_rss_bytes": 38166528,
-            "incremental_peak_bytes": 888832,
-            "elapsed_ms": 4.877,
+            "baseline_rss_bytes": 37281792,
+            "peak_rss_bytes": 38227968,
+            "incremental_peak_bytes": 946176,
+            "elapsed_ms": 4.51,
             "input": {
               "aggregate_rows": 38
             },
@@ -1068,10 +1068,10 @@
             "engine": "vanilla_pg_pm4py",
             "dataset": "sap_p2p",
             "workload": "next_activity_prediction",
-            "baseline_rss_bytes": 37318656,
-            "peak_rss_bytes": 189599744,
-            "incremental_peak_bytes": 152281088,
-            "elapsed_ms": 493.605,
+            "baseline_rss_bytes": 37306368,
+            "peak_rss_bytes": 189566976,
+            "incremental_peak_bytes": 152260608,
+            "elapsed_ms": 493.129,
             "input": {
               "source": "vanilla_pg",
               "event_rows": 42015,
@@ -1084,10 +1084,10 @@
             "engine": "pg_ocpm_pm4py",
             "dataset": "sap_p2p",
             "workload": "next_activity_prediction",
-            "baseline_rss_bytes": 37330944,
-            "peak_rss_bytes": 189562880,
-            "incremental_peak_bytes": 152231936,
-            "elapsed_ms": 462.256,
+            "baseline_rss_bytes": 37289984,
+            "peak_rss_bytes": 189587456,
+            "incremental_peak_bytes": 152297472,
+            "elapsed_ms": 454.906,
             "input": {
               "source": "pg_ocpm",
               "event_rows": 42015,
@@ -1100,10 +1100,10 @@
             "engine": "pg_ocpm_ocpm_engine",
             "dataset": "sap_p2p",
             "workload": "next_activity_prediction",
-            "baseline_rss_bytes": 37310464,
-            "peak_rss_bytes": 38146048,
-            "incremental_peak_bytes": 835584,
-            "elapsed_ms": 29.273,
+            "baseline_rss_bytes": 37294080,
+            "peak_rss_bytes": 38170624,
+            "incremental_peak_bytes": 876544,
+            "elapsed_ms": 29.943,
             "input": {
               "aggregate_rows": 19
             },
@@ -1115,10 +1115,10 @@
             "engine": "vanilla_pg_pm4py",
             "dataset": "sap_p2p",
             "workload": "edge_bottleneck_ranking",
-            "baseline_rss_bytes": 37289984,
-            "peak_rss_bytes": 192798720,
-            "incremental_peak_bytes": 155508736,
-            "elapsed_ms": 550.157,
+            "baseline_rss_bytes": 37302272,
+            "peak_rss_bytes": 192684032,
+            "incremental_peak_bytes": 155381760,
+            "elapsed_ms": 495.944,
             "input": {
               "source": "vanilla_pg",
               "event_rows": 42029,
@@ -1131,10 +1131,10 @@
             "engine": "pg_ocpm_pm4py",
             "dataset": "sap_p2p",
             "workload": "edge_bottleneck_ranking",
-            "baseline_rss_bytes": 37322752,
-            "peak_rss_bytes": 192655360,
-            "incremental_peak_bytes": 155332608,
-            "elapsed_ms": 481.334,
+            "baseline_rss_bytes": 37273600,
+            "peak_rss_bytes": 192651264,
+            "incremental_peak_bytes": 155377664,
+            "elapsed_ms": 469.299,
             "input": {
               "source": "pg_ocpm",
               "event_rows": 42029,
@@ -1147,10 +1147,10 @@
             "engine": "pg_ocpm_ocpm_engine",
             "dataset": "sap_p2p",
             "workload": "edge_bottleneck_ranking",
-            "baseline_rss_bytes": 37310464,
-            "peak_rss_bytes": 38133760,
-            "incremental_peak_bytes": 823296,
-            "elapsed_ms": 4.712,
+            "baseline_rss_bytes": 37298176,
+            "peak_rss_bytes": 38174720,
+            "incremental_peak_bytes": 876544,
+            "elapsed_ms": 5.187,
             "input": {
               "aggregate_rows": 19
             },
@@ -1225,10 +1225,28 @@
     },
     "shared_pg_ocpm": {
       "heap_bytes": 53010432,
-      "index_bytes": 20643840,
-      "toast_bytes": 33300480,
-      "total_bytes": 107208704,
+      "index_bytes": 20668416,
+      "toast_bytes": 33325056,
+      "total_bytes": 107257856,
       "indexes": [
+        {
+          "table": "binding_activity",
+          "name": "binding_activity_pkey",
+          "definition": "CREATE UNIQUE INDEX binding_activity_pkey ON ocpm.binding_activity USING btree (dataset_id, tenant_id, object_type, activity)",
+          "bytes": 8192
+        },
+        {
+          "table": "binding_neighbor_activity",
+          "name": "binding_neighbor_activity_pkey",
+          "definition": "CREATE UNIQUE INDEX binding_neighbor_activity_pkey ON ocpm.binding_neighbor_activity USING btree (dataset_id, tenant_id, source_object_type, target_object_type, activity)",
+          "bytes": 8192
+        },
+        {
+          "table": "binding_object",
+          "name": "binding_object_pkey",
+          "definition": "CREATE UNIQUE INDEX binding_object_pkey ON ocpm.binding_object USING btree (dataset_id, tenant_id, object_type)",
+          "bytes": 8192
+        },
         {
           "table": "case_bucket",
           "name": "case_bucket_pkey",
@@ -1388,10 +1406,10 @@
       },
       "ocpm_engine": {
         "distribution": "ocpm-engine",
-        "version": "0.3.0",
+        "version": "0.4.0",
         "license_expression": null,
-        "package_bytes": 649310,
-        "dependency_closure_bytes": 649310,
+        "package_bytes": 656273,
+        "dependency_closure_bytes": 656273,
         "dependency_distributions": [
           "ocpm-engine"
         ],
@@ -1400,5 +1418,5 @@
       "shared_psycopg2_binary_bytes": 16446501
     }
   },
-  "payload_sha256": "62a6f3dc38b06f9c70946e80010f8badc3592f7dbda219983ad2becbfe835823"
+  "payload_sha256": "3e432c3c3a26d20159f4a008ead90dbc3ba222716b9d21f095d110f7ab029562"
 }

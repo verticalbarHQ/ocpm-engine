@@ -27,13 +27,13 @@ make perf-public-check
 ```
 
 `PG_OCPM_SOURCE` must identify a local `pg_ocpm` checkout. Alternatively, set
-`PG_OCPM_REPOSITORY` to a public Git URL and the runner will clone tag `v0.4.0`
+`PG_OCPM_REPOSITORY` to a public Git URL and the runner will clone tag `v0.5.0`
 into the ignored benchmark workspace.
 
 The runner builds a release-mode stable-ABI Rust wheel, recreates both database
 volumes, records nine randomized measured runs after two warmups, runs 1/4/8/16
 worker concurrency sweeps for DFG conformance and drift, writes
-`.benchmarks/public-common-pm-0.3.0.json`, and stops its containers on exit.
+`.benchmarks/public-common-pm-0.4.0.json`, and stops its containers on exit.
 `check_public_result.py` validates the committed payload digest, correctness
 flags, workload count, and 10x gates without requiring Docker.
 

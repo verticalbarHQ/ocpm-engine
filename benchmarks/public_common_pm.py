@@ -22,6 +22,7 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
+from importlib import metadata
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
@@ -1155,7 +1156,10 @@ def benchmark(args: argparse.Namespace) -> dict:
     result = {
         "schema_version": 1,
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "release": {"ocpm_engine": "0.3.0", "pg_ocpm": str(version)},
+        "release": {
+            "ocpm_engine": metadata.version("ocpm-engine"),
+            "pg_ocpm": str(version),
+        },
         "source": {
             "title": "Collection of Object-Centric Event Logs (SAP IDES O2C and P2P)",
             "doi": "10.5281/zenodo.8261133",

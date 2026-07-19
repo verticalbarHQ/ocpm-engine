@@ -8,30 +8,30 @@ Source: **98,350 events**, **107,767 objects**, and **236,265 event-object links
 
 | Workload | Vanilla PG + PM4Py | pg_ocpm + PM4Py | pg_ocpm + ocpm-engine | pg_ocpm PM4Py vs vanilla | Engine vs vanilla |
 |---|---:|---:|---:|---:|---:|
-| dfg_conformance_95pct | 139.02 ms | 101.35 ms | 12.07 ms | 1.37x | 11.52x |
-| variant_conformance_95pct | 129.17 ms | 91.31 ms | 16.11 ms | 1.42x | 8.02x |
-| next_activity_prediction | 140.71 ms | 103.16 ms | 12.06 ms | 1.36x | 11.67x |
-| edge_bottleneck_ranking | 196.87 ms | 148.15 ms | 3.35 ms | 1.33x | 58.70x |
+| dfg_conformance_95pct | 142.59 ms | 104.21 ms | 12.06 ms | 1.37x | 11.83x |
+| variant_conformance_95pct | 130.37 ms | 92.30 ms | 16.33 ms | 1.41x | 7.98x |
+| next_activity_prediction | 140.01 ms | 101.93 ms | 11.81 ms | 1.37x | 11.86x |
+| edge_bottleneck_ranking | 193.57 ms | 147.81 ms | 3.33 ms | 1.31x | 58.20x |
 
-Geometric-mean speedup versus vanilla: **1.37x** for pg_ocpm + PM4Py and **15.86x** for pg_ocpm + ocpm-engine. Correctness: **4/4**.
+Geometric-mean speedup versus vanilla: **1.37x** for pg_ocpm + PM4Py and **15.97x** for pg_ocpm + ocpm-engine. Correctness: **4/4**.
 
 ### DFG concurrency
 
 | Workers | Vanilla PG + PM4Py | pg_ocpm + PM4Py | pg_ocpm + ocpm-engine | Engine/vanilla |
 |---:|---:|---:|---:|---:|
-| 1 | 7.13 req/s | 8.99 req/s | 81.23 req/s | 11.39x |
-| 2 | 12.29 req/s | 18.65 req/s | 154.74 req/s | 12.59x |
-| 4 | 22.55 req/s | 33.55 req/s | 260.54 req/s | 11.56x |
-| 8 | 32.02 req/s | 56.43 req/s | 394.38 req/s | 12.32x |
+| 1 | 7.19 req/s | 9.54 req/s | 81.36 req/s | 11.32x |
+| 2 | 12.75 req/s | 18.48 req/s | 154.70 req/s | 12.14x |
+| 4 | 23.08 req/s | 32.20 req/s | 265.21 req/s | 11.49x |
+| 8 | 32.63 req/s | 55.01 req/s | 501.48 req/s | 15.37x |
 
 ### Isolated peak RSS
 
 | Workload | Vanilla PG + PM4Py | pg_ocpm + PM4Py | pg_ocpm + ocpm-engine |
 |---|---:|---:|---:|
-| dfg_conformance_95pct | 189.4 MiB | 188.7 MiB | 36.4 MiB |
-| variant_conformance_95pct | 184.8 MiB | 184.9 MiB | 39.1 MiB |
-| next_activity_prediction | 188.7 MiB | 189.4 MiB | 36.4 MiB |
-| edge_bottleneck_ranking | 201.1 MiB | 201.4 MiB | 36.4 MiB |
+| dfg_conformance_95pct | 189.4 MiB | 189.4 MiB | 36.4 MiB |
+| variant_conformance_95pct | 184.8 MiB | 184.8 MiB | 39.2 MiB |
+| next_activity_prediction | 189.4 MiB | 189.4 MiB | 36.4 MiB |
+| edge_bottleneck_ranking | 201.4 MiB | 201.2 MiB | 36.4 MiB |
 
 ## sap_p2p
 
@@ -39,37 +39,37 @@ Source: **24,854 events**, **74,489 objects**, and **105,039 event-object links*
 
 | Workload | Vanilla PG + PM4Py | pg_ocpm + PM4Py | pg_ocpm + ocpm-engine | pg_ocpm PM4Py vs vanilla | Engine vs vanilla |
 |---|---:|---:|---:|---:|---:|
-| dfg_conformance_95pct | 123.22 ms | 96.80 ms | 25.05 ms | 1.27x | 4.92x |
-| variant_conformance_95pct | 116.46 ms | 90.13 ms | 0.71 ms | 1.29x | 164.73x |
-| next_activity_prediction | 122.02 ms | 95.52 ms | 25.10 ms | 1.28x | 4.86x |
-| edge_bottleneck_ranking | 127.31 ms | 103.81 ms | 1.01 ms | 1.23x | 125.92x |
+| dfg_conformance_95pct | 126.30 ms | 98.57 ms | 25.20 ms | 1.28x | 5.01x |
+| variant_conformance_95pct | 120.36 ms | 92.72 ms | 0.70 ms | 1.30x | 171.45x |
+| next_activity_prediction | 122.92 ms | 95.85 ms | 24.86 ms | 1.28x | 4.95x |
+| edge_bottleneck_ranking | 127.01 ms | 102.77 ms | 0.93 ms | 1.24x | 136.28x |
 
-Geometric-mean speedup versus vanilla: **1.27x** for pg_ocpm + PM4Py and **26.54x** for pg_ocpm + ocpm-engine. Correctness: **4/4**.
+Geometric-mean speedup versus vanilla: **1.27x** for pg_ocpm + PM4Py and **27.58x** for pg_ocpm + ocpm-engine. Correctness: **4/4**.
 
 ### DFG concurrency
 
 | Workers | Vanilla PG + PM4Py | pg_ocpm + PM4Py | pg_ocpm + ocpm-engine | Engine/vanilla |
 |---:|---:|---:|---:|---:|
-| 1 | 8.03 req/s | 9.60 req/s | 39.75 req/s | 4.95x |
-| 2 | 14.71 req/s | 18.25 req/s | 69.00 req/s | 4.69x |
-| 4 | 26.51 req/s | 33.34 req/s | 125.10 req/s | 4.72x |
-| 8 | 36.84 req/s | 60.63 req/s | 222.36 req/s | 6.04x |
+| 1 | 8.00 req/s | 10.19 req/s | 40.10 req/s | 5.01x |
+| 2 | 15.17 req/s | 19.89 req/s | 78.07 req/s | 5.15x |
+| 4 | 25.96 req/s | 35.64 req/s | 122.92 req/s | 4.74x |
+| 8 | 36.17 req/s | 59.74 req/s | 228.55 req/s | 6.32x |
 
 ### Isolated peak RSS
 
 | Workload | Vanilla PG + PM4Py | pg_ocpm + PM4Py | pg_ocpm + ocpm-engine |
 |---|---:|---:|---:|
-| dfg_conformance_95pct | 180.8 MiB | 180.8 MiB | 36.3 MiB |
-| variant_conformance_95pct | 180.0 MiB | 180.1 MiB | 36.4 MiB |
+| dfg_conformance_95pct | 180.8 MiB | 180.8 MiB | 36.4 MiB |
+| variant_conformance_95pct | 180.0 MiB | 180.1 MiB | 36.5 MiB |
 | next_activity_prediction | 180.8 MiB | 180.8 MiB | 36.4 MiB |
-| edge_bottleneck_ranking | 183.9 MiB | 183.7 MiB | 36.4 MiB |
+| edge_bottleneck_ranking | 183.8 MiB | 183.7 MiB | 36.4 MiB |
 
 ## Shared storage and client footprint
 
 | Representation | Total | Indexes |
 |---|---:|---:|
 | Vanilla relational OCEL with one workload secondary B-tree | 125.3 MiB | 65.9 MiB |
-| pg_ocpm serving schema | 102.2 MiB | 19.7 MiB |
+| pg_ocpm serving schema | 102.3 MiB | 19.7 MiB |
 
 The vanilla index total also includes primary-key and uniqueness indexes required for relational integrity. Only `ocel_e2o_object` is retained as a workload-specific secondary index.
 
