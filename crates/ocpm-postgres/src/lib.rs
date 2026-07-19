@@ -1,4 +1,4 @@
-//! Thin asynchronous adapter over pg_ocpm 0.5 aggregate and binding interfaces.
+//! Thin asynchronous adapter over pg_ocpm 0.6 aggregate and binding interfaces.
 
 use ocpm_core::{
     TransitionKey,
@@ -6,7 +6,10 @@ use ocpm_core::{
 };
 use std::time::SystemTime;
 use thiserror::Error;
-use tokio_postgres::Client;
+use tokio_postgres::{
+    Client, Statement,
+    types::{ToSql, Type},
+};
 
 pub const DFG_COUNTS_SQL: &str = r#"
 SELECT source_activity, target_activity, edge_type, frequency
@@ -61,6 +64,8 @@ pub const BINDING_MAX_ACTIVITY_DELAY_SQL: &str =
     "SELECT ocpm.binding_max_activity_delay($1, $2, $3, $4, $5)";
 pub const BINDING_NEIGHBOR_PAIRS_SQL: &str =
     "SELECT ocpm.binding_neighbor_pairs($1, $2, $3, $4, $5)";
+pub const BINDING_RELATION_UNIVERSAL_EQUAL_SQL: &str =
+    "SELECT ocpm.binding_relation_universal_equal($1, $2, $3, $4, $5, $6, $7)";
 
 #[derive(Debug, Error)]
 pub enum AdapterError {
@@ -68,6 +73,54 @@ pub enum AdapterError {
     Postgres(#[from] tokio_postgres::Error),
     #[error(transparent)]
     Binding(#[from] BindingDecodeError),
+    #[error("binding query must return exactly one bytea column")]
+    InvalidBindingResultShape,
+    #[error("binding query returned a NULL capsule")]
+    NullBindingCapsule,
+    #[error("the requested materialized relation summary has not been declared or rebuilt")]
+    MissingRelationSummary,
+}
+
+/// A decoded binding capsule plus its encoded wire size.
+#[derive(Clone, Debug, PartialEq)]
+pub struct BindingQueryResult {
+    pub capsule: BindingCapsule,
+    pub encoded_bytes: usize,
+}
+
+/// A connection-specific prepared query that returns one pg_ocpm binding capsule.
+#[derive(Clone, Debug)]
+pub struct PreparedBindingQuery {
+    statement: Statement,
+}
+
+impl PreparedBindingQuery {
+    /// Prepare and validate a query that returns exactly one `bytea` column.
+    pub async fn prepare(client: &Client, sql: &str) -> Result<Self, AdapterError> {
+        let statement = client.prepare(sql).await?;
+        if statement.columns().len() != 1 || *statement.columns()[0].type_() != Type::BYTEA {
+            return Err(AdapterError::InvalidBindingResultShape);
+        }
+        Ok(Self { statement })
+    }
+
+    /// Execute the prepared query, fetch its sole row, and decode its capsule.
+    pub async fn execute(
+        &self,
+        client: &Client,
+        parameters: &[&(dyn ToSql + Sync)],
+    ) -> Result<BindingQueryResult, AdapterError> {
+        let row = client.query_one(&self.statement, parameters).await?;
+        let bytes = row
+            .try_get::<_, Option<Vec<u8>>>(0)?
+            .ok_or(AdapterError::NullBindingCapsule)?;
+        let encoded_bytes = bytes.len();
+        let capsule = BindingCapsule::decode(&bytes)?;
+        Ok(BindingQueryResult {
+            capsule,
+            encoded_bytes,
+        })
+    }
 }
 
 async fn binding_capsule(
@@ -75,10 +128,8 @@ async fn binding_capsule(
     sql: &str,
     parameters: &[&(dyn tokio_postgres::types::ToSql + Sync)],
 ) -> Result<BindingCapsule, AdapterError> {
-    let statement = client.prepare(sql).await?;
-    let row = client.query_one(&statement, parameters).await?;
-    let bytes: Vec<u8> = row.get(0);
-    Ok(BindingCapsule::decode(&bytes)?)
+    let query = PreparedBindingQuery::prepare(client, sql).await?;
+    Ok(query.execute(client, parameters).await?.capsule)
 }
 
 pub async fn binding_object_activity_count(
@@ -241,6 +292,48 @@ pub async fn binding_neighbor_pairs(
         ],
     )
     .await
+}
+
+/// Declares the typed relation consumed by a relation binding operator.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct RelationBindingSpec<'a> {
+    pub source_object_type: &'a str,
+    pub source_activity: &'a str,
+    pub target_object_type: &'a str,
+    pub target_activity: &'a str,
+    pub related_object_type: &'a str,
+}
+
+/// Evaluate a workload-declared typed relation summary.
+///
+/// Each returned row contains the source object, its related object, and the
+/// source event. A violation means at least one target binding for that source
+/// is related to a different object. The relation summary must first be
+/// declared through `ocpm.rebuild_binding_index(..., relation_specs)`.
+pub async fn binding_relation_universal_equal(
+    client: &Client,
+    dataset_id: i64,
+    tenant_id: i64,
+    spec: &RelationBindingSpec<'_>,
+) -> Result<BindingCapsule, AdapterError> {
+    match binding_capsule(
+        client,
+        BINDING_RELATION_UNIVERSAL_EQUAL_SQL,
+        &[
+            &dataset_id,
+            &tenant_id,
+            &spec.source_object_type,
+            &spec.source_activity,
+            &spec.target_object_type,
+            &spec.target_activity,
+            &spec.related_object_type,
+        ],
+    )
+    .await
+    {
+        Err(AdapterError::NullBindingCapsule) => Err(AdapterError::MissingRelationSummary),
+        result => result,
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

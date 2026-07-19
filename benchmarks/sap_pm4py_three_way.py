@@ -27,6 +27,11 @@ from typing import Any
 import psutil
 import psycopg2
 
+try:
+    from benchmark_provenance import public_benchmark_provenance
+except ModuleNotFoundError:  # imported as benchmarks.sap_pm4py_three_way in tests
+    from benchmarks.benchmark_provenance import public_benchmark_provenance
+
 DATASETS = {
     "sap_o2c": {"object_type": "MATERIAL"},
     "sap_p2p": {"object_type": "EBELN_EBELP"},
@@ -95,7 +100,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=20260718)
     parser.add_argument("--timeout-seconds", type=int, default=120)
     parser.add_argument("--concurrency", default="1,2,4,8")
-    parser.add_argument("--concurrency-requests", type=int, default=16)
+    parser.add_argument(
+        "--concurrency-requests",
+        "--concurrency-min-requests-per-worker",
+        dest="concurrency_requests",
+        type=int,
+        default=32,
+        help="minimum measured requests per worker in every concurrency epoch",
+    )
+    parser.add_argument("--concurrency-epochs", type=int, default=3)
+    parser.add_argument("--concurrency-min-seconds", type=float, default=5.0)
+    parser.add_argument(
+        "--concurrency-only",
+        action="store_true",
+        help="replace only concurrency sections in the existing --output artifact",
+    )
     parser.add_argument(
         "--output",
         default=".benchmarks/sap-pm4py-three-way.json",
@@ -118,6 +137,21 @@ def parse_args() -> argparse.Namespace:
         parser.error("--warmups must be nonnegative and --runs must be positive")
     if args.memory_worker and not (args.memory_dataset and args.memory_workload):
         parser.error("--memory-worker requires dataset and workload")
+    levels = [int(value) for value in args.concurrency.split(",") if value]
+    if (
+        not levels
+        or any(value < 1 for value in levels)
+        or len(set(levels)) != len(levels)
+    ):
+        parser.error("--concurrency must contain unique positive worker counts")
+    if args.concurrency_epochs < 3:
+        parser.error("--concurrency-epochs must be at least 3")
+    if args.concurrency_min_seconds < 5.0:
+        parser.error("--concurrency-min-seconds must be at least 5")
+    if args.concurrency_requests < 32:
+        parser.error("--concurrency-requests must be at least 32 per worker")
+    if args.memory_worker and args.concurrency_only:
+        parser.error("--memory-worker and --concurrency-only are mutually exclusive")
     return args
 
 
@@ -686,13 +720,24 @@ def timed_comparison(
 ) -> dict[str, Any]:
     if tuple(calls) != ENGINES:
         raise ValueError("calls must follow ENGINES ordering")
-    answers: dict[str, dict[str, Any]] = {}
+    answers = {name: call() for name, call in calls.items()}
+    expected = canonical(answers["pg_ocpm_ocpm_engine"]["answer"])
+    for name, result in answers.items():
+        if canonical(result["answer"]) != expected:
+            raise AssertionError(
+                f"three-way correctness mismatch during {name} preflight"
+            )
     for _ in range(warmups):
         order = list(calls)
         rng.shuffle(order)
         for name in order:
             answers[name] = calls[name]()
+            if canonical(answers[name]["answer"]) != expected:
+                raise AssertionError(
+                    f"three-way correctness mismatch during {name} warmup"
+                )
     samples = {name: [] for name in calls}
+    exact_samples = {name: 0 for name in calls}
     first_counts = {name: 0 for name in calls}
     for _ in range(runs):
         order = list(calls)
@@ -702,23 +747,11 @@ def timed_comparison(
             started = time.perf_counter()
             answers[name] = calls[name]()
             samples[name].append(time.perf_counter() - started)
-    canonical_answers = {
-        name: canonical(result["answer"]) for name, result in answers.items()
-    }
-    expected = canonical_answers["pg_ocpm_ocpm_engine"]
-    mismatches = {
-        name: answer for name, answer in canonical_answers.items() if answer != expected
-    }
-    if mismatches:
-        detail = "\n".join(
-            f"{name}_sha256={hashlib.sha256(answer.encode()).hexdigest()}"
-            for name, answer in mismatches.items()
-        )
-        raise AssertionError(
-            "three-way correctness mismatch\n"
-            "pg_ocpm_ocpm_engine_sha256="
-            f"{hashlib.sha256(expected.encode()).hexdigest()}\n{detail}"
-        )
+            if canonical(answers[name]["answer"]) != expected:
+                raise AssertionError(
+                    f"three-way correctness mismatch during measured {name} sample"
+                )
+            exact_samples[name] += 1
     measured = {name: metrics(values) for name, values in samples.items()}
     vanilla = measured["vanilla_pg_pm4py"]["p50_ms"]
     pg_pm4py = measured["pg_ocpm_pm4py"]["p50_ms"]
@@ -726,7 +759,11 @@ def timed_comparison(
     return {
         "correct": True,
         **{
-            name: {**measured[name], "input": answers[name]["input"]}
+            name: {
+                **measured[name],
+                "exact_samples": exact_samples[name],
+                "input": answers[name]["input"],
+            }
             for name in ENGINES
         },
         "speedups": {
@@ -758,23 +795,89 @@ def restore_fixture(payload: dict[str, Any]) -> Fixture:
 _CONCURRENCY_STATE: dict[str, Any] = {}
 
 
+def concurrency_method(args: argparse.Namespace) -> dict[str, Any]:
+    return {
+        "epochs_per_engine_level": args.concurrency_epochs,
+        "minimum_epoch_seconds": args.concurrency_min_seconds,
+        "minimum_requests_per_worker_per_epoch": args.concurrency_requests,
+        "connection_model": (
+            "prestarted process workers with one persistent PostgreSQL connection "
+            "per worker; connection setup and pool startup excluded"
+        ),
+        "warmup_gate": "one exact canonical warmup response from every worker PID",
+        "correctness_gate": "exact canonical equality for every measured request",
+        "aggregation": (
+            "median epoch QPS and median epoch p50/p95/p99; every epoch retained"
+        ),
+        "arm_order": "deterministic rotation by dataset, worker level, and epoch",
+    }
+
+
+def concurrency_epoch_metrics(samples: list[float]) -> dict[str, Any]:
+    ordered = sorted(samples)
+    return {
+        "p50_ms": round(statistics.median(ordered) * 1000, 3),
+        "p95_ms": round(percentile(ordered, 0.95) * 1000, 3),
+        "p99_ms": round(percentile(ordered, 0.99) * 1000, 3),
+        "minimum_ms": round(ordered[0] * 1000, 3),
+        "maximum_ms": round(ordered[-1] * 1000, 3),
+    }
+
+
+def aggregate_concurrency_epochs(
+    workers: int, epochs: list[dict[str, Any]]
+) -> dict[str, Any]:
+    return {
+        "workers": workers,
+        "epoch_count": len(epochs),
+        "requests": sum(epoch["requests"] for epoch in epochs),
+        "runs": sum(epoch["requests"] for epoch in epochs),
+        "throughput_qps": round(
+            statistics.median(epoch["throughput_qps"] for epoch in epochs), 3
+        ),
+        "p50_ms": round(statistics.median(epoch["p50_ms"] for epoch in epochs), 3),
+        "p95_ms": round(statistics.median(epoch["p95_ms"] for epoch in epochs), 3),
+        "p99_ms": round(statistics.median(epoch["p99_ms"] for epoch in epochs), 3),
+        "minimum_ms": min(epoch["minimum_ms"] for epoch in epochs),
+        "maximum_ms": max(epoch["maximum_ms"] for epoch in epochs),
+        "minimum_epoch_wall_ms": min(epoch["wall_ms"] for epoch in epochs),
+        "minimum_requests_per_worker": min(
+            min(epoch["worker_request_counts"]) for epoch in epochs
+        ),
+        "correct": all(epoch["correct"] for epoch in epochs),
+        "epochs": epochs,
+    }
+
+
 def concurrency_initializer(
     engine: str,
     host: str,
     database: str,
     timeout_seconds: int,
     fixture: dict[str, Any],
+    ready,
+    start_event,
+    deadline,
+    minimum_requests: int,
+    expected: str,
 ) -> None:
+    _CONCURRENCY_STATE.clear()
     _CONCURRENCY_STATE.update(
         {
             "engine": engine,
             "connection": connect(host, database, timeout_seconds),
             "fixture": restore_fixture(fixture),
+            "ready": ready,
+            "start_event": start_event,
+            "deadline": deadline,
+            "minimum_requests": minimum_requests,
+            "expected": expected,
+            "startup_timeout": min(timeout_seconds, 30),
         }
     )
 
 
-def concurrency_task(_: int) -> tuple[float, str]:
+def concurrency_request() -> tuple[float, str]:
     engine = _CONCURRENCY_STATE["engine"]
     connection = _CONCURRENCY_STATE["connection"]
     fixture = _CONCURRENCY_STATE["fixture"]
@@ -788,51 +891,164 @@ def concurrency_task(_: int) -> tuple[float, str]:
     return time.perf_counter() - started, canonical(result["answer"])
 
 
-def concurrency_sweep(
+def concurrency_epoch_worker(_: int) -> dict[str, Any]:
+    worker_id = os.getpid()
+    expected = _CONCURRENCY_STATE["expected"]
+    error = None
+    try:
+        _elapsed, warm_answer = concurrency_request()
+        if warm_answer != expected:
+            error = "warmup correctness fingerprint mismatch"
+    except Exception as exc:  # pragma: no cover - exercised by live harness
+        error = f"warmup failed: {exc}"
+    try:
+        _CONCURRENCY_STATE["ready"].wait(timeout=_CONCURRENCY_STATE["startup_timeout"])
+    except threading.BrokenBarrierError:
+        return {"worker_id": worker_id, "error": error or "startup barrier failed"}
+    if not _CONCURRENCY_STATE["start_event"].wait(
+        timeout=_CONCURRENCY_STATE["startup_timeout"]
+    ):
+        return {"worker_id": worker_id, "error": error or "start signal timed out"}
+    if error is not None:
+        return {"worker_id": worker_id, "error": error}
+
+    samples: list[float] = []
+    while (
+        len(samples) < _CONCURRENCY_STATE["minimum_requests"]
+        or time.perf_counter() < _CONCURRENCY_STATE["deadline"].value
+    ):
+        try:
+            elapsed, answer = concurrency_request()
+        except Exception as exc:  # pragma: no cover - exercised by live harness
+            return {"worker_id": worker_id, "error": f"request failed: {exc}"}
+        if answer != expected:
+            return {
+                "worker_id": worker_id,
+                "error": "measured correctness fingerprint mismatch",
+            }
+        samples.append(elapsed)
+    return {"worker_id": worker_id, "samples": samples}
+
+
+def run_concurrency_epoch(
     args: argparse.Namespace,
     fixture: Fixture,
     engine: str,
     expected: str,
+    workers: int,
 ) -> dict[str, Any]:
-    results = {}
     context = multiprocessing.get_context("spawn")
     host = args.baseline_host if engine == "vanilla_pg_pm4py" else args.extension_host
-    for workers in [int(value) for value in args.concurrency.split(",") if value]:
-        requests = max(args.concurrency_requests, workers * 2)
-        with ProcessPoolExecutor(
-            max_workers=workers,
-            mp_context=context,
-            initializer=concurrency_initializer,
-            initargs=(
-                engine,
-                host,
-                args.database,
-                args.timeout_seconds,
-                serialize_fixture(fixture),
-            ),
-        ) as pool:
-            warm = list(pool.map(concurrency_task, range(workers), chunksize=1))
-            if any(answer != expected for _, answer in warm):
-                raise AssertionError("concurrency warmup correctness mismatch")
-            started = time.perf_counter()
-            samples = list(pool.map(concurrency_task, range(requests), chunksize=1))
-            wall = time.perf_counter() - started
-        if any(answer != expected for _, answer in samples):
-            raise AssertionError("concurrency correctness mismatch")
-        latencies = [elapsed for elapsed, _ in samples]
-        results[str(workers)] = {
-            **metrics(latencies),
-            "requests": requests,
-            "wall_ms": round(wall * 1000, 3),
-            "throughput_qps": round(requests / wall, 3),
-            "correct": True,
-        }
-        print(
-            f"  concurrency {fixture.dataset_name} {engine} x{workers}: "
-            f"{results[str(workers)]['throughput_qps']:.2f} req/s",
-            flush=True,
+    ready = context.Barrier(workers + 1)
+    start_event = context.Event()
+    deadline = context.Value("d", 0.0)
+    with ProcessPoolExecutor(
+        max_workers=workers,
+        mp_context=context,
+        initializer=concurrency_initializer,
+        initargs=(
+            engine,
+            host,
+            args.database,
+            args.timeout_seconds,
+            serialize_fixture(fixture),
+            ready,
+            start_event,
+            deadline,
+            args.concurrency_requests,
+            expected,
+        ),
+    ) as pool:
+        futures = [
+            pool.submit(concurrency_epoch_worker, slot) for slot in range(workers)
+        ]
+        try:
+            ready.wait(timeout=min(args.timeout_seconds, 30))
+        except threading.BrokenBarrierError as exc:
+            ready.abort()
+            start_event.set()
+            raise RuntimeError("not every concurrency worker became ready") from exc
+        started = time.perf_counter()
+        with deadline.get_lock():
+            deadline.value = started + args.concurrency_min_seconds
+        start_event.set()
+        worker_results = [future.result() for future in futures]
+        wall = time.perf_counter() - started
+
+    errors = [result["error"] for result in worker_results if "error" in result]
+    if errors:
+        raise AssertionError("; ".join(errors))
+    worker_ids = [result["worker_id"] for result in worker_results]
+    if len(set(worker_ids)) != workers:
+        raise RuntimeError(f"warmed {len(set(worker_ids))}/{workers} worker processes")
+    worker_request_counts = [len(result["samples"]) for result in worker_results]
+    samples = [sample for result in worker_results for sample in result["samples"]]
+    if wall < args.concurrency_min_seconds:
+        raise RuntimeError("concurrency epoch ended before its duration floor")
+    if min(worker_request_counts) < args.concurrency_requests:
+        raise RuntimeError(
+            "concurrency epoch ended before its per-worker request floor"
         )
-    return results
+    return {
+        **concurrency_epoch_metrics(samples),
+        "requests": len(samples),
+        "wall_ms": round(wall * 1000, 3),
+        "throughput_qps": round(len(samples) / wall, 3),
+        "warmed_worker_count": len(set(worker_ids)),
+        "worker_ids": sorted(worker_ids),
+        "worker_request_counts": sorted(worker_request_counts),
+        "answer_sha256": hashlib.sha256(expected.encode()).hexdigest(),
+        "correct": True,
+    }
+
+
+def concurrency_comparison(
+    args: argparse.Namespace,
+    fixture: Fixture,
+    expected: str,
+    dataset_index: int,
+) -> dict[str, Any]:
+    levels = [int(value) for value in args.concurrency.split(",") if value]
+    epochs: dict[str, dict[str, list[dict[str, Any]]]] = {
+        engine: {str(workers): [] for workers in levels} for engine in ENGINES
+    }
+    epoch_arm_orders: dict[str, list[list[str]]] = {
+        str(workers): [] for workers in levels
+    }
+    for level_index, workers in enumerate(levels):
+        for epoch_index in range(args.concurrency_epochs):
+            offset = (dataset_index + level_index + epoch_index) % len(ENGINES)
+            order = ENGINES[offset:] + ENGINES[:offset]
+            epoch_arm_orders[str(workers)].append(list(order))
+            for arm_position, engine in enumerate(order, start=1):
+                print(
+                    f"  concurrency {fixture.dataset_name} {engine} x{workers} "
+                    f"epoch {epoch_index + 1}/{args.concurrency_epochs}",
+                    flush=True,
+                )
+                epoch = run_concurrency_epoch(args, fixture, engine, expected, workers)
+                epoch.update(
+                    {
+                        "epoch": epoch_index + 1,
+                        "arm_position": arm_position,
+                    }
+                )
+                epochs[engine][str(workers)].append(epoch)
+
+    return {
+        "workload": "dfg_conformance_95pct",
+        "levels": [str(workers) for workers in levels],
+        "epoch_arm_orders": epoch_arm_orders,
+        **{
+            engine: {
+                str(workers): aggregate_concurrency_epochs(
+                    workers, epochs[engine][str(workers)]
+                )
+                for workers in levels
+            }
+            for engine in ENGINES
+        },
+    }
 
 
 def memory_worker(args: argparse.Namespace) -> None:
@@ -1098,6 +1314,54 @@ def mib(value: int) -> float:
     return value / (1024**2)
 
 
+def write_artifact(path: Path, result: dict[str, Any]) -> dict[str, Any]:
+    payload = dict(result)
+    payload.pop("payload_sha256", None)
+    encoded = json.dumps(payload, indent=2, default=str) + "\n"
+    payload["payload_sha256"] = hashlib.sha256(encoded.encode()).hexdigest()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(payload, indent=2, default=str) + "\n")
+    temporary.replace(path)
+    return payload
+
+
+def load_verified_artifact(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        raise SystemExit(f"concurrency-only artifact does not exist: {path}")
+    result = json.loads(path.read_text())
+    recorded = result.get("payload_sha256")
+    unsigned = dict(result)
+    unsigned.pop("payload_sha256", None)
+    computed = hashlib.sha256(
+        (json.dumps(unsigned, indent=2, default=str) + "\n").encode()
+    ).hexdigest()
+    if recorded != computed:
+        raise SystemExit(
+            f"refusing to update artifact with invalid payload digest: {path}"
+        )
+    return result
+
+
+def preserved_concurrency_only_payload(result: dict[str, Any]) -> dict[str, Any]:
+    """Return every field that a concurrency-only refresh must not change."""
+
+    preserved = json.loads(json.dumps(result, default=str))
+    for key in (
+        "payload_sha256",
+        "schema_version",
+        "generated_at",
+        "section_generated_at",
+    ):
+        preserved.pop(key, None)
+    method = preserved.get("method", {})
+    method.pop("concurrency", None)
+    method.pop("concurrency_model", None)
+    for dataset in preserved.get("datasets", []):
+        dataset.pop("concurrency", None)
+    return preserved
+
+
 def render(result: dict[str, Any]) -> str:
     lines = [
         "# SAP O2C and P2P three-way process-mining benchmark",
@@ -1248,8 +1512,10 @@ def render(result: dict[str, Any]) -> str:
             "the temporal boundary are excluded from both partitions."
         ),
         (
-            "- Concurrency uses prestarted, warmed process workers with one PostgreSQL "
-            "connection per worker."
+            "- Concurrency uses three independently prestarted epochs per engine and "
+            "level, one persistent PostgreSQL connection per worker, an exact warmup "
+            "from every worker PID, and at least five seconds plus 32 requests per "
+            "worker in every epoch. QPS and p50/p95/p99 are medians of epoch metrics."
         ),
         "- Peak RSS uses a fresh process for each dataset, workload, and engine path.",
         "- Source: Zenodo DOI `10.5281/zenodo.8261133`, CC BY 4.0.",
@@ -1260,6 +1526,85 @@ def render(result: dict[str, Any]) -> str:
         "",
     ]
     return "\n".join(lines)
+
+
+def update_concurrency_only(args: argparse.Namespace) -> dict[str, Any]:
+    output = Path(args.output)
+    report = Path(args.report)
+    result = load_verified_artifact(output)
+    preserved_before = preserved_concurrency_only_payload(result)
+    if result.get("source", {}).get("datasets") != args.datasets:
+        raise SystemExit("concurrency-only dataset selection changed")
+    baseline = connect(args.baseline_host, args.database, args.timeout_seconds)
+    extension = connect(args.extension_host, args.database, args.timeout_seconds)
+    try:
+        environment = {
+            "client": {
+                "python": sys.version.split()[0],
+                "platform": platform.platform(),
+                "machine": platform.machine(),
+                "logical_cpus_visible": os.cpu_count(),
+                "pm4py_version": metadata.version("pm4py"),
+                "ocpm_engine_version": metadata.version("ocpm-engine"),
+            },
+            "database": {
+                "vanilla_pg": database_environment(baseline, False),
+                "pg_ocpm": database_environment(extension, True),
+            },
+        }
+        if result.get("environment") != environment:
+            raise SystemExit(
+                "concurrency-only environment differs from the existing artifact"
+            )
+        if result.get("provenance") != public_benchmark_provenance():
+            raise SystemExit(
+                "concurrency-only source, host, or image provenance changed"
+            )
+        stored = {item["dataset"]: item for item in result["datasets"]}
+        if tuple(stored) != tuple(args.datasets):
+            raise SystemExit("concurrency-only artifact dataset order changed")
+        for dataset_index, dataset_name in enumerate(args.datasets):
+            fixture = discover_fixture(extension, baseline, args, dataset_name)
+            if stored[dataset_name]["fixture"] != serialize_fixture(fixture):
+                raise SystemExit(
+                    f"{dataset_name}: concurrency-only fixture does not match artifact"
+                )
+            expected = canonical(
+                run_ocpm_engine(extension, fixture, "dfg_conformance_95pct")["answer"]
+            )
+            stored[dataset_name]["concurrency"] = concurrency_comparison(
+                args, fixture, expected, dataset_index
+            )
+        original_generated_at = result["generated_at"]
+        result["schema_version"] = 3
+        result["generated_at"] = datetime.now(timezone.utc).isoformat()
+        result["section_generated_at"] = {
+            "latency_storage_and_memory": result.get("section_generated_at", {}).get(
+                "latency_storage_and_memory", original_generated_at
+            ),
+            "concurrency": result["generated_at"],
+        }
+        result["method"].pop("concurrency_model", None)
+        result["method"]["concurrency"] = concurrency_method(args)
+        if preserved_concurrency_only_payload(result) != preserved_before:
+            raise SystemExit(
+                "concurrency-only refresh changed latency, storage, memory, "
+                "fixture, or other preserved evidence"
+            )
+        result = write_artifact(output, result)
+        report.parent.mkdir(parents=True, exist_ok=True)
+        temporary_report = report.with_suffix(report.suffix + ".tmp")
+        temporary_report.write_text(render(result))
+        temporary_report.replace(report)
+        print(
+            f"updated concurrency only in {output} and {report}; "
+            "latency, storage, and memory preserved",
+            flush=True,
+        )
+        return result
+    finally:
+        baseline.close()
+        extension.close()
 
 
 def benchmark(args: argparse.Namespace) -> dict[str, Any]:
@@ -1276,7 +1621,7 @@ def benchmark(args: argparse.Namespace) -> dict[str, Any]:
         )
     }
 
-    for dataset_name in args.datasets:
+    for dataset_index, dataset_name in enumerate(args.datasets):
         fixture = discover_fixture(extension, baseline, args, dataset_name)
         print(
             f"fixture {dataset_name}: {fixture.object_type}, {fixture.cases:,} cases "
@@ -1319,14 +1664,7 @@ def benchmark(args: argparse.Namespace) -> dict[str, Any]:
         expected = canonical(
             run_ocpm_engine(extension, fixture, "dfg_conformance_95pct")["answer"]
         )
-        concurrency = {
-            "workload": "dfg_conformance_95pct",
-            "levels": [value for value in args.concurrency.split(",") if value],
-            **{
-                engine: concurrency_sweep(args, fixture, engine, expected)
-                for engine in ENGINES
-            },
-        }
+        concurrency = concurrency_comparison(args, fixture, expected, dataset_index)
 
         memory = {}
         for workload in WORKLOADS:
@@ -1397,7 +1735,7 @@ def benchmark(args: argparse.Namespace) -> dict[str, Any]:
     extension.close()
 
     result = {
-        "schema_version": 1,
+        "schema_version": 3,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "source": {
             "title": (
@@ -1408,6 +1746,7 @@ def benchmark(args: argparse.Namespace) -> dict[str, Any]:
             "datasets": list(args.datasets),
         },
         "environment": environment,
+        "provenance": public_benchmark_provenance(),
         "method": {
             "warmups": args.warmups,
             "measured_runs": args.runs,
@@ -1421,10 +1760,7 @@ def benchmark(args: argparse.Namespace) -> dict[str, Any]:
             "correctness_gate": (
                 "three-way canonical answer equality before sample acceptance"
             ),
-            "concurrency_model": (
-                "prestarted warmed process workers with one PostgreSQL connection per "
-                "worker"
-            ),
+            "concurrency": concurrency_method(args),
             "memory_model": (
                 "fresh process baseline and peak RSS including engine import and one "
                 "request"
@@ -1455,13 +1791,14 @@ def benchmark(args: argparse.Namespace) -> dict[str, Any]:
         "datasets": dataset_results,
         "storage": storage,
     }
-    encoded = json.dumps(result, indent=2, default=str) + "\n"
-    result["payload_sha256"] = hashlib.sha256(encoded.encode()).hexdigest()
+    result["section_generated_at"] = {
+        "latency_storage_and_memory": result["generated_at"],
+        "concurrency": result["generated_at"],
+    }
     output = Path(args.output)
     report = Path(args.report)
-    output.parent.mkdir(parents=True, exist_ok=True)
+    result = write_artifact(output, result)
     report.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(result, indent=2, default=str) + "\n")
     report.write_text(render(result))
     print(f"wrote {output} and {report}", flush=True)
     return result
@@ -1472,7 +1809,10 @@ def main() -> None:
     if args.memory_worker:
         memory_worker(args)
         return
-    benchmark(args)
+    if args.concurrency_only:
+        update_concurrency_only(args)
+    else:
+        benchmark(args)
 
 
 if __name__ == "__main__":

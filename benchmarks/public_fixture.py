@@ -122,7 +122,8 @@ CREATE INDEX ocel_o2o_target
 NORMALIZE_EVENTS = """
 INSERT INTO ocpm.event_fact (
     dataset_id, tenant_id, case_id, object_id, external_object_id,
-    object_type, activity, event_timestamp, context, updated_by, attributes
+    object_type, activity, event_timestamp, context, updated_by, attributes,
+    event_id
 )
 SELECT
     %(ocpm_dataset_id)s, 1, eo.object_key, eo.object_key,
@@ -130,10 +131,10 @@ SELECT
     event.event_timestamp, NULL, NULL,
     jsonb_build_object(
         'external_event_id', event.external_event_id,
-        'event_key', event.event_key,
         'event_qualifier', eo.qualifier,
         'event_attributes', event.attributes
-    )
+    ),
+    event.event_key
 FROM ocel.event_object eo
 JOIN ocel.event event
   ON event.dataset_id=eo.dataset_id AND event.event_key=eo.event_key

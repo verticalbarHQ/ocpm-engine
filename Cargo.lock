@@ -204,6 +204,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "itoa"
+version = "1.0.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
+
+[[package]]
 name = "js-sys"
 version = "0.3.103"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -291,7 +297,7 @@ dependencies = [
 
 [[package]]
 name = "ocpm-core"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "serde",
  "thiserror",
@@ -299,9 +305,12 @@ dependencies = [
 
 [[package]]
 name = "ocpm-postgres"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "ocpm-core",
+ "serde",
+ "serde_json",
+ "sha2",
  "thiserror",
  "tokio",
  "tokio-postgres",
@@ -309,7 +318,7 @@ dependencies = [
 
 [[package]]
 name = "ocpm-python"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "ocpm-core",
  "pyo3",
@@ -557,6 +566,19 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "serde_json"
+version = "1.0.150"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e8014e44b4736ed0538adeecded0fce2a272f22dc9578a7eb6b2d9993c74cfb9"
+dependencies = [
+ "itoa",
+ "memchr",
+ "serde",
+ "serde_core",
+ "zmij",
 ]
 
 [[package]]
@@ -880,3 +902,9 @@ name = "wit-bindgen"
 version = "0.57.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ebf944e87a7c253233ad6766e082e3cd714b5d03812acc24c318f549614536e"
+
+[[package]]
+name = "zmij"
+version = "1.0.23"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29666d0abbfad1e3dc4dcf6144730dd3a3ab225bbbdac83319345b1b44ccfc1b"

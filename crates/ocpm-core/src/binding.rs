@@ -16,6 +16,7 @@ pub enum BindingSchema {
     Value = 4,
     FiveIds = 5,
     PairGroups = 6,
+    ThreeIdsViolation = 7,
 }
 
 impl TryFrom<u8> for BindingSchema {
@@ -29,6 +30,7 @@ impl TryFrom<u8> for BindingSchema {
             4 => Ok(Self::Value),
             5 => Ok(Self::FiveIds),
             6 => Ok(Self::PairGroups),
+            7 => Ok(Self::ThreeIdsViolation),
             other => Err(BindingDecodeError::UnknownSchema(other)),
         }
     }
@@ -48,6 +50,8 @@ pub enum BindingDecodeError {
     VarintOverflow,
     #[error("binding capsule count exceeds the addressable platform size")]
     CountOverflow,
+    #[error("binding capsule allocation could not be reserved safely")]
+    AllocationFailed,
     #[error("binding capsule identifier delta overflows i64")]
     DeltaOverflow,
     #[error("binding capsule contains invalid UTF-8")]
@@ -249,24 +253,69 @@ fn decode_materialized(
         BindingSchema::Value => (0, false, false, true),
         BindingSchema::FiveIds => (5, false, false, false),
         BindingSchema::PairGroups => unreachable!(),
+        BindingSchema::ThreeIdsViolation => (3, false, true, false),
     };
-    let mut id_columns = Vec::with_capacity(id_count);
+    let mut minimum_bytes = row_count
+        .checked_mul(id_count)
+        .ok_or(BindingDecodeError::CountOverflow)?;
+    if has_labels {
+        // A valid label payload has a dictionary-count varint and one
+        // dictionary-index varint per row. Dictionary entries are checked as
+        // they are decoded below.
+        minimum_bytes = minimum_bytes
+            .checked_add(1)
+            .and_then(|value| value.checked_add(row_count))
+            .ok_or(BindingDecodeError::CountOverflow)?;
+    }
+    if has_violations {
+        minimum_bytes = minimum_bytes
+            .checked_add(row_count / 8 + usize::from(row_count % 8 != 0))
+            .ok_or(BindingDecodeError::CountOverflow)?;
+    }
+    if has_values {
+        // Every encoded f64 bit pattern occupies at least one varint byte.
+        minimum_bytes = minimum_bytes
+            .checked_add(row_count)
+            .ok_or(BindingDecodeError::CountOverflow)?;
+    }
+    cursor.require_minimum(minimum_bytes)?;
+
+    let mut id_columns = reserved_vec(id_count)?;
     for _ in 0..id_count {
         id_columns.push(cursor.delta_ids(row_count)?);
     }
     let (label_dictionary, label_indexes) = if has_labels {
         let dictionary_count = cursor.usize_varint()?;
-        if dictionary_count > row_count {
+        if dictionary_count > row_count || (row_count != 0 && dictionary_count == 0) {
             return Err(BindingDecodeError::InvalidLabelDictionary);
         }
-        let mut dictionary = Vec::with_capacity(dictionary_count);
+        let mut dictionary_minimum = dictionary_count
+            .checked_add(row_count)
+            .ok_or(BindingDecodeError::CountOverflow)?;
+        if has_violations {
+            dictionary_minimum = dictionary_minimum
+                .checked_add(row_count / 8 + usize::from(row_count % 8 != 0))
+                .ok_or(BindingDecodeError::CountOverflow)?;
+        }
+        if has_values {
+            dictionary_minimum = dictionary_minimum
+                .checked_add(row_count)
+                .ok_or(BindingDecodeError::CountOverflow)?;
+        }
+        cursor.require_minimum(dictionary_minimum)?;
+        let mut dictionary = reserved_vec(dictionary_count)?;
         for _ in 0..dictionary_count {
             let length = cursor.usize_varint()?;
             let value = str::from_utf8(cursor.take(length)?)
                 .map_err(|_| BindingDecodeError::InvalidUtf8)?;
-            dictionary.push(value.to_owned());
+            let mut owned = String::new();
+            owned
+                .try_reserve_exact(value.len())
+                .map_err(|_| BindingDecodeError::AllocationFailed)?;
+            owned.push_str(value);
+            dictionary.push(owned);
         }
-        let mut indexes = Vec::with_capacity(row_count);
+        let mut indexes = reserved_vec(row_count)?;
         for _ in 0..row_count {
             let index = cursor.usize_varint()?;
             if index >= dictionary_count {
@@ -279,17 +328,18 @@ fn decode_materialized(
         (Vec::new(), None)
     };
     let violations = if has_violations {
-        let packed = cursor.take(row_count.div_ceil(8))?;
-        Some(
-            (0..row_count)
-                .map(|index| packed[index / 8] & (1 << (index % 8)) != 0)
-                .collect(),
-        )
+        let packed_count = row_count / 8 + usize::from(row_count % 8 != 0);
+        let packed = cursor.take(packed_count)?;
+        let mut values = reserved_vec(row_count)?;
+        for index in 0..row_count {
+            values.push(packed[index / 8] & (1 << (index % 8)) != 0);
+        }
+        Some(values)
     } else {
         None
     };
     let values = if has_values {
-        let mut values = Vec::with_capacity(row_count);
+        let mut values = reserved_vec(row_count)?;
         for _ in 0..row_count {
             values.push(f64::from_bits(cursor.varint()?));
         }
@@ -311,8 +361,13 @@ fn decode_pair_groups(
     row_count: usize,
 ) -> Result<PairGroups, BindingDecodeError> {
     let group_count = cursor.usize_varint()?;
+    cursor.require_minimum(
+        group_count
+            .checked_mul(2)
+            .ok_or(BindingDecodeError::CountOverflow)?,
+    )?;
     let sources = cursor.delta_ids(group_count)?;
-    let mut sizes = Vec::with_capacity(group_count);
+    let mut sizes = reserved_vec(group_count)?;
     let mut entry_count = 0_usize;
     let mut expanded_count = 0_usize;
     for _ in 0..group_count {
@@ -334,6 +389,11 @@ fn decode_pair_groups(
     if expanded_count != row_count {
         return Err(BindingDecodeError::InvalidPairGroups);
     }
+    cursor.require_minimum(
+        entry_count
+            .checked_mul(2)
+            .ok_or(BindingDecodeError::CountOverflow)?,
+    )?;
     let targets = cursor.delta_ids(entry_count)?;
     let events = cursor.delta_ids(entry_count)?;
     Ok(PairGroups {
@@ -342,6 +402,14 @@ fn decode_pair_groups(
         targets,
         events,
     })
+}
+
+fn reserved_vec<T>(count: usize) -> Result<Vec<T>, BindingDecodeError> {
+    let mut values = Vec::new();
+    values
+        .try_reserve_exact(count)
+        .map_err(|_| BindingDecodeError::AllocationFailed)?;
+    Ok(values)
 }
 
 struct Cursor<'a> {
@@ -364,6 +432,13 @@ impl<'a> Cursor<'a> {
         let (value, rest) = self.remaining.split_at(count);
         self.remaining = rest;
         Ok(value)
+    }
+
+    fn require_minimum(&self, count: usize) -> Result<(), BindingDecodeError> {
+        if count > self.remaining.len() {
+            return Err(BindingDecodeError::Truncated);
+        }
+        Ok(())
     }
 
     fn byte(&mut self) -> Result<u8, BindingDecodeError> {
@@ -395,7 +470,8 @@ impl<'a> Cursor<'a> {
     }
 
     fn delta_ids(&mut self, count: usize) -> Result<Vec<i64>, BindingDecodeError> {
-        let mut values = Vec::with_capacity(count);
+        self.require_minimum(count)?;
+        let mut values = reserved_vec(count)?;
         let mut previous = 0_i64;
         for _ in 0..count {
             previous = previous
@@ -462,6 +538,22 @@ mod tests {
     }
 
     #[test]
+    fn decodes_three_numeric_ids_with_violation() {
+        let mut bytes = header(BindingSchema::ThreeIdsViolation, 2);
+        for delta in [10, 1, 100, 1, 1000, 1] {
+            signed(delta, &mut bytes);
+        }
+        bytes.push(0b0000_0010);
+
+        let capsule = BindingCapsule::decode(&bytes).unwrap();
+        let rows = capsule.rows().collect::<Vec<_>>();
+        assert_eq!(rows[0].ids(), &[10, 100, 1000]);
+        assert_eq!(rows[1].ids(), &[11, 101, 1001]);
+        assert_eq!(rows[0].violated, Some(false));
+        assert_eq!(rows[1].violated, Some(true));
+    }
+
+    #[test]
     fn lazily_expands_multiple_pair_groups() {
         let mut bytes = header(BindingSchema::PairGroups, 5);
         varint(2, &mut bytes);
@@ -503,6 +595,54 @@ mod tests {
         assert_eq!(
             BindingCapsule::decode(&bytes),
             Err(BindingDecodeError::InvalidPairGroups)
+        );
+    }
+
+    #[test]
+    fn rejects_impossible_materialized_count_before_reserving_rows() {
+        let bytes = header(BindingSchema::FiveIds, usize::MAX);
+
+        assert_eq!(
+            BindingCapsule::decode(&bytes),
+            Err(BindingDecodeError::CountOverflow)
+        );
+    }
+
+    #[test]
+    fn rejects_truncated_materialized_rows_before_reserving_rows() {
+        let bytes = header(BindingSchema::ThreeIdsViolation, 1_000_000);
+
+        assert_eq!(
+            BindingCapsule::decode(&bytes),
+            Err(BindingDecodeError::Truncated)
+        );
+    }
+
+    #[test]
+    fn rejects_impossible_pair_group_count_before_reserving_groups() {
+        let mut bytes = header(BindingSchema::PairGroups, 0);
+        varint(u64::MAX, &mut bytes);
+
+        assert_eq!(
+            BindingCapsule::decode(&bytes),
+            Err(BindingDecodeError::CountOverflow)
+        );
+    }
+
+    #[test]
+    fn rejects_truncated_pair_entries_before_reserving_entries() {
+        let group_size = 1_000_000_usize;
+        let mut bytes = header(
+            BindingSchema::PairGroups,
+            group_size.checked_mul(group_size).unwrap(),
+        );
+        varint(1, &mut bytes);
+        signed(1, &mut bytes);
+        varint(group_size as u64, &mut bytes);
+
+        assert_eq!(
+            BindingCapsule::decode(&bytes),
+            Err(BindingDecodeError::Truncated)
         );
     }
 }

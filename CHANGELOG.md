@@ -2,10 +2,29 @@
 
 All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
 
-## Unreleased
+## 0.5.0 - 2026-07-19
 
-- Refreshed the public SAP O2C/P2P benchmark artifacts and reports against
-  `ocpm-engine 0.4.0` and `pg_ocpm 0.5.0`.
+- Prepared the corrected public SAP O2C/P2P and OCPQ protocols for clean
+  `ocpm-engine 0.5.0` and `pg_ocpm 0.6.0` release measurements.
+- Added reusable prepared binding queries that validate a single non-null
+  `bytea` result, reuse the PostgreSQL plan, decode compact capsules, and
+  expose the encoded transfer size.
+- Added decoding for three numeric identifiers plus a violation bit and a
+  generic adapter for workload-declared, directed universal-equality relation
+  constraints in `pg_ocpm 0.6.0`.
+- Replaced the invalid OCPQ comparison with a same-host Q1-Q7 harness that uses
+  OCPQ's evaluation boundary, performs complete owned-row materialization,
+  requires exact external-ID output parity, and records latency, storage,
+  fresh-process memory, and 1/4/8/16-client concurrency.
+- Added repeatable public OCPQ and SAP release gates.
+- Hardened public Python concurrency gates with persistent per-worker
+  connections, verified worker warmups, three duration-bounded epochs,
+  per-worker request floors, exact request parity, and concurrency-only artifact
+  refreshes that preserve latency, storage, and memory evidence.
+- Removed public common-PM artifacts produced by the obsolete short-request
+  concurrency protocol. The 0.4 fixture, p50 latency, and storage regression
+  limits now live in a compact baseline that contains no concurrency fields.
+- Raised the minimum supported extension version to `pg_ocpm 0.6.0`.
 
 ## 0.4.0 - 2026-07-18
 
@@ -17,9 +36,8 @@ All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
 - Added Python capsule metadata and row-decoding APIs that release the GIL
   during native decoding.
 - Raised the minimum supported extension version to `pg_ocpm 0.5.0`.
-- Added a reproducible public OCPQ comparison with published and pinned
-  same-host OCPQ results, correctness, latency, concurrency, memory, and
-  storage gates.
+- Added the initial OCPQ benchmark integration, superseded by the corrected
+  measurement and exact-output harness in 0.5.0.
 
 ## 0.3.0 - 2026-07-18
 

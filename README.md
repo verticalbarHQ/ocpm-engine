@@ -9,7 +9,7 @@ This package does not install another PostgreSQL extension or create database
 objects. PostgreSQL must already have `pg_ocpm` installed and the target dataset
 must already be finalized with `ocpm.finish_load(...)`.
 
-Required extension version: `pg_ocpm >= 0.5.0`. See the
+Required extension version: `pg_ocpm >= 0.6.0`. See the
 [release notes](CHANGELOG.md) for every library version.
 
 ## Native analytics
@@ -51,8 +51,9 @@ concurrency, correctness gates, and published context, see
 For the three-way comparison of lightly indexed PostgreSQL with PM4Py,
 `pg_ocpm` with PM4Py, and `pg_ocpm` with ocpm-engine, see
 [SAP PM4Py three-way performance](docs/sap-pm4py-three-way-performance.md).
-For the seven-query comparison with published and same-host reproduced OCPQ,
-see [OCPQ comparison](docs/ocpq-performance.md).
+For the seven-query same-host OCPQ comparison, with author-published timings
+retained only as source context, see
+[OCPQ comparison](docs/ocpq-performance.md).
 For the detailed application read-path design and code references, see
 [Application query performance improvements](docs/technical-performance-improvements.md).
 For the open-source capability survey, license boundary, research review, and
@@ -75,7 +76,9 @@ pytest
 ```
 
 Run both self-contained public SAP benchmarks with `make perf-public` and
-validate the committed results with `make perf-public-check`. See
+validate the staged results with `make perf-public-preview-check`. After review
+and explicit promotion, validate committed artifacts with
+`make perf-public-release-check`. See
 [the benchmark guide](benchmarks/README.md) for the exact methodology.
 
 ## Use

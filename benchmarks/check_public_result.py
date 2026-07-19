@@ -1,11 +1,61 @@
-"""Validate the committed public benchmark release gate and payload digest."""
+"""Validate public common-PM evidence against a compact regression baseline."""
 
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
+import math
+import statistics
 from pathlib import Path
+from typing import Any
+
+try:
+    from benchmark_provenance import validate_recorded_public_provenance
+except ModuleNotFoundError:  # loaded through importlib by unit tests
+    from benchmarks.benchmark_provenance import validate_recorded_public_provenance
+
+ROOT = Path(__file__).resolve().parents[1]
+REGRESSION_BASELINE = (
+    ROOT / "docs/results/public-common-pm-0.4.0-regression-baseline.json"
+)
+EXPECTED_PAYLOAD_SHA256 = (
+    "6fe793b14df606a90fd39408e644aea1e937235eaa5ac047777716b5c7dfee72"
+)
+EXPECTED_BASELINE_PAYLOAD_SHA256 = (
+    "2f4d7aa425444bbde420547bbda7b0a4839c38e0294e6e9a9f43954f9d19a331"
+)
+CURRENT_RELEASE = {"ocpm_engine": "0.5.0", "pg_ocpm": "0.6.0"}
+BASELINE_RELEASE = {"ocpm_engine": "0.4.0", "pg_ocpm": "0.5.0"}
+BASELINE_ARTIFACT_TYPE = "public_common_pm_latency_storage_regression_baseline"
+EXPECTED_SOURCE = {
+    "title": "Collection of Object-Centric Event Logs (SAP IDES O2C and P2P)",
+    "doi": "10.5281/zenodo.8261133",
+    "license": "CC BY 4.0",
+}
+EXPECTED_DATASETS = ("sap_o2c", "sap_p2p")
+EXPECTED_WORKLOADS = (
+    "dfg_conformance_95pct",
+    "variant_conformance_95pct",
+    "next_activity_prediction",
+    "dfg_frequency_drift",
+    "repeated_transition_rework",
+    "edge_bottleneck_ranking",
+    "edge_bottleneck_prediction",
+    "edge_duration_time_series",
+    "activity_profile",
+)
+EXPECTED_CONCURRENCY_LEVELS = ("1", "4", "8", "16")
+EXPECTED_CONCURRENCY_ENGINES = ("vanilla_postgres_python", "pg_ocpm_rust")
+EXPECTED_CONCURRENCY_EPOCHS = 3
+MINIMUM_CONCURRENCY_SECONDS = 5.0
+MINIMUM_REQUESTS_PER_WORKER = 32
+LATENCY_CEILING = 1.10
+LATENCY_ABSOLUTE_SLACK_MS = 0.10
+STORAGE_CEILING = 1.01
+MAXIMUM_CONCURRENCY_THROUGHPUT_CV = 0.15
+MINIMUM_CANDIDATE_THROUGHPUT_RATIO = 10.0
+MAXIMUM_CANDIDATE_CONCURRENCY_P95_MS = 15.0
 
 
 def parse_args() -> argparse.Namespace:
@@ -13,43 +63,440 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "result",
         nargs="?",
-        default="docs/results/public-common-pm-0.4.0.json",
+        default="docs/results/public-common-pm-0.5.0.json",
+    )
+    parser.add_argument(
+        "--regression-baseline",
+        "--baseline",
+        dest="baseline",
+        type=Path,
+        default=REGRESSION_BASELINE,
+        help=(
+            "compact committed 0.4 latency/storage baseline; contains no "
+            "historical concurrency evidence"
+        ),
+    )
+    parser.add_argument(
+        "--expected-payload-sha256",
+        help="explicit expected current-artifact digest",
+    )
+    parser.add_argument(
+        "--preview",
+        action="store_true",
+        help=(
+            "validate a staged, self-digested artifact without requiring the "
+            "published digest pin"
+        ),
     )
     return parser.parse_args()
 
 
-def main() -> None:
-    path = Path(parse_args().result)
+def fail(message: str) -> None:
+    raise SystemExit(message)
+
+
+def load_verified(path: Path, expected_digest: str | None = None) -> dict[str, Any]:
     result = json.loads(path.read_text())
-    if result.get("release") != {"ocpm_engine": "0.4.0", "pg_ocpm": "0.5.0"}:
-        raise SystemExit("unexpected public benchmark release versions")
-    recorded = result.pop("payload_sha256", None)
-    encoded = json.dumps(result, indent=2, default=str) + "\n"
+    recorded = result.get("payload_sha256")
+    unsigned = dict(result)
+    unsigned.pop("payload_sha256", None)
+    encoded = json.dumps(unsigned, indent=2, default=str) + "\n"
     computed = hashlib.sha256(encoded.encode()).hexdigest()
     if recorded != computed:
-        raise SystemExit(
-            f"payload digest mismatch: recorded={recorded!r}, computed={computed}"
+        fail(
+            f"{path}: payload digest mismatch: "
+            f"recorded={recorded!r}, computed={computed}"
         )
+    if expected_digest is not None and recorded != expected_digest:
+        fail(
+            f"{path}: unexpected payload digest: "
+            f"recorded={recorded!r}, expected={expected_digest}"
+        )
+    return result
+
+
+def latency_limit(prior_ms: float) -> float:
+    """Allow 10% or 0.10 ms, whichever is larger, for sub-ms jitter."""
+
+    return max(
+        prior_ms * LATENCY_CEILING,
+        prior_ms + LATENCY_ABSOLUTE_SLACK_MS,
+    )
+
+
+def workload_map(result: dict[str, Any]) -> dict[tuple[str, str], dict[str, Any]]:
+    rows: dict[tuple[str, str], dict[str, Any]] = {}
+    for dataset in result["datasets"]:
+        dataset_name = dataset["fixture"]["name"]
+        for workload in dataset["workloads"]:
+            key = (dataset_name, workload["workload"])
+            if key in rows:
+                fail(f"duplicate workload row: {key}")
+            rows[key] = workload
+    return rows
+
+
+def latency_method(method: dict[str, Any]) -> dict[str, Any]:
+    stable = dict(method)
+    stable.pop("concurrency", None)
+    stable.pop("concurrency_model", None)
+    return stable
+
+
+def validate_regression_baseline(baseline: dict[str, Any]) -> None:
+    expected_top_level = {
+        "schema_version",
+        "artifact_type",
+        "release",
+        "source",
+        "environment",
+        "method",
+        "datasets",
+        "storage",
+        "payload_sha256",
+    }
+    if set(baseline) != expected_top_level:
+        fail("public regression baseline contains unexpected fields")
+    if baseline.get("schema_version") != 1:
+        fail("unexpected public regression baseline schema version")
+    if baseline.get("artifact_type") != BASELINE_ARTIFACT_TYPE:
+        fail("unexpected public regression baseline artifact type")
+    if baseline.get("release") != BASELINE_RELEASE:
+        fail("unexpected public regression baseline release versions")
+    if baseline.get("source") != EXPECTED_SOURCE:
+        fail("public regression baseline source metadata changed")
+    if set(baseline.get("environment", {})) != {
+        "client",
+        "vanilla_postgres",
+        "pg_ocpm_postgres",
+    }:
+        fail("public regression baseline environment is incomplete")
+    if set(baseline.get("method", {})) != {
+        "warmups",
+        "measured_runs",
+        "random_seed",
+        "latency_scope",
+        "baseline",
+        "candidate",
+        "correctness_gate",
+        "execution_order",
+        "storage",
+    }:
+        fail("public regression baseline method contains non-regression fields")
+
+    datasets = baseline.get("datasets", [])
+    if (
+        tuple(item.get("fixture", {}).get("name") for item in datasets)
+        != EXPECTED_DATASETS
+    ):
+        fail("public regression baseline dataset order changed")
+    for dataset in datasets:
+        if set(dataset) != {"fixture", "workloads"}:
+            fail("public regression baseline dataset contains unexpected fields")
+        workloads = dataset.get("workloads", [])
+        if tuple(item.get("workload") for item in workloads) != EXPECTED_WORKLOADS:
+            fail("public regression baseline workload order changed")
+        for workload in workloads:
+            if set(workload) != {
+                "workload",
+                "vanilla_postgres_python",
+                "pg_ocpm_rust",
+            }:
+                fail("public regression baseline workload contains unexpected fields")
+            for engine in ("vanilla_postgres_python", "pg_ocpm_rust"):
+                metrics = workload.get(engine, {})
+                if set(metrics) != {"p50_ms"}:
+                    fail("public regression baseline retains non-p50 latency fields")
+                p50 = metrics.get("p50_ms")
+                if type(p50) not in {int, float} or not math.isfinite(p50) or p50 <= 0:
+                    fail("public regression baseline contains invalid p50 latency")
+
+    storage = baseline.get("storage", {})
+    if set(storage) != {"vanilla_postgres", "pg_ocpm"}:
+        fail("public regression baseline storage representations changed")
+    for metrics in storage.values():
+        if set(metrics) != {"index_bytes", "total_bytes"}:
+            fail("public regression baseline retains non-regression storage fields")
+        if any(type(value) is not int or value <= 0 for value in metrics.values()):
+            fail("public regression baseline contains invalid storage values")
+
+
+def validate_concurrency_protocol(result: dict[str, Any]) -> None:
+    protocol = result["method"].get("concurrency", {})
+    if (
+        protocol.get("epochs_per_engine_level") != EXPECTED_CONCURRENCY_EPOCHS
+        or protocol.get("minimum_epoch_seconds") != MINIMUM_CONCURRENCY_SECONDS
+        or protocol.get("minimum_requests_per_worker_per_epoch")
+        != MINIMUM_REQUESTS_PER_WORKER
+        or "persistent PostgreSQL connection"
+        not in protocol.get("connection_model", "")
+        or "every worker" not in protocol.get("warmup_gate", "")
+        or "every measured request" not in protocol.get("correctness_gate", "")
+        or "median epoch QPS" not in protocol.get("aggregation", "")
+    ):
+        fail("public concurrency protocol is not the stable three-epoch contract")
+
+
+def validate_concurrency_section(section_name: str, section: dict[str, Any]) -> None:
+    expected_workload = (
+        "dfg_frequency_drift"
+        if section_name == "drift_concurrency"
+        else "dfg_conformance_95pct"
+    )
+    if (
+        section.get("fixture") != "sap_o2c"
+        or section.get("workload") != expected_workload
+    ):
+        fail(f"{section_name}: fixture or workload changed")
+    if tuple(section.get("levels", [])) != EXPECTED_CONCURRENCY_LEVELS:
+        fail(f"{section_name}: concurrency levels changed")
+    orders = section.get("epoch_arm_orders", {})
+    if tuple(orders) != EXPECTED_CONCURRENCY_LEVELS:
+        fail(f"{section_name}: epoch arm-order levels changed")
+    drift_offset = int(section_name == "drift_concurrency")
+    hashes = set()
+    for level_index, level in enumerate(EXPECTED_CONCURRENCY_LEVELS):
+        level_orders = orders[level]
+        if len(level_orders) != EXPECTED_CONCURRENCY_EPOCHS:
+            fail(f"{section_name}/x{level}: expected three epoch arm orders")
+        for epoch_index, order in enumerate(level_orders):
+            offset = (level_index + epoch_index + drift_offset) % len(
+                EXPECTED_CONCURRENCY_ENGINES
+            )
+            expected_order = (
+                EXPECTED_CONCURRENCY_ENGINES[offset:]
+                + EXPECTED_CONCURRENCY_ENGINES[:offset]
+            )
+            if tuple(order) != expected_order:
+                fail(f"{section_name}/x{level}: arm rotation changed")
+
+        workers = int(level)
+        for engine in EXPECTED_CONCURRENCY_ENGINES:
+            if tuple(section.get(engine, {})) != EXPECTED_CONCURRENCY_LEVELS:
+                fail(f"{section_name}/{engine}: concurrency levels changed")
+            aggregate = section[engine][level]
+            epochs = aggregate.get("epochs", [])
+            if (
+                aggregate.get("workers") != workers
+                or aggregate.get("epoch_count") != EXPECTED_CONCURRENCY_EPOCHS
+                or len(epochs) != EXPECTED_CONCURRENCY_EPOCHS
+                or aggregate.get("correct") is not True
+            ):
+                fail(f"{section_name}/{engine}/x{level}: invalid epoch aggregate")
+            for epoch_index, epoch in enumerate(epochs):
+                order = level_orders[epoch_index]
+                worker_ids = epoch.get("worker_ids", [])
+                request_counts = epoch.get("worker_request_counts", [])
+                if (
+                    epoch.get("epoch") != epoch_index + 1
+                    or epoch.get("arm_position") != order.index(engine) + 1
+                    or epoch.get("correct") is not True
+                    or epoch.get("warmed_worker_count") != workers
+                    or len(worker_ids) != workers
+                    or len(set(worker_ids)) != workers
+                    or len(request_counts) != workers
+                    or min(request_counts, default=0) < MINIMUM_REQUESTS_PER_WORKER
+                    or epoch.get("requests") != sum(request_counts)
+                    or epoch.get("wall_ms", 0) < MINIMUM_CONCURRENCY_SECONDS * 1000
+                ):
+                    fail(
+                        f"{section_name}/{engine}/x{level}: invalid epoch "
+                        f"{epoch_index + 1}"
+                    )
+                expected_qps = epoch["requests"] * 1000 / epoch["wall_ms"]
+                if not math.isclose(
+                    epoch.get("throughput_qps", 0), expected_qps, abs_tol=0.01
+                ):
+                    fail(f"{section_name}/{engine}/x{level}: inconsistent epoch QPS")
+                if not (
+                    0
+                    <= epoch.get("minimum_ms", -1)
+                    <= epoch.get("p50_ms", -1)
+                    <= epoch.get("p95_ms", -1)
+                    <= epoch.get("p99_ms", -1)
+                    <= epoch.get("maximum_ms", -1)
+                ):
+                    fail(f"{section_name}/{engine}/x{level}: invalid epoch latency")
+                hashes.add(epoch.get("answer_sha256"))
+            aggregates = {
+                "throughput_qps": round(
+                    statistics.median(epoch["throughput_qps"] for epoch in epochs), 3
+                ),
+                "p50_ms": round(
+                    statistics.median(epoch["p50_ms"] for epoch in epochs), 3
+                ),
+                "p95_ms": round(
+                    statistics.median(epoch["p95_ms"] for epoch in epochs), 3
+                ),
+                "p99_ms": round(
+                    statistics.median(epoch["p99_ms"] for epoch in epochs), 3
+                ),
+            }
+            if any(aggregate.get(key) != value for key, value in aggregates.items()):
+                fail(f"{section_name}/{engine}/x{level}: aggregate is not epoch median")
+            if aggregate.get("requests") != sum(epoch["requests"] for epoch in epochs):
+                fail(
+                    f"{section_name}/{engine}/x{level}: aggregate request count changed"
+                )
+            qps = [epoch["throughput_qps"] for epoch in epochs]
+            if statistics.pstdev(qps) / statistics.fmean(qps) > (
+                MAXIMUM_CONCURRENCY_THROUGHPUT_CV
+            ):
+                fail(f"{section_name}/{engine}/x{level}: unstable epoch throughput")
+        baseline = section["vanilla_postgres_python"][level]
+        candidate = section["pg_ocpm_rust"][level]
+        if candidate["throughput_qps"] < (
+            baseline["throughput_qps"] * MINIMUM_CANDIDATE_THROUGHPUT_RATIO
+        ):
+            fail(f"{section_name}/x{level}: candidate throughput ratio fell below 10x")
+        if candidate["p95_ms"] > MAXIMUM_CANDIDATE_CONCURRENCY_P95_MS:
+            fail(f"{section_name}/x{level}: candidate p95 exceeded 15 ms")
+    if None in hashes or len(hashes) != 1:
+        fail(f"{section_name}: exact answer hashes differ across arms or epochs")
+
+
+def validate_contract(
+    result: dict[str, Any], baseline: dict[str, Any], *, allow_dirty: bool
+) -> dict[tuple[str, str], dict[str, Any]]:
+    if result.get("schema_version") != 3:
+        fail("unexpected public benchmark schema version")
+    if result.get("release") != CURRENT_RELEASE:
+        fail("unexpected public benchmark release versions")
+    section_times = result.get("section_generated_at", {})
+    if (
+        set(section_times) != {"latency_and_storage", "concurrency"}
+        or section_times.get("concurrency") != result.get("generated_at")
+        or not isinstance(section_times.get("latency_and_storage"), str)
+    ):
+        fail("public section-level generation provenance is invalid")
+    if result.get("source") != EXPECTED_SOURCE:
+        fail("public dataset source metadata changed")
+    if result.get("source") != baseline.get("source"):
+        fail("public dataset source differs from the prior committed fixture")
+    if result.get("environment") != baseline.get("environment"):
+        fail("public benchmark host/database settings changed")
+    try:
+        validate_recorded_public_provenance(
+            result.get("provenance"), allow_dirty=allow_dirty
+        )
+    except ValueError as error:
+        fail(str(error))
+    if latency_method(result.get("method", {})) != latency_method(
+        baseline.get("method", {})
+    ):
+        fail("public benchmark measurement boundary or settings changed")
+    validate_concurrency_protocol(result)
+
+    datasets = result.get("datasets", [])
+    baseline_datasets = {item["fixture"]["name"]: item for item in baseline["datasets"]}
+    if tuple(item["fixture"]["name"] for item in datasets) != EXPECTED_DATASETS:
+        fail("expected SAP O2C and P2P datasets in stable order")
+    for dataset in datasets:
+        name = dataset["fixture"]["name"]
+        if dataset["fixture"] != baseline_datasets[name]["fixture"]:
+            fail(f"{name}: fixture partition or filter settings changed")
+        names = tuple(item["workload"] for item in dataset["workloads"])
+        if names != EXPECTED_WORKLOADS:
+            fail(f"{name}: workload set or ordering changed")
+        for row in dataset["workloads"]:
+            if row.get("correct") is not True:
+                fail(f"{name}/{row['workload']}: correctness gate failed")
+            for engine in ("vanilla_postgres_python", "pg_ocpm_rust"):
+                metrics = row[engine]
+                if metrics.get("runs") != result["method"]["measured_runs"]:
+                    fail(f"{name}/{row['workload']}/{engine}: run count changed")
+                if metrics.get("exact_samples") != result["method"]["measured_runs"]:
+                    fail(
+                        f"{name}/{row['workload']}/{engine}: not every timed "
+                        "sample passed exactness"
+                    )
+                minimum = metrics.get("minimum_ms", 0)
+                p50 = metrics.get("p50_ms", 0)
+                p95 = metrics.get("p95_ms", 0)
+                if not (0 < minimum <= p50 <= p95):
+                    fail(f"{name}/{row['workload']}/{engine}: invalid latency metrics")
+            expected_speedup = round(
+                row["vanilla_postgres_python"]["p50_ms"]
+                / row["pg_ocpm_rust"]["p50_ms"],
+                3,
+            )
+            if not math.isclose(row["speedup"], expected_speedup, abs_tol=0.001):
+                fail(f"{name}/{row['workload']}: inconsistent speedup")
+
+    rows = workload_map(result)
     summary = result["summary"]
-    workloads = [
-        workload for dataset in result["datasets"] for workload in dataset["workloads"]
-    ]
-    if summary["correct_workloads"] != summary["total_workloads"]:
-        raise SystemExit("not every public workload passed its correctness gate")
-    if len(workloads) != summary["total_workloads"]:
-        raise SystemExit("summary workload count does not match result rows")
-    if not all(workload["correct"] for workload in workloads):
-        raise SystemExit("at least one public workload is marked incorrect")
-    minimum = min(workload["speedup"] for workload in workloads)
-    if minimum < 10.0 or summary["geometric_mean_speedup"] < 10.0:
-        raise SystemExit(
-            "10x gate failed: every workload and the geometric mean must pass"
-        )
-    if not summary["target_met"]:
-        raise SystemExit("public result target_met flag is false")
+    if len(rows) != len(EXPECTED_DATASETS) * len(EXPECTED_WORKLOADS):
+        fail("unexpected public workload count")
+    if summary["correct_workloads"] != len(rows):
+        fail("not every public workload passed its correctness gate")
+    if summary["total_workloads"] != len(rows):
+        fail("summary workload count does not match result rows")
+    speedups = [row["speedup"] for row in rows.values()]
+    minimum = min(speedups)
+    geometric = math.exp(sum(math.log(value) for value in speedups) / len(speedups))
+    if not math.isclose(summary["minimum_speedup"], minimum, abs_tol=0.001):
+        fail("summary minimum speedup is inconsistent")
+    if not math.isclose(summary["geometric_mean_speedup"], geometric, abs_tol=0.001):
+        fail("summary geometric-mean speedup is inconsistent")
+    if minimum < 10.0 or geometric < 10.0:
+        fail("10x gate failed: every workload and geometric mean must pass")
+    if summary.get("target_speedup") != 10.0 or summary.get("target_met") is not True:
+        fail("public 10x target metadata is inconsistent")
+    validate_concurrency_section("concurrency", result["concurrency"])
+    validate_concurrency_section("drift_concurrency", result["drift_concurrency"])
+    return rows
+
+
+def validate_regressions(
+    result: dict[str, Any],
+    baseline: dict[str, Any],
+    rows: dict[tuple[str, str], dict[str, Any]],
+) -> None:
+    prior_rows = workload_map(baseline)
+    if set(rows) != set(prior_rows):
+        fail("current and prior workload keys differ")
+    for key, row in rows.items():
+        for engine in ("vanilla_postgres_python", "pg_ocpm_rust"):
+            current = row[engine]["p50_ms"]
+            prior = prior_rows[key][engine]["p50_ms"]
+            allowed = latency_limit(prior)
+            if current > allowed:
+                fail(
+                    f"{key}/{engine}: p50 regression "
+                    f"{current:.3f} ms > allowed {allowed:.3f} ms "
+                    f"from prior {prior:.3f} ms"
+                )
+
+    for representation in ("vanilla_postgres", "pg_ocpm"):
+        for metric in ("index_bytes", "total_bytes"):
+            current = result["storage"][representation][metric]
+            prior = baseline["storage"][representation][metric]
+            if current > prior * STORAGE_CEILING:
+                fail(
+                    f"{representation}/{metric}: storage regression "
+                    f"{current} > {STORAGE_CEILING:.0%} of {prior}"
+                )
+
+
+def main() -> None:
+    args = parse_args()
+    if args.preview and args.expected_payload_sha256:
+        fail("--preview and --expected-payload-sha256 are mutually exclusive")
+    expected_digest = (
+        None
+        if args.preview
+        else args.expected_payload_sha256 or EXPECTED_PAYLOAD_SHA256
+    )
+    result = load_verified(Path(args.result), expected_digest)
+    baseline = load_verified(args.baseline, EXPECTED_BASELINE_PAYLOAD_SHA256)
+    validate_regression_baseline(baseline)
+    rows = validate_contract(result, baseline, allow_dirty=args.preview)
+    validate_regressions(result, baseline, rows)
+    minimum = min(row["speedup"] for row in rows.values())
     print(
-        f"public benchmark verified: {len(workloads)} correct workloads, "
-        f"minimum {minimum:.3f}x"
+        f"public benchmark verified: {len(rows)} exact workloads, "
+        f"minimum {minimum:.3f}x; latency, three-epoch concurrency, and storage "
+        "gates passed"
     )
 
 

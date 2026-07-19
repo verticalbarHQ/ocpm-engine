@@ -1,6 +1,6 @@
 # Process-mining capability map and execution boundary
 
-Snapshot date: 2026-07-18.
+Snapshot date: 2026-07-19.
 
 This review uses public documentation and papers to identify established
 process-mining functions. It does not copy implementation code from the
@@ -13,7 +13,7 @@ GitHub stars are a point-in-time popularity signal, not a quality ranking.
 
 | Project | Snapshot | License | Documented emphasis | Use in this project |
 |---|---:|---|---|---|
-| [PM4Py](https://github.com/process-intelligence-solutions/pm4py) | 984 stars | AGPL-3.0 | Broad discovery, conformance, enhancement, filtering, statistics, and prediction | Documentation-only capability baseline |
+| [PM4Py](https://github.com/process-intelligence-solutions/pm4py) | 984 stars | AGPL-3.0 | Broad discovery, conformance, enhancement, filtering, statistics, and prediction | Version-pinned benchmark/reference baseline; not linked into the production runtime |
 | [bupaR](https://github.com/bupaverse/bupaR) | 61 stars | MIT | Event-log handling, descriptive statistics, filtering, and process maps in R | Permissive capability reference |
 | [OCPA](https://ocpa.readthedocs.io/en/latest/) | 44 stars | GPL-3.0 | OCEL management, object-centric discovery, variants, conformance, performance, and predictive features | Documentation-only OCPM baseline |
 | [Cortado](https://github.com/cortado-tool/cortado) | 41 stars | GPL-3.0 | Interactive and incremental process discovery | Documentation-only capability baseline |
@@ -64,8 +64,8 @@ scaling, or would otherwise retain large algorithm state inside PostgreSQL.
 |---|---|---|---:|---|
 | Dynamic case/object filtering | `pg_ocpm` | Apply exact predicates before network transfer | Existing capsules/indexes | PostgreSQL plans and MVCC own read semantics |
 | DFG, variant, rework, duration, time-series, and feature counts | `pg_ocpm` | Native scans reduce arrays to sufficient statistics | Existing capsules/indexes | Short bounded database work; no hydrated event tables |
-| Activity/case/start/end profile | `pg_ocpm 0.4.0` | Reuses filtered compact case capsules | **0 bytes** | One database request; no middleware path expansion |
-| DFG/variant/activity drift | `ocpm-engine 0.3.0` | Linear arithmetic over aligned count vectors | **0 bytes** | GIL-releasing Rust; can scale outside database backends |
+| Activity/case/start/end profile | `pg_ocpm` | Reuses filtered compact case capsules | **0 bytes** | One database request; no middleware path expansion |
+| DFG/variant/activity drift | `ocpm-engine` | Linear arithmetic over aligned count vectors | **0 bytes** | GIL-releasing Rust; can scale outside database backends |
 | Frequency conformance, deterministic next activity, bottleneck ranking | `ocpm-engine` | Model construction does not need event rows | **0 bytes** | Stateless kernels can run concurrently and be cached |
 | Token replay, alignments, Petri-net/process-tree discovery | `ocpm-engine` | Search/model state is CPU- and memory-intensive | Model artifacts only | Avoid monopolizing PostgreSQL workers and memory contexts |
 | ML/GNN prediction, simulation, prescription | engine/service layer | Training, accelerators, and model lifecycle are not SQL concerns | External versioned models | Independently scheduled CPU/GPU workers |
@@ -93,7 +93,7 @@ write impact, not latency alone.
 - [Comprehensive concept-drift characterization
   (2026)](https://doi.org/10.1016/j.is.2025.102584) uses directly-follows
   behavior across windows and motivates explainable localization, not only a
-  binary drift flag. `ocpm-engine 0.3.0` therefore returns a bounded
+  binary drift flag. `ocpm-engine` therefore returns a bounded
   Jensen-Shannon score plus per-relation contributions and signed share change.
 - [The OCED standardization proposal
   (2024)](https://arxiv.org/abs/2410.14495) reinforces keeping import adapters

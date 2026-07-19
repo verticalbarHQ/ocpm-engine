@@ -1,22 +1,29 @@
-FROM rust:1.86.0 AS builder
+FROM rust:1.86.0@sha256:300ec56abce8cc9448ddea2172747d048ed902a3090e6b57babb2bf19f754081 AS builder
 
 ARG OCPQ_COMMIT=80457e561edd7bb9e142d959dd7e0f96e6b03f2f
 RUN apt-get update \
     && apt-get install -y --no-install-recommends git \
     && rm -rf /var/lib/apt/lists/*
+COPY benchmarks/ocpq/ocpq_reference_benchmark.rs /tmp/ocpq_reference_benchmark.rs
 WORKDIR /source
 RUN git clone https://github.com/aarkue/OCPQ.git \
     && cd OCPQ \
     && git checkout "${OCPQ_COMMIT}" \
+    && test "$(git rev-parse HEAD)" = "${OCPQ_COMMIT}" \
+    && cp /tmp/ocpq_reference_benchmark.rs backend/ocpq_cli/src/main.rs \
     && cargo build --release --locked --package ocpq_cli
 
-FROM debian:bookworm-slim
+FROM debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bbd5acbfca6ec875818
+
+ARG SOURCE_REVISION=unknown
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates libsqlite3-0 \
     && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /benchmark /queries /root/Downloads
-COPY --from=builder /source/OCPQ/target/release/ocpq_cli /usr/local/bin/ocpq_cli
+    && mkdir -p /benchmark /queries /output
+COPY --from=builder /source/OCPQ/target/release/ocpq_cli \
+    /usr/local/bin/ocpq_reference_benchmark
+LABEL org.opencontainers.image.revision="${SOURCE_REVISION}"
 
 WORKDIR /benchmark
-ENTRYPOINT ["/usr/local/bin/ocpq_cli"]
+ENTRYPOINT ["/usr/local/bin/ocpq_reference_benchmark"]

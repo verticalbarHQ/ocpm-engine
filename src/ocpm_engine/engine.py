@@ -18,7 +18,7 @@ class Cursor(Protocol):
 _MIN_TIMESTAMP = datetime(1, 1, 1, tzinfo=UTC)
 _MAX_TIMESTAMP = datetime(9999, 12, 31, 23, 59, 59, 999999, tzinfo=UTC)
 _TIMELINE_PERIODS = frozenset({"hour", "day", "week", "month", "quarter", "year"})
-_MINIMUM_PG_OCPM_VERSION = (0, 5, 0)
+_MINIMUM_PG_OCPM_VERSION = (0, 6, 0)
 
 
 class OcpmEngine:
@@ -53,7 +53,7 @@ class OcpmEngine:
         except ValueError as error:
             raise RuntimeError(f"invalid pg_ocpm version: {version}") from error
         if parsed < _MINIMUM_PG_OCPM_VERSION:
-            raise RuntimeError("ocpm-engine requires pg_ocpm 0.5.0 or later")
+            raise RuntimeError("ocpm-engine requires pg_ocpm 0.6.0 or later")
         return version
 
     def build(self, request: ProcessMiningRequest) -> QueryPlan:

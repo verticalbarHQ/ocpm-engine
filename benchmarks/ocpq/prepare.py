@@ -54,18 +54,78 @@ SELECT ocpm.register_dataset(
     '{"source":"OCPQ evaluation BPIC 2017 OCEL"}'::jsonb
 );
 
+DO $ocpq_invariants$
+DECLARE
+    invalid_resource_events bigint;
+    root_applications_without_children bigint;
+BEGIN
+    WITH resource_counts AS (
+        SELECT
+            event.event_key,
+            count(DISTINCT object.object_key) FILTER (
+                WHERE object.object_type = 'Case_R'
+            ) AS resource_count
+        FROM bench.event_dim event
+        LEFT JOIN bench.event_object relation USING (event_key)
+        LEFT JOIN bench.object_dim object USING (object_key)
+        WHERE event.activity IN ('A_Accepted', 'O_Created')
+        GROUP BY event.event_key
+    )
+    SELECT count(*) INTO invalid_resource_events
+    FROM resource_counts
+    WHERE resource_count <> 1;
+
+    IF invalid_resource_events <> 0 THEN
+        RAISE EXCEPTION
+            'OCPQ Q5 Case_R cardinality invariant failed; invalid events: %',
+            invalid_resource_events;
+    END IF;
+
+    WITH roots AS (
+        SELECT DISTINCT application.object_key AS application_id
+        FROM bench.event_dim event
+        JOIN bench.event_object relation USING (event_key)
+        JOIN bench.object_dim application USING (object_key)
+        WHERE event.activity = 'A_Accepted'
+          AND application.object_type = 'Application'
+    ), applications_with_created_offers AS (
+        SELECT DISTINCT relation.source_object_key AS application_id
+        FROM bench.object_object relation
+        JOIN bench.object_dim application
+          ON application.object_key = relation.source_object_key
+        JOIN bench.object_dim offer
+          ON offer.object_key = relation.target_object_key
+        JOIN bench.event_object offer_event
+          ON offer_event.object_key = offer.object_key
+        JOIN bench.event_dim event USING (event_key)
+        WHERE application.object_type = 'Application'
+          AND offer.object_type = 'Offer'
+          AND event.activity = 'O_Created'
+    )
+    SELECT count(*) INTO root_applications_without_children
+    FROM roots
+    LEFT JOIN applications_with_created_offers USING (application_id)
+    WHERE applications_with_created_offers.application_id IS NULL;
+
+    IF root_applications_without_children <> 0 THEN
+        RAISE EXCEPTION
+            'OCPQ Q5 root-child invariant failed; invalid roots: %',
+            root_applications_without_children;
+    END IF;
+END
+$ocpq_invariants$;
+
 INSERT INTO ocpm.event_fact (
     dataset_id,tenant_id,case_id,object_id,external_object_id,
-    object_type,activity,event_timestamp,context,updated_by,attributes
+    object_type,activity,event_timestamp,context,updated_by,attributes,event_id
 )
 SELECT ocpm.dataset_id('bpic2017-ocpq'),1,
        eo.object_key,eo.object_key,object.external_id,
        object.object_type,event.activity,event.event_timestamp,NULL,event.resource,
        jsonb_build_object(
            'external_event_id',event.external_id,
-           'event_key',event.event_key,
            'event_qualifier',eo.qualifier
-       )
+       ),event.event_key
 FROM bench.event_object eo
 JOIN bench.event_dim event USING(event_key)
 JOIN bench.object_dim object USING(object_key);
@@ -113,14 +173,6 @@ WITH bounds AS (
       ON source.object_key=relation.source_object_key
     JOIN bench.object_dim target
       ON target.object_key=relation.target_object_key
-    UNION
-    SELECT relation.target_object_key,target.object_type,
-           relation.source_object_key,source.object_type
-    FROM bench.object_object relation
-    JOIN bench.object_dim source
-      ON source.object_key=relation.source_object_key
-    JOIN bench.object_dim target
-      ON target.object_key=relation.target_object_key
 )
 INSERT INTO ocpm.link_adjacency (
     dataset_id,tenant_id,from_object_id,from_object_type,
@@ -135,14 +187,24 @@ FROM relations CROSS JOIN bounds;
 SELECT ocpm.finish_load(ocpm.dataset_id('bpic2017-ocpq'));
 SELECT ocpm.rebuild_binding_index(
     ocpm.dataset_id('bpic2017-ocpq'),
-    ARRAY['Application','Offer']::text[],
+    ARRAY['Application','Offer','Case_R']::text[],
     ARRAY[
         'A_Submitted','O_Created','O_Returned','A_Accepted','O_Accepted'
     ]::text[],
     '[{"source_object_type":"Application",'
     '"target_object_type":"Offer",'
-    '"activities":["O_Accepted","O_Created"]}]'::jsonb
+    '"activities":["O_Accepted","O_Created"]}]'::jsonb,
+    '[{"source_object_type":"Application",'
+    '"source_activity":"A_Accepted",'
+    '"target_object_type":"Offer",'
+    '"target_activity":"O_Created",'
+    '"related_object_type":"Case_R"}]'::jsonb
 );
+
+-- All serving and correctness lookups now come from the compact ocpm schema.
+-- Remove the transient relational import so storage measures the complete
+-- retained database representation rather than omitting support tables.
+DROP SCHEMA bench CASCADE;
 """
 
 
@@ -151,6 +213,7 @@ def arguments() -> argparse.Namespace:
     parser.add_argument("--sqlite", required=True, type=Path)
     parser.add_argument("--csv-dir", type=Path, default=Path(".benchmarks/ocpq-csv"))
     parser.add_argument("--host", default="postgres_ocpm")
+    parser.add_argument("--port", type=int, default=5432)
     parser.add_argument("--database", default="postgres")
     parser.add_argument("--user", default="postgres")
     parser.add_argument("--password", default="pg")
@@ -218,6 +281,7 @@ def load(args: argparse.Namespace) -> None:
     export_csv(args.sqlite, args.csv_dir)
     connection = psycopg2.connect(
         host=args.host,
+        port=args.port,
         dbname=args.database,
         user=args.user,
         password=args.password,

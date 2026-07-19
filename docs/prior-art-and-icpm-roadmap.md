@@ -34,8 +34,79 @@ an ablation.
   pre-aggregation are established database techniques. A patent or paper claim
   cannot be the use of any one of them in isolation.
 
-No implementation from these works was copied or linked. Their concepts define
-the comparison and novelty boundary.
+The production runtime does not copy or link these implementations. The
+benchmark harness executes version-pinned PM4Py and can locally compile a
+pinned OCPQ reference without redistributing either project. Their concepts
+define the comparison and novelty boundary.
+
+### Database-execution research evaluated for 0.5.0
+
+- [Factorized databases](https://arxiv.org/abs/1104.0867) motivate keeping
+  repeated bindings compact and expanding only at the client boundary. The
+  release applies that principle to generic binding capsules, including Q7's
+  duplicate-preserving pair groups.
+- [Yannakakis+](https://arxiv.org/abs/2504.03279) and
+  [Predicate Transfer](https://vldb.org/cidrdb/papers/2024/p22-yang.pdf)
+  reinforce reducing acyclic relation inputs before materialization. The
+  release performs the declared relation reduction during rebuild and persists
+  the final constraint capsule rather than reconstructing a join per request.
+- [Free Join](https://arxiv.org/abs/2301.10841) and worst-case-optimal join
+  research informed the boundary between fixed native kernels and a future
+  generic constraint planner. No third-party join engine was embedded.
+- [DBToaster](https://www.vldb.org/pvldb/vol5/p968_yanifahmad_vldb2012.pdf)
+  and dynamic Yannakakis maintenance are relevant to a future incremental
+  refresh path. The current release intentionally rebuilds declared summaries
+  so its invalidation and MVCC semantics remain explicit.
+- Vectorized execution and morsel-driven parallelism remain scale-out options.
+  The measured release first removes tuple and serialization work through
+  delta-coded numeric columns, prepared queries, and complete owned-row
+  materialization at the API boundary.
+
+These papers supplied design criteria, not source code. No proprietary engine
+implementation or restrictively licensed implementation was copied, linked, or
+translated into this release.
+
+### July 2026 execution-method refresh
+
+A fresh primary-source review did not identify a stronger broadly applicable
+representation than the implemented sparse-locator plus compressed-capsule
+boundary, but it did sharpen the next scale ablations:
+
+- DuckDB's official [vector execution
+  documentation](https://duckdb.org/docs/current/internals/vector) describes
+  flat, constant, dictionary, and sequence vectors that can remain compressed
+  during execution. `pg_ocpm` uses the same general principle without copying
+  DuckDB code: repeated labels stay dictionary-like, monotone identifiers and
+  timestamps use compact numeric payloads, and Rust expands logical rows only
+  at the API boundary.
+- ClickHouse 25.6's official description of [lightweight projections as
+  secondary indexes](https://clickhouse.com/blog/projections-secondary-indices)
+  stores alternate sort keys plus offsets instead of duplicating full rows.
+  The PostgreSQL-native analogue already evaluated here is a narrow relational
+  locator and leading-key/time B-tree surface pointing at compressed capsules.
+  This supports keeping indexes selective and small rather than adding a
+  workload-specific covering index for every algorithm.
+- The SIGMOD 2025 [data-chunk compaction
+  work](https://duckdb.org/library/data-chunk-compaction/) reports that sparse
+  vector batches can lose efficiency after selective operators. The current
+  fixed-size capsule segmentation avoids tiny SQL tuples, but adaptive
+  re-compaction remains a scale ablation because its benefit cannot be inferred
+  from the present medium-sized, warm-cache fixtures.
+- PostgreSQL's official [BRIN
+  documentation](https://www.postgresql.org/docs/current/brin.html) confirms
+  that small lossy summaries can prune naturally ordered large relations.
+  Replacing the current time B-trees with BRIN is deliberately not a default:
+  the public serving tables are compact enough that false-positive page reads
+  may cost more than the saved index bytes. It belongs in the planned 1x-100x
+  storage/selectivity ablation.
+
+This refresh used documentation and papers as design evidence only. It did not
+copy, link, translate, or depend on DuckDB or ClickHouse implementation code.
+The high-impact moonshot already evaluated in this release is factorized,
+duplicate-preserving result capsules with late full-row materialization. Their
+effect is covered by exact OCPQ parity plus latency, memory, storage, and
+multi-epoch concurrency gates; the next ideas above require larger-scale causal
+ablations rather than another benchmark-specific index.
 
 ## Candidate contribution hypotheses
 
@@ -54,10 +125,10 @@ These are hypotheses for literature and patent review, not claims:
    construction/scoring; Python receives final compact results through a
    GIL-releasing stable ABI. The contribution would be the co-design and cost
    boundary, not Rust bindings alone.
-4. **Storage-performance co-optimization.** The representation uses 40.9% less
-   total space and 82.7% less index space than the indexed relational OCEL
-   baseline in the public fixture while lowering all 18 measured p50 latencies
-   by at least 17.012x.
+4. **Storage-performance co-optimization.** The representation is designed to
+   reduce retained serving and index space while avoiding request-time
+   lifecycle reconstruction. Quantitative release claims remain pending the
+   clean, correctness-gated rerun.
 5. **Correctness-gated reproducible evaluation.** Every timed pair must produce
    the same canonical answer, the release artifact carries a digest, and
    latency, index/heap/TOAST storage, and concurrency use one containerized
@@ -139,7 +210,7 @@ Suggested artifact sequence:
    notebook/dashboard, anonymous reviewer access if the track requires it, and
    a complete artifact appendix.
 
-Do not submit an abstract centered only on the 36.264x headline. Reviewers will
+Do not submit an abstract centered only on a benchmark headline. Reviewers will
 reasonably ask which component caused it, whether precomputation is charged,
 whether outputs are equivalent, how it compares with current tools, and whether
 the result survives scale and cold-cache conditions. The roadmap above is the

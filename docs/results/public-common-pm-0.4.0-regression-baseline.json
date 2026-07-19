@@ -1,0 +1,261 @@
+{
+  "schema_version": 1,
+  "artifact_type": "public_common_pm_latency_storage_regression_baseline",
+  "release": {
+    "ocpm_engine": "0.4.0",
+    "pg_ocpm": "0.5.0"
+  },
+  "source": {
+    "title": "Collection of Object-Centric Event Logs (SAP IDES O2C and P2P)",
+    "doi": "10.5281/zenodo.8261133",
+    "license": "CC BY 4.0"
+  },
+  "environment": {
+    "client": {
+      "python": "3.11.15",
+      "platform": "Linux-7.0.11-orbstack-00360-gc9bc4d96ac70-aarch64-with-glibc2.36",
+      "machine": "aarch64",
+      "logical_cpus_visible": 18
+    },
+    "vanilla_postgres": {
+      "postgres_version": "16.14 (Debian 16.14-1.pgdg13+1)",
+      "shared_buffers": "1GB",
+      "effective_cache_size": "4GB",
+      "work_mem": "16MB",
+      "maintenance_work_mem": "1GB",
+      "max_parallel_workers_per_gather": "4",
+      "random_page_cost": "1.1",
+      "jit": "off"
+    },
+    "pg_ocpm_postgres": {
+      "postgres_version": "16.14 (Debian 16.14-1.pgdg13+1)",
+      "shared_buffers": "1GB",
+      "effective_cache_size": "4GB",
+      "work_mem": "16MB",
+      "maintenance_work_mem": "1GB",
+      "max_parallel_workers_per_gather": "4",
+      "random_page_cost": "1.1",
+      "jit": "off"
+    }
+  },
+  "method": {
+    "warmups": 2,
+    "measured_runs": 9,
+    "random_seed": 20260718,
+    "latency_scope": "database extraction/aggregation plus model construction and scoring",
+    "baseline": "indexed relational OCEL in vanilla PostgreSQL plus independent Python reference kernels",
+    "candidate": "pg_ocpm compact aggregates plus ocpm-engine Rust kernels",
+    "correctness_gate": "canonical result equality before latency inclusion",
+    "execution_order": "randomized per measured pair with recorded seed",
+    "storage": "sum of PostgreSQL heap, index, and TOAST relation bytes"
+  },
+  "datasets": [
+    {
+      "fixture": {
+        "name": "sap_o2c",
+        "baseline_dataset_id": 1,
+        "extension_dataset_id": 1,
+        "object_type": "MATERIAL",
+        "from_time": "1992-06-23 23:59:59.999999+00:00",
+        "train_to": "2011-04-04 12:49:23+00:00",
+        "test_from": "2011-04-04 12:49:23.000001+00:00",
+        "to_time": "2020-04-28 00:00:00.000001+00:00",
+        "source_activity": "Create Purchase Order",
+        "target_activity": "Create Purchase Order",
+        "slow_threshold": 2419200.0
+      },
+      "workloads": [
+        {
+          "workload": "dfg_conformance_95pct",
+          "vanilla_postgres_python": {
+            "p50_ms": 37.787
+          },
+          "pg_ocpm_rust": {
+            "p50_ms": 1.111
+          }
+        },
+        {
+          "workload": "variant_conformance_95pct",
+          "vanilla_postgres_python": {
+            "p50_ms": 25.331
+          },
+          "pg_ocpm_rust": {
+            "p50_ms": 1.489
+          }
+        },
+        {
+          "workload": "next_activity_prediction",
+          "vanilla_postgres_python": {
+            "p50_ms": 37.044
+          },
+          "pg_ocpm_rust": {
+            "p50_ms": 1.093
+          }
+        },
+        {
+          "workload": "dfg_frequency_drift",
+          "vanilla_postgres_python": {
+            "p50_ms": 37.217
+          },
+          "pg_ocpm_rust": {
+            "p50_ms": 1.106
+          }
+        },
+        {
+          "workload": "repeated_transition_rework",
+          "vanilla_postgres_python": {
+            "p50_ms": 39.369
+          },
+          "pg_ocpm_rust": {
+            "p50_ms": 1.877
+          }
+        },
+        {
+          "workload": "edge_bottleneck_ranking",
+          "vanilla_postgres_python": {
+            "p50_ms": 41.458
+          },
+          "pg_ocpm_rust": {
+            "p50_ms": 1.824
+          }
+        },
+        {
+          "workload": "edge_bottleneck_prediction",
+          "vanilla_postgres_python": {
+            "p50_ms": 96.754
+          },
+          "pg_ocpm_rust": {
+            "p50_ms": 2.699
+          }
+        },
+        {
+          "workload": "edge_duration_time_series",
+          "vanilla_postgres_python": {
+            "p50_ms": 251.333
+          },
+          "pg_ocpm_rust": {
+            "p50_ms": 2.337
+          }
+        },
+        {
+          "workload": "activity_profile",
+          "vanilla_postgres_python": {
+            "p50_ms": 48.127
+          },
+          "pg_ocpm_rust": {
+            "p50_ms": 2.51
+          }
+        }
+      ]
+    },
+    {
+      "fixture": {
+        "name": "sap_p2p",
+        "baseline_dataset_id": 2,
+        "extension_dataset_id": 2,
+        "object_type": "EBELN_EBELP",
+        "from_time": "1994-11-10 23:59:59.999999+00:00",
+        "train_to": "2004-05-06 00:00:00+00:00",
+        "test_from": "2004-05-06 00:00:00.000001+00:00",
+        "to_time": "2020-06-04 00:00:00.000001+00:00",
+        "source_activity": "Create Purchase Order",
+        "target_activity": "Enter Incoming Invoice",
+        "slow_threshold": 1227737.0
+      },
+      "workloads": [
+        {
+          "workload": "dfg_conformance_95pct",
+          "vanilla_postgres_python": {
+            "p50_ms": 15.735
+          },
+          "pg_ocpm_rust": {
+            "p50_ms": 0.462
+          }
+        },
+        {
+          "workload": "variant_conformance_95pct",
+          "vanilla_postgres_python": {
+            "p50_ms": 27.004
+          },
+          "pg_ocpm_rust": {
+            "p50_ms": 0.393
+          }
+        },
+        {
+          "workload": "next_activity_prediction",
+          "vanilla_postgres_python": {
+            "p50_ms": 15.707
+          },
+          "pg_ocpm_rust": {
+            "p50_ms": 0.371
+          }
+        },
+        {
+          "workload": "dfg_frequency_drift",
+          "vanilla_postgres_python": {
+            "p50_ms": 15.648
+          },
+          "pg_ocpm_rust": {
+            "p50_ms": 0.36
+          }
+        },
+        {
+          "workload": "repeated_transition_rework",
+          "vanilla_postgres_python": {
+            "p50_ms": 17.693
+          },
+          "pg_ocpm_rust": {
+            "p50_ms": 0.744
+          }
+        },
+        {
+          "workload": "edge_bottleneck_ranking",
+          "vanilla_postgres_python": {
+            "p50_ms": 16.245
+          },
+          "pg_ocpm_rust": {
+            "p50_ms": 0.512
+          }
+        },
+        {
+          "workload": "edge_bottleneck_prediction",
+          "vanilla_postgres_python": {
+            "p50_ms": 34.253
+          },
+          "pg_ocpm_rust": {
+            "p50_ms": 0.772
+          }
+        },
+        {
+          "workload": "edge_duration_time_series",
+          "vanilla_postgres_python": {
+            "p50_ms": 105.406
+          },
+          "pg_ocpm_rust": {
+            "p50_ms": 1.795
+          }
+        },
+        {
+          "workload": "activity_profile",
+          "vanilla_postgres_python": {
+            "p50_ms": 29.817
+          },
+          "pg_ocpm_rust": {
+            "p50_ms": 0.499
+          }
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "vanilla_postgres": {
+      "index_bytes": 119447552,
+      "total_bytes": 181698560
+    },
+    "pg_ocpm": {
+      "index_bytes": 20709376,
+      "total_bytes": 107323392
+    }
+  },
+  "payload_sha256": "2f4d7aa425444bbde420547bbda7b0a4839c38e0294e6e9a9f43954f9d19a331"
+}
