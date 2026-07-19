@@ -12,6 +12,7 @@ pg_ocpm_release="0.7.0"
 public_result_name="public-common-pm-${engine_release}.json"
 sap_result_name="sap-pm4py-three-way-${engine_release}.json"
 sap_report_name="sap-pm4py-three-way-${engine_release}.md"
+release_bridge="$root/.benchmarks/sap-common-pm-release-bridge-0.4.0-to-0.6.0.json"
 
 if [[ "${1:-}" == "--concurrency-only" ]]; then
     concurrency_only=true
@@ -31,6 +32,13 @@ if [[ "$concurrency_only" == true ]]; then
             exit 2
         fi
     done
+fi
+
+if [[ ! -f "$release_bridge" ]]; then
+    echo "public preview validation requires the staged matched-release bridge:" >&2
+    echo "  $release_bridge" >&2
+    echo "run: make perf-sap-release-bridge-preview" >&2
+    exit 2
 fi
 
 if [[ -z "$pg_ocpm_source" ]]; then
@@ -186,7 +194,7 @@ public_result="$root/.benchmarks/$public_result_name"
 sap_result="$root/.benchmarks/$sap_result_name"
 
 "$python" "$root/benchmarks/check_public_result.py" \
-    "$public_result" --preview
+    "$public_result" --release-bridge "$release_bridge" --preview
 "$python" "$root/benchmarks/check_sap_pm4py_result.py" \
     "$sap_result" --preview
 "$python" "$root/benchmarks/check_public_provenance_pair.py" \

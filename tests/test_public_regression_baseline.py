@@ -55,3 +55,31 @@ def test_public_baseline_contract_rejects_extra_latency_metrics() -> None:
 
     with pytest.raises(SystemExit, match="non-p50 latency fields"):
         CHECKER.validate_regression_baseline(baseline)
+
+
+def test_historical_p50_is_not_used_as_current_latency_gate(monkeypatch) -> None:
+    baseline = load_baseline()
+    for dataset in baseline["datasets"]:
+        for workload in dataset["workloads"]:
+            workload["vanilla_postgres_python"]["p50_ms"] = 0.000001
+            workload["pg_ocpm_rust"]["p50_ms"] = 0.000001
+    result = {"storage": copy.deepcopy(baseline["storage"])}
+    checked = []
+
+    def validate_bridge(bridge, public_result, *, allow_dirty):
+        checked.append((bridge, public_result, allow_dirty))
+
+    monkeypatch.setattr(
+        CHECKER.release_bridge_checker,
+        "validate_for_public",
+        validate_bridge,
+    )
+    bridge = {"artifact_type": "matched-release-test"}
+    CHECKER.validate_regressions(
+        result,
+        baseline,
+        bridge,
+        allow_dirty=True,
+    )
+
+    assert checked == [(bridge, result, True)]

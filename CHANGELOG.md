@@ -22,6 +22,15 @@ All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
 - Replaced single-batch SAP tail latency with three 30-round epochs, retaining
   every integer-nanosecond sample and realized arm-order code so release
   checkers can recompute pooled p50/p95 and report the epoch-p95 range.
+- Added a matched SAP release bridge for `pg_ocpm 0.5.0` plus `ocpm-engine
+  0.4.0` versus `pg_ocpm 0.7.0` plus `ocpm-engine 0.6.0`. The bridge uses
+  long-lived version-isolated workers, an untimed vanilla oracle, exactly
+  counterbalanced 3x30 execution order, first-versus-second position summaries,
+  and per-sample latency and answer-hash evidence across all 18 public workloads.
+- Stopped treating the historical two-warmup, nine-sample SAP latency values as
+  directly comparable release evidence. They remain descriptive; matched
+  release latency now requires the bridge, while the stable historical storage
+  ceiling remains enforced.
 - Removed the obsolete root-only runner and certification paths so withdrawn
   artifacts cannot satisfy current preview or release gates.
 - Raised the minimum supported extension version to `pg_ocpm 0.7.0`.

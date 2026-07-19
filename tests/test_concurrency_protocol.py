@@ -185,9 +185,13 @@ def test_release_latency_protocol_requires_three_epochs_of_thirty_runs(
     }
 
     checker.validate_latency_sample_counts(current)
-    assert checker.latency_method(current) == checker.latency_method(historical)
     with pytest.raises(SystemExit, match="three epochs of 30"):
         checker.validate_latency_sample_counts(historical)
+
+
+def test_public_checker_does_not_equate_historical_latency_protocol() -> None:
+    assert not hasattr(PUBLIC_CHECK, "latency_method")
+    assert not hasattr(PUBLIC_CHECK, "LATENCY_CEILING")
 
 
 @pytest.mark.parametrize("runner", (PUBLIC, SAP))

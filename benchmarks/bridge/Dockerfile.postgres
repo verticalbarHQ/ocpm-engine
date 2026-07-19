@@ -1,0 +1,36 @@
+ARG POSTGRES_IMAGE
+
+FROM ${POSTGRES_IMAGE} AS builder
+
+ARG PG_MAJOR=16
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       build-essential \
+       postgresql-server-dev-${PG_MAJOR} \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build/pg_ocpm
+COPY --from=pg_source . ./
+
+RUN make PG_CONFIG=/usr/lib/postgresql/${PG_MAJOR}/bin/pg_config -j"$(nproc)" \
+    && make PG_CONFIG=/usr/lib/postgresql/${PG_MAJOR}/bin/pg_config \
+       DESTDIR=/staging install \
+    && mkdir /out \
+    && cp /staging/usr/lib/postgresql/${PG_MAJOR}/lib/pg_ocpm.so /out/ \
+    && cp /staging/usr/share/postgresql/${PG_MAJOR}/extension/pg_ocpm.control /out/ \
+    && cp /staging/usr/share/postgresql/${PG_MAJOR}/extension/pg_ocpm--*.sql /out/
+
+FROM ${POSTGRES_IMAGE}
+
+ARG PG_MAJOR=16
+ARG SOURCE_REVISION
+ARG PG_OCPM_VERSION
+
+COPY --from=builder /out/pg_ocpm.so /usr/lib/postgresql/${PG_MAJOR}/lib/
+COPY --from=builder /out/pg_ocpm.control /usr/share/postgresql/${PG_MAJOR}/extension/
+COPY --from=builder /out/pg_ocpm--*.sql /usr/share/postgresql/${PG_MAJOR}/extension/
+
+LABEL org.opencontainers.image.title="pg_ocpm SAP release bridge" \
+      org.opencontainers.image.revision="${SOURCE_REVISION}" \
+      org.opencontainers.image.version="${PG_OCPM_VERSION}"

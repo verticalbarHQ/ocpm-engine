@@ -2,6 +2,7 @@ PYTHON ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 
 .PHONY: check-python perf-public perf-public-concurrency \
 	perf-public-preview-check perf-public-release-check \
+	perf-sap-release-bridge-preview perf-sap-release-bridge-preview-check \
 	perf-ocpq-preview-check perf-ocpq-release-check perf-release-check
 
 check-python:
@@ -14,11 +15,26 @@ perf-public-concurrency: check-python
 	PYTHON="$(PYTHON)" ./benchmarks/run_public_benchmark.sh --concurrency-only
 
 perf-public-preview-check: check-python
-	$(PYTHON) benchmarks/check_public_result.py .benchmarks/public-common-pm-0.6.0.json --preview
+	$(PYTHON) benchmarks/check_sap_release_bridge.py \
+		.benchmarks/sap-common-pm-release-bridge-0.4.0-to-0.6.0.json \
+		--preview
+	$(PYTHON) benchmarks/check_public_result.py \
+		.benchmarks/public-common-pm-0.6.0.json \
+		--release-bridge \
+		.benchmarks/sap-common-pm-release-bridge-0.4.0-to-0.6.0.json \
+		--preview
 	$(PYTHON) benchmarks/check_sap_pm4py_result.py .benchmarks/sap-pm4py-three-way-0.6.0.json --preview
 	$(PYTHON) benchmarks/check_public_provenance_pair.py \
 		--common .benchmarks/public-common-pm-0.6.0.json \
 		--sap .benchmarks/sap-pm4py-three-way-0.6.0.json \
+		--preview
+
+perf-sap-release-bridge-preview: check-python
+	PYTHON="$(PYTHON)" ./benchmarks/run_sap_release_bridge.sh --preview
+
+perf-sap-release-bridge-preview-check: check-python
+	$(PYTHON) benchmarks/check_sap_release_bridge.py \
+		.benchmarks/sap-common-pm-release-bridge-0.4.0-to-0.6.0.json \
 		--preview
 
 perf-public-release-check: check-python

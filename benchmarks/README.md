@@ -49,21 +49,55 @@ and drift, writes
 The preview check validates both ignored artifacts without changing
 `docs/results/`. `check_public_result.py` validates exact public fixtures and
 settings, correctness flags, workload count, 10x latency gates, the stable
-concurrency protocol, and 1% storage ceiling without requiring Docker. The
-historical p50 guard permits 10% or 0.10 ms, whichever is larger, so sub-ms
-results are not rejected solely because of timer and scheduling jitter.
+concurrency protocol, and 1% storage ceiling without requiring Docker. Product
+latency non-regression requires the independently checked matched-release
+bridge described below; the historical nine-sample values are not compared
+directly with the current 90-sample protocol.
 Every serial arm retains all 90 positive integer nanosecond samples and the
 realized per-round arm-order codes. The release checker independently recomputes
 the pooled p50 and nearest-rank p95, every epoch summary, and the epoch-p95
 median and range. Reports show pooled p95 with the minimum-to-maximum range of
 the three epoch p95s, so a tail claim cannot hide an isolated noisy epoch.
 
-Latency and storage regressions use the compact
+The stable storage guard uses the compact
 [`public-common-pm-0.4.0-regression-baseline.json`](../docs/results/public-common-pm-0.4.0-regression-baseline.json).
-It retains only the matching source, environment, latency method, fixtures,
-per-workload p50 values, and index/total storage values from the valid 0.4 run.
-The obsolete 0.2 and 0.3 artifacts and the full 0.4 artifact were removed; no
-historical concurrency result is retained or accepted as regression evidence.
+Its historical p50 values remain descriptive, but cannot certify latency
+because that run used only two warmups and nine samples without balanced order
+or raw evidence. The obsolete 0.2 and 0.3 artifacts and the full 0.4 artifact
+were removed; no historical concurrency result is retained or accepted as
+regression evidence.
+
+### Matched SAP release bridge
+
+`sap_release_bridge.py` compares `pg_ocpm 0.5.0` plus `ocpm-engine 0.4.0`
+against `pg_ocpm 0.7.0` plus `ocpm-engine 0.6.0` on the same checksum-pinned
+SAP fixture and host. Vanilla PostgreSQL is an untimed correctness oracle. Two
+long-lived, version-isolated workers report latency measured inside the worker,
+so controller and pipe overhead is excluded.
+
+Every workload uses ten warmup rounds with five executions in each order and
+three measured epochs of 30 rounds with exactly 15 executions in each order.
+The artifact retains every positive integer-nanosecond sample, every answer
+hash, and every realized order, plus first-position and second-position latency
+summaries for each arm. Its independent checker derives those position strata
+from the raw order codes and samples, recomputes all metrics, requires all 90
+answers per release to match the oracle, applies the existing 10% or 0.10 ms
+per-workload ceiling to unrounded medians, and preserves the 1% storage ceiling.
+
+The runner requires a local `pg_ocpm` repository containing both locked
+revisions (the sibling `../pg_ocpm` by default, or `PG_OCPM_SOURCE`). It creates
+and verifies clean detached worktrees for all four measured releases under the
+ignored `.benchmarks/` directory, then builds fresh isolated database volumes.
+Execute the ignored preview path with:
+
+```sh
+make perf-sap-release-bridge-preview
+make perf-sap-release-bridge-preview-check
+```
+
+The bridge is deliberately separate from the public result artifact. Release
+validation fails closed until a reviewed bridge payload digest is pinned; a
+self-digested preview cannot silently replace historical latency evidence.
 
 Publication is an explicit second step. After reviewing the staged JSON, copy
 the accepted artifacts into `docs/results/`, update the expected payload digest

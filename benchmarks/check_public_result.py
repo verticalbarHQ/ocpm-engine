@@ -16,16 +16,25 @@ try:
 except ModuleNotFoundError:  # loaded through importlib by unit tests
     from benchmarks.benchmark_provenance import validate_recorded_public_provenance
 
+try:
+    import check_sap_release_bridge as release_bridge_checker
+except ModuleNotFoundError:  # loaded through importlib by unit tests
+    from benchmarks import check_sap_release_bridge as release_bridge_checker
+
 ROOT = Path(__file__).resolve().parents[1]
 REGRESSION_BASELINE = (
     ROOT / "docs/results/public-common-pm-0.4.0-regression-baseline.json"
 )
+RELEASE_BRIDGE = ROOT / "docs/results/sap-common-pm-release-bridge-0.4.0-to-0.6.0.json"
 EXPECTED_PAYLOAD_SHA256 = (
     "6fe793b14df606a90fd39408e644aea1e937235eaa5ac047777716b5c7dfee72"
 )
 EXPECTED_BASELINE_PAYLOAD_SHA256 = (
     "2f4d7aa425444bbde420547bbda7b0a4839c38e0294e6e9a9f43954f9d19a331"
 )
+# Filled only after the independently checked bridge has been reviewed and
+# promoted. Preview validation uses the artifact's self-digest instead.
+EXPECTED_BRIDGE_PAYLOAD_SHA256: str | None = None
 CURRENT_RELEASE = {"ocpm_engine": "0.6.0", "pg_ocpm": "0.7.0"}
 BASELINE_RELEASE = {"ocpm_engine": "0.4.0", "pg_ocpm": "0.5.0"}
 BASELINE_ARTIFACT_TYPE = "public_common_pm_latency_storage_regression_baseline"
@@ -51,8 +60,6 @@ EXPECTED_CONCURRENCY_ENGINES = ("vanilla_postgres_python", "pg_ocpm_rust")
 EXPECTED_CONCURRENCY_EPOCHS = 3
 MINIMUM_CONCURRENCY_SECONDS = 5.0
 MINIMUM_REQUESTS_PER_WORKER = 32
-LATENCY_CEILING = 1.10
-LATENCY_ABSOLUTE_SLACK_MS = 0.10
 STORAGE_CEILING = 1.01
 MAXIMUM_CONCURRENCY_THROUGHPUT_CV = 0.15
 MINIMUM_CANDIDATE_THROUGHPUT_RATIO = 10.0
@@ -84,6 +91,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--expected-payload-sha256",
         help="explicit expected current-artifact digest",
+    )
+    parser.add_argument(
+        "--release-bridge",
+        type=Path,
+        default=RELEASE_BRIDGE,
+        help="matched 0.4/0.5-to-0.6/0.7 SAP release bridge artifact",
+    )
+    parser.add_argument(
+        "--expected-release-bridge-sha256",
+        help="explicit expected release-bridge payload digest",
     )
     parser.add_argument(
         "--preview",
@@ -120,15 +137,6 @@ def load_verified(path: Path, expected_digest: str | None = None) -> dict[str, A
     return result
 
 
-def latency_limit(prior_ms: float) -> float:
-    """Allow 10% or 0.10 ms, whichever is larger, for sub-ms jitter."""
-
-    return max(
-        prior_ms * LATENCY_CEILING,
-        prior_ms + LATENCY_ABSOLUTE_SLACK_MS,
-    )
-
-
 def workload_map(result: dict[str, Any]) -> dict[tuple[str, str], dict[str, Any]]:
     rows: dict[tuple[str, str], dict[str, Any]] = {}
     for dataset in result["datasets"]:
@@ -139,16 +147,6 @@ def workload_map(result: dict[str, Any]) -> dict[tuple[str, str], dict[str, Any]
                 fail(f"duplicate workload row: {key}")
             rows[key] = workload
     return rows
-
-
-def latency_method(method: dict[str, Any]) -> dict[str, Any]:
-    stable = dict(method)
-    stable.pop("concurrency", None)
-    stable.pop("concurrency_model", None)
-    stable.pop("warmups", None)
-    stable.pop("measured_runs", None)
-    stable.pop("serial_latency", None)
-    return stable
 
 
 def validate_latency_sample_counts(method: dict[str, Any]) -> None:
@@ -527,10 +525,6 @@ def validate_contract(
         )
     except ValueError as error:
         fail(str(error))
-    if latency_method(result.get("method", {})) != latency_method(
-        baseline.get("method", {})
-    ):
-        fail("public benchmark measurement boundary or settings changed")
     validate_latency_sample_counts(result.get("method", {}))
     validate_concurrency_protocol(result)
 
@@ -598,22 +592,11 @@ def validate_contract(
 def validate_regressions(
     result: dict[str, Any],
     baseline: dict[str, Any],
-    rows: dict[tuple[str, str], dict[str, Any]],
+    bridge: dict[str, Any],
+    *,
+    allow_dirty: bool,
 ) -> None:
-    prior_rows = workload_map(baseline)
-    if set(rows) != set(prior_rows):
-        fail("current and prior workload keys differ")
-    for key, row in rows.items():
-        for engine in ("vanilla_postgres_python", "pg_ocpm_rust"):
-            current = row[engine]["p50_ms"]
-            prior = prior_rows[key][engine]["p50_ms"]
-            allowed = latency_limit(prior)
-            if current > allowed:
-                fail(
-                    f"{key}/{engine}: p50 regression "
-                    f"{current:.3f} ms > allowed {allowed:.3f} ms "
-                    f"from prior {prior:.3f} ms"
-                )
+    release_bridge_checker.validate_for_public(bridge, result, allow_dirty=allow_dirty)
 
     for representation in ("vanilla_postgres", "pg_ocpm"):
         for metric in ("index_bytes", "total_bytes"):
@@ -628,23 +611,35 @@ def validate_regressions(
 
 def main() -> None:
     args = parse_args()
-    if args.preview and args.expected_payload_sha256:
-        fail("--preview and --expected-payload-sha256 are mutually exclusive")
+    if args.preview and (
+        args.expected_payload_sha256 or args.expected_release_bridge_sha256
+    ):
+        fail("--preview and explicit expected digests are mutually exclusive")
     expected_digest = (
         None
         if args.preview
         else args.expected_payload_sha256 or EXPECTED_PAYLOAD_SHA256
     )
+    bridge_digest = (
+        None
+        if args.preview
+        else args.expected_release_bridge_sha256 or EXPECTED_BRIDGE_PAYLOAD_SHA256
+    )
+    if not args.preview and bridge_digest is None:
+        fail(
+            "release verification requires a reviewed, pinned SAP release bridge digest"
+        )
     result = load_verified(Path(args.result), expected_digest)
     baseline = load_verified(args.baseline, EXPECTED_BASELINE_PAYLOAD_SHA256)
+    bridge = release_bridge_checker.load_verified(args.release_bridge, bridge_digest)
     validate_regression_baseline(baseline)
     rows = validate_contract(result, baseline, allow_dirty=args.preview)
-    validate_regressions(result, baseline, rows)
+    validate_regressions(result, baseline, bridge, allow_dirty=args.preview)
     minimum = min(row["speedup"] for row in rows.values())
     print(
         f"public benchmark verified: {len(rows)} exact workloads, "
-        f"minimum {minimum:.3f}x; latency, three-epoch concurrency, and storage "
-        "gates passed"
+        f"minimum {minimum:.3f}x; matched release bridge, three-epoch "
+        "concurrency, and historical storage gates passed"
     )
 
 
