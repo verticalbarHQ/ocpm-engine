@@ -82,8 +82,8 @@ EXPECTED_HARNESS_SHA256 = {
     "controller": "874a5fcc081040a0ac9c99c1bbf48d3240ffcfa25b2bfef75fd8b298fd1ace22",
     "support": "eed18acd3b4b2d2d9511b7783ba9cc5ebe1df8fc5998ed4be22f380c06beecf0",
     "worker": "bf2772136b1f8f2e0580e4533ce7556c13c57343aed99301657b2fb0f0ac31ce",
-    "common_pm": "7a21984ff0eaf4d349b251c7a6aea1205cf22587cb85a0626b1cc9fd8623cf27",
-    "pm4py": "448f7c76e6431e0c265e943deff7236ee647d104130097ae3aa8c313d0568b62",
+    "common_pm": "5cafc5e15cba2d5ec7e74a177c91b26348f77cb1da5f4b156f2a8838700ac64c",
+    "pm4py": "0dd531b696760ddb14ce9be95c6f47c6e8063e71a740474423f20be5e3489648",
     "requirements_lock": (
         "659c44221d2a473777901318dcfd7ac23443beb10d57642e337b2a03132bbb54"
     ),
