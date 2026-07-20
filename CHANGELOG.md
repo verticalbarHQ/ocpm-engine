@@ -15,6 +15,9 @@ All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
 - Added a dual dynamic DFG strategy: ordinary filters aggregate finalized edge
   buckets, while edge predicates reuse `pg_ocpm`'s native event stream for both
   case selection and directly-follows aggregation.
+- Materialized the bounded edge expansion once before joining dynamic case
+  sets, preventing PostgreSQL row-estimation errors from selecting a nested
+  loop that repeatedly decodes the same buckets.
 - Added case-ID query plans and canonical DFG execution/scoring so callers and
   regression suites can verify exact selected-case parity independently of
   aggregate results.

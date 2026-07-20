@@ -80,18 +80,14 @@ _LIFECYCLE_EDGES_CTE = """lifecycle_edges AS MATERIALIZED (
 )"""
 
 
-_BUCKET_DFG_CTE = """dfg AS (
-    SELECT bucket.source_activity,
-           bucket.target_activity,
-           count(*)::bigint AS frequency,
-           round(avg(item.execution_time)::numeric,6)::double precision
-               AS mean_duration
+_BUCKET_EDGES_CTE = """dfg_edges AS MATERIALIZED (
+    SELECT bucket.source_activity,bucket.target_activity,
+           item.case_id,item.execution_time
     FROM ocpm.edge_bucket bucket
     CROSS JOIN LATERAL unnest(
         bucket.case_ids,bucket.source_timestamps,
         bucket.target_timestamps,bucket.execution_times
     ) AS item(case_id,source_timestamp,target_timestamp,execution_time)
-    JOIN selected USING (case_id)
     WHERE bucket.dataset_id=%(dataset_id)s
       AND bucket.tenant_id=%(tenant_id)s
       AND bucket.source_object_type=%(backbone_type)s
@@ -102,7 +98,18 @@ _BUCKET_DFG_CTE = """dfg AS (
       AND bucket.max_target_timestamp>=%(from_date)s
       AND item.source_timestamp>=%(from_date)s
       AND item.target_timestamp<=%(to_date)s
-    GROUP BY bucket.source_activity,bucket.target_activity
+)"""
+
+
+_BUCKET_DFG_CTE = """dfg AS (
+    SELECT edge.source_activity,
+           edge.target_activity,
+           count(*)::bigint AS frequency,
+           round(avg(edge.execution_time)::numeric,6)::double precision
+               AS mean_duration
+    FROM dfg_edges edge
+    JOIN selected USING (case_id)
+    GROUP BY edge.source_activity,edge.target_activity
 )"""
 
 
@@ -310,7 +317,10 @@ def compile_dynamic_dfg(
     if projection == "case_ids":
         result_sql = _CASE_ID_PROJECTION
     else:
-        ctes.append(_STREAM_DFG_CTE if has_edge_filters else _BUCKET_DFG_CTE)
+        if has_edge_filters:
+            ctes.append(_STREAM_DFG_CTE)
+        else:
+            ctes.extend((_BUCKET_EDGES_CTE, _BUCKET_DFG_CTE))
         result_sql = _DFG_PROJECTION
     strategy = "native event stream" if has_edge_filters else "compact bucket scan"
     return "WITH " + ",\n".join(ctes) + "\n" + result_sql, params, strategy

@@ -140,6 +140,7 @@ def test_dynamic_case_filters_keep_the_fast_bucket_dfg_path() -> None:
 
     assert "ocpm.case_bucket" in plan.sql
     assert "ocpm.edge_bucket" in plan.sql
+    assert "dfg_edges AS MATERIALIZED" in plan.sql
     assert "ocpm.event_log_rows" not in plan.sql
     assert plan.strategy == "compact bucket scan dynamic dfg"
 

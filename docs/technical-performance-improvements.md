@@ -76,6 +76,7 @@ SQL focused on selection, aggregation, and response construction.
 | Parameterized plans | SQL text variation and unsafe interpolation | Stable SQL plus bound parameters |
 | Uniform dynamic filtering | Endpoint-specific filter SQL and repeated joins | Typed predicates composed as materialized case sets |
 | Edge-aware DFG routing | Re-expand or join normalized event rows for every request | Edge buckets normally; native event stream when edge predicates require it |
+| Cardinality-stable DFG join | Repeated array decoding after a low case-set estimate | Materialize the bounded edge expansion once before the case-set join |
 
 ## 1. Typed request normalization
 
