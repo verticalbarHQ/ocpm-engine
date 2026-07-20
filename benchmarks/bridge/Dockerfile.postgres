@@ -23,6 +23,7 @@ RUN make PG_CONFIG=/usr/lib/postgresql/${PG_MAJOR}/bin/pg_config -j"$(nproc)" \
 
 FROM ${POSTGRES_IMAGE}
 
+ARG POSTGRES_IMAGE
 ARG PG_MAJOR=16
 ARG SOURCE_REVISION
 ARG PG_OCPM_VERSION
@@ -33,4 +34,5 @@ COPY --from=builder /out/pg_ocpm--*.sql /usr/share/postgresql/${PG_MAJOR}/extens
 
 LABEL org.opencontainers.image.title="pg_ocpm SAP release bridge" \
       org.opencontainers.image.revision="${SOURCE_REVISION}" \
-      org.opencontainers.image.version="${PG_OCPM_VERSION}"
+      org.opencontainers.image.version="${PG_OCPM_VERSION}" \
+      org.opencontainers.image.base.name="${POSTGRES_IMAGE}"

@@ -17,6 +17,6 @@ per-workload and geometric-mean 10x latency gates, three duration-bounded
 concurrency epochs, a 10x candidate-throughput ratio, storage ceilings, and
 clean source/image provenance.
 
-Run `make perf-public`, inspect the ignored staging artifacts, and then run
-`make perf-public-preview-check`. Results will be shown for review before any
-artifact is copied into `docs/results/`.
+Run `make perf-sap-release-bridge-preview`, then `make perf-public`. Inspect the
+ignored staging artifacts and run `make perf-public-preview-check`. Results will
+be shown for review before any artifact is copied into `docs/results/`.

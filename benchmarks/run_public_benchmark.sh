@@ -12,7 +12,7 @@ pg_ocpm_release="0.7.0"
 public_result_name="public-common-pm-${engine_release}.json"
 sap_result_name="sap-pm4py-three-way-${engine_release}.json"
 sap_report_name="sap-pm4py-three-way-${engine_release}.md"
-release_bridge="$root/.benchmarks/sap-common-pm-release-bridge-0.4.0-to-0.6.0.json"
+release_bridge="$root/.benchmarks/sap-release-bridge-0.4.0-to-0.6.0.json"
 
 if [[ "${1:-}" == "--concurrency-only" ]]; then
     concurrency_only=true

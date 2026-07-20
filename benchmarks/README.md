@@ -32,6 +32,7 @@ Run the complete Docker-isolated path with:
 
 ```sh
 export PG_OCPM_SOURCE=/path/to/pg_ocpm
+make perf-sap-release-bridge-preview
 make perf-public
 make perf-public-preview-check
 ```
@@ -48,41 +49,47 @@ and drift, writes
 `.benchmarks/sap-pm4py-three-way-0.6.0.json`, and stops its containers on exit.
 The preview check validates both ignored artifacts without changing
 `docs/results/`. `check_public_result.py` validates exact public fixtures and
-settings, correctness flags, workload count, 10x latency gates, the stable
-concurrency protocol, and 1% storage ceiling without requiring Docker. Product
-latency non-regression requires the independently checked matched-release
-bridge described below; the historical nine-sample values are not compared
-directly with the current 90-sample protocol.
+settings, correctness flags, workload count, 10x latency gates, and the stable
+concurrency protocol without requiring Docker. Product latency, memory,
+concurrency, and storage non-regression require the independently checked
+matched-release bridge described below.
 Every serial arm retains all 90 positive integer nanosecond samples and the
 realized per-round arm-order codes. The release checker independently recomputes
 the pooled p50 and nearest-rank p95, every epoch summary, and the epoch-p95
 median and range. Reports show pooled p95 with the minimum-to-maximum range of
 the three epoch p95s, so a tail claim cannot hide an isolated noisy epoch.
 
-The stable storage guard uses the compact
+The compact
 [`public-common-pm-0.4.0-regression-baseline.json`](../docs/results/public-common-pm-0.4.0-regression-baseline.json).
-Its historical p50 values remain descriptive, but cannot certify latency
-because that run used only two warmups and nine samples without balanced order
-or raw evidence. The obsolete 0.2 and 0.3 artifacts and the full 0.4 artifact
-were removed; no historical concurrency result is retained or accepted as
-regression evidence.
+retains only source, fixture, and workload identity. Historical latency,
+memory, storage, and concurrency values were removed and cannot satisfy a
+release gate.
 
 ### Matched SAP release bridge
 
-`sap_release_bridge.py` compares `pg_ocpm 0.5.0` plus `ocpm-engine 0.4.0`
+`sap_release_regression.py` compares `pg_ocpm 0.5.0` plus `ocpm-engine 0.4.0`
 against `pg_ocpm 0.7.0` plus `ocpm-engine 0.6.0` on the same checksum-pinned
-SAP fixture and host. Vanilla PostgreSQL is an untimed correctness oracle. Two
-long-lived, version-isolated workers report latency measured inside the worker,
-so controller and pipe overhead is excluded.
+SAP fixture and host. Vanilla PostgreSQL is an untimed correctness oracle. The
+common-PM suite covers its native `pg_ocpm` plus Rust path. The PM4Py suite
+covers both release-sensitive paths: PM4Py over `pg_ocpm` and `ocpm-engine`
+over `pg_ocpm`.
 
 Every workload uses ten warmup rounds with five executions in each order and
 three measured epochs of 30 rounds with exactly 15 executions in each order.
 The artifact retains every positive integer-nanosecond sample, every answer
 hash, and every realized order, plus first-position and second-position latency
-summaries for each arm. Its independent checker derives those position strata
-from the raw order codes and samples, recomputes all metrics, requires all 90
-answers per release to match the oracle, applies the existing 10% or 0.10 ms
-per-workload ceiling to unrounded medians, and preserves the 1% storage ceiling.
+summaries for each arm. Four fresh-process RSS samples per arm use an exact 2/2
+execution-order schedule. Four duration-bounded concurrency epochs at every
+worker level retain raw controller round-trip and worker-internal samples. The
+independent checker recomputes every latency, RSS, QPS, p50, p95, p99, order,
+and correctness claim before applying the matched-release non-inferiority gates.
+
+Autovacuum is disabled in the release-bridge containers. Both `pg_ocpm` arms
+receive an explicit database-wide `VACUUM (ANALYZE)` before the structural
+storage snapshot. The artifact records each relation's main, FSM, VM, index,
+TOAST, and TOAST-index bytes plus maintenance state. A second post-workload
+snapshot is diagnostic only. This prevents relation age or background
+maintenance from being reported as product storage growth.
 
 The runner requires a local `pg_ocpm` repository containing both locked
 revisions (the sibling `../pg_ocpm` by default, or `PG_OCPM_SOURCE`). It creates
@@ -95,9 +102,11 @@ make perf-sap-release-bridge-preview
 make perf-sap-release-bridge-preview-check
 ```
 
-The bridge is deliberately separate from the public result artifact. Release
-validation fails closed until a reviewed bridge payload digest is pinned; a
-self-digested preview cannot silently replace historical latency evidence.
+The ignored preview is written to
+`.benchmarks/sap-release-bridge-0.4.0-to-0.6.0.json`. The bridge is deliberately
+separate from the two current-versus-vanilla public result artifacts. Release
+validation fails closed until its reviewed payload digest is pinned; a
+self-digested preview cannot silently replace matched release evidence.
 
 Publication is an explicit second step. After reviewing the staged JSON, copy
 the accepted artifacts into `docs/results/`, update the expected payload digest
@@ -156,8 +165,9 @@ The relational index reduction is applied only after the main public benchmark
 finishes, so the two suites remain independent. The recorded report is
 [SAP PM4Py three-way performance](../docs/sap-pm4py-three-way-performance.md),
 and `check_sap_pm4py_result.py` validates its committed JSON payload, source
-counts, fixture settings, exact answer hashes, 10% p50 tolerance, 1% storage
-ceiling, bounded isolated memory, and every retained concurrency epoch.
+counts, fixture settings, exact answer hashes, current-path performance gates,
+and every retained concurrency epoch. Matched-release latency, memory,
+concurrency, and storage gates come from `sap_release_regression.py`.
 Concurrency protocol versions are structurally gated rather than compared
 across incompatible timing boundaries. To refresh concurrency without rerunning
 latency, storage, or memory, use `--concurrency-only` with the existing `--output`
@@ -166,9 +176,8 @@ clean-database sequence. Run `make perf-public-preview-check` to revalidate the
 staged artifacts without rerunning Docker. Published release artifacts and their
 latency and storage gates retain pinned payload digests.
 
-Historical SAP regressions use the compact
+The compact
 [`sap-pm4py-three-way-0.4.0-regression-baseline.json`](../docs/results/sap-pm4py-three-way-0.4.0-regression-baseline.json).
-It retains only comparable source, fixture, environment, method, answer/input
-shape, p50 latency, isolated incremental/total RSS, and index/total storage
-values. It contains no raw samples, historical concurrency measurements,
-generated summaries, or dependency-footprint claims.
+retains only source counts, fixture identity, exact answer hashes, and input
+shapes. It contains no historical latency, memory, storage, concurrency,
+environment, method, generated-summary, or dependency-footprint values.

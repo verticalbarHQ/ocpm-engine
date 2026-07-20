@@ -17,20 +17,20 @@ except ModuleNotFoundError:  # loaded through importlib by unit tests
     from benchmarks.benchmark_provenance import validate_recorded_public_provenance
 
 try:
-    import check_sap_release_bridge as release_bridge_checker
+    import check_sap_release_regression as release_regression_checker
 except ModuleNotFoundError:  # loaded through importlib by unit tests
-    from benchmarks import check_sap_release_bridge as release_bridge_checker
+    from benchmarks import check_sap_release_regression as release_regression_checker
 
 ROOT = Path(__file__).resolve().parents[1]
 REGRESSION_BASELINE = (
     ROOT / "docs/results/public-common-pm-0.4.0-regression-baseline.json"
 )
-RELEASE_BRIDGE = ROOT / "docs/results/sap-common-pm-release-bridge-0.4.0-to-0.6.0.json"
+RELEASE_BRIDGE = ROOT / "docs/results/sap-release-bridge-0.4.0-to-0.6.0.json"
 EXPECTED_PAYLOAD_SHA256 = (
     "6fe793b14df606a90fd39408e644aea1e937235eaa5ac047777716b5c7dfee72"
 )
 EXPECTED_BASELINE_PAYLOAD_SHA256 = (
-    "2f4d7aa425444bbde420547bbda7b0a4839c38e0294e6e9a9f43954f9d19a331"
+    "bff5956359d45f070905408081dcb466b9d7ec7bb5115271cc0d8347a5c9a60a"
 )
 # Filled only after the independently checked bridge has been reviewed and
 # promoted. Preview validation uses the artifact's self-digest instead.
@@ -44,6 +44,19 @@ EXPECTED_SOURCE = {
     "license": "CC BY 4.0",
 }
 EXPECTED_DATASETS = ("sap_o2c", "sap_p2p")
+EXPECTED_FIXTURE_FIELDS = {
+    "name",
+    "baseline_dataset_id",
+    "extension_dataset_id",
+    "object_type",
+    "from_time",
+    "train_to",
+    "test_from",
+    "to_time",
+    "source_activity",
+    "target_activity",
+    "slow_threshold",
+}
 EXPECTED_WORKLOADS = (
     "dfg_conformance_95pct",
     "variant_conformance_95pct",
@@ -60,7 +73,6 @@ EXPECTED_CONCURRENCY_ENGINES = ("vanilla_postgres_python", "pg_ocpm_rust")
 EXPECTED_CONCURRENCY_EPOCHS = 3
 MINIMUM_CONCURRENCY_SECONDS = 5.0
 MINIMUM_REQUESTS_PER_WORKER = 32
-STORAGE_CEILING = 1.01
 MAXIMUM_CONCURRENCY_THROUGHPUT_CV = 0.15
 MINIMUM_CANDIDATE_THROUGHPUT_RATIO = 10.0
 MAXIMUM_CANDIDATE_CONCURRENCY_P95_MS = 15.0
@@ -84,8 +96,8 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=REGRESSION_BASELINE,
         help=(
-            "compact committed 0.4 latency/storage baseline; contains no "
-            "historical concurrency evidence"
+            "compact committed source and fixture contract; historical "
+            "performance values are not regression gates"
         ),
     )
     parser.add_argument(
@@ -293,10 +305,7 @@ def validate_regression_baseline(baseline: dict[str, Any]) -> None:
         "artifact_type",
         "release",
         "source",
-        "environment",
-        "method",
         "datasets",
-        "storage",
         "payload_sha256",
     }
     if set(baseline) != expected_top_level:
@@ -309,25 +318,6 @@ def validate_regression_baseline(baseline: dict[str, Any]) -> None:
         fail("unexpected public regression baseline release versions")
     if baseline.get("source") != EXPECTED_SOURCE:
         fail("public regression baseline source metadata changed")
-    if set(baseline.get("environment", {})) != {
-        "client",
-        "vanilla_postgres",
-        "pg_ocpm_postgres",
-    }:
-        fail("public regression baseline environment is incomplete")
-    if set(baseline.get("method", {})) != {
-        "warmups",
-        "measured_runs",
-        "random_seed",
-        "latency_scope",
-        "baseline",
-        "candidate",
-        "correctness_gate",
-        "execution_order",
-        "storage",
-    }:
-        fail("public regression baseline method contains non-regression fields")
-
     datasets = baseline.get("datasets", [])
     if (
         tuple(item.get("fixture", {}).get("name") for item in datasets)
@@ -337,32 +327,13 @@ def validate_regression_baseline(baseline: dict[str, Any]) -> None:
     for dataset in datasets:
         if set(dataset) != {"fixture", "workloads"}:
             fail("public regression baseline dataset contains unexpected fields")
+        if set(dataset.get("fixture", {})) != EXPECTED_FIXTURE_FIELDS:
+            fail("public regression baseline fixture contains unexpected fields")
         workloads = dataset.get("workloads", [])
         if tuple(item.get("workload") for item in workloads) != EXPECTED_WORKLOADS:
             fail("public regression baseline workload order changed")
-        for workload in workloads:
-            if set(workload) != {
-                "workload",
-                "vanilla_postgres_python",
-                "pg_ocpm_rust",
-            }:
-                fail("public regression baseline workload contains unexpected fields")
-            for engine in ("vanilla_postgres_python", "pg_ocpm_rust"):
-                metrics = workload.get(engine, {})
-                if set(metrics) != {"p50_ms"}:
-                    fail("public regression baseline retains non-p50 latency fields")
-                p50 = metrics.get("p50_ms")
-                if type(p50) not in {int, float} or not math.isfinite(p50) or p50 <= 0:
-                    fail("public regression baseline contains invalid p50 latency")
-
-    storage = baseline.get("storage", {})
-    if set(storage) != {"vanilla_postgres", "pg_ocpm"}:
-        fail("public regression baseline storage representations changed")
-    for metrics in storage.values():
-        if set(metrics) != {"index_bytes", "total_bytes"}:
-            fail("public regression baseline retains non-regression storage fields")
-        if any(type(value) is not int or value <= 0 for value in metrics.values()):
-            fail("public regression baseline contains invalid storage values")
+        if any(set(workload) != {"workload"} for workload in workloads):
+            fail("public regression baseline workload contains unexpected fields")
 
 
 def validate_concurrency_protocol(result: dict[str, Any]) -> None:
@@ -517,8 +488,6 @@ def validate_contract(
         fail("public dataset source metadata changed")
     if result.get("source") != baseline.get("source"):
         fail("public dataset source differs from the prior committed fixture")
-    if result.get("environment") != baseline.get("environment"):
-        fail("public benchmark host/database settings changed")
     try:
         validate_recorded_public_provenance(
             result.get("provenance"), allow_dirty=allow_dirty
@@ -591,22 +560,15 @@ def validate_contract(
 
 def validate_regressions(
     result: dict[str, Any],
-    baseline: dict[str, Any],
     bridge: dict[str, Any],
     *,
     allow_dirty: bool,
 ) -> None:
-    release_bridge_checker.validate_for_public(bridge, result, allow_dirty=allow_dirty)
-
-    for representation in ("vanilla_postgres", "pg_ocpm"):
-        for metric in ("index_bytes", "total_bytes"):
-            current = result["storage"][representation][metric]
-            prior = baseline["storage"][representation][metric]
-            if current > prior * STORAGE_CEILING:
-                fail(
-                    f"{representation}/{metric}: storage regression "
-                    f"{current} > {STORAGE_CEILING:.0%} of {prior}"
-                )
+    release_regression_checker.validate_for_public_common(
+        result,
+        bridge,
+        allow_dirty=allow_dirty,
+    )
 
 
 def main() -> None:
@@ -631,15 +593,18 @@ def main() -> None:
         )
     result = load_verified(Path(args.result), expected_digest)
     baseline = load_verified(args.baseline, EXPECTED_BASELINE_PAYLOAD_SHA256)
-    bridge = release_bridge_checker.load_verified(args.release_bridge, bridge_digest)
+    bridge = release_regression_checker.load_verified(
+        args.release_bridge,
+        bridge_digest,
+    )
     validate_regression_baseline(baseline)
     rows = validate_contract(result, baseline, allow_dirty=args.preview)
-    validate_regressions(result, baseline, bridge, allow_dirty=args.preview)
+    validate_regressions(result, bridge, allow_dirty=args.preview)
     minimum = min(row["speedup"] for row in rows.values())
     print(
         f"public benchmark verified: {len(rows)} exact workloads, "
-        f"minimum {minimum:.3f}x; matched release bridge, three-epoch "
-        "concurrency, and historical storage gates passed"
+        f"minimum {minimum:.3f}x; matched release latency, memory, "
+        "concurrency, and storage gates passed"
     )
 
 

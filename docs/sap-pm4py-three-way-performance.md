@@ -4,8 +4,8 @@ No `pg_ocpm 0.7.0` plus `ocpm-engine 0.6.0` PM4Py comparison is published in
 this source revision. Earlier staging values predated the final per-sample
 exactness, source-provenance, hash-locked dependency, concurrency-performance,
 and total peak-RSS gates. The full staging artifact was removed rather than
-promoted; only a compact latency, memory, and storage regression baseline is
-retained, with no raw samples or historical concurrency evidence.
+promoted. The compact historical file retains only source counts, fixture
+identity, exact answers, and input shapes; all performance values were removed.
 
 The clean run compares three complete request paths on the checksum-pinned SAP
 IDES O2C and P2P OCEL 2.0 logs:
@@ -23,6 +23,7 @@ concurrency epochs, at least a 3x engine-throughput ratio at every worker level,
 bounded total and incremental peak RSS, storage regression limits, clean
 source/image provenance, and exact benchmark package versions.
 
-Run `make perf-public`, inspect the ignored staging artifact and generated
-report, and then run `make perf-public-preview-check`. Results will be shown for
-review before any artifact is copied into `docs/results/`.
+Run `make perf-sap-release-bridge-preview`, then `make perf-public`. Inspect the
+ignored staging artifacts and generated reports, then run
+`make perf-public-preview-check`. Results will be shown for review before any
+artifact is copied into `docs/results/`.

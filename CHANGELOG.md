@@ -24,13 +24,13 @@ All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
   checkers can recompute pooled p50/p95 and report the epoch-p95 range.
 - Added a matched SAP release bridge for `pg_ocpm 0.5.0` plus `ocpm-engine
   0.4.0` versus `pg_ocpm 0.7.0` plus `ocpm-engine 0.6.0`. The bridge uses
-  long-lived version-isolated workers, an untimed vanilla oracle, exactly
-  counterbalanced 3x30 execution order, first-versus-second position summaries,
-  and per-sample latency and answer-hash evidence across all 18 public workloads.
-- Stopped treating the historical two-warmup, nine-sample SAP latency values as
-  directly comparable release evidence. They remain descriptive; matched
-  release latency now requires the bridge, while the stable historical storage
-  ceiling remains enforced.
+  version-isolated workers, an untimed vanilla oracle, exactly counterbalanced
+  3x30 latency order, four fresh-process RSS samples per arm, duration-bounded
+  concurrency epochs, and maintenance-stabilized relation-level storage across
+  the native common-PM and PM4Py execution paths.
+- Removed the historical two-warmup, nine-sample SAP latency, memory, and
+  storage values. Compact committed files retain only source, fixture, input,
+  and answer contracts; all release non-regression gates use the matched bridge.
 - Removed the obsolete root-only runner and certification paths so withdrawn
   artifacts cannot satisfy current preview or release gates.
 - Raised the minimum supported extension version to `pg_ocpm 0.7.0`.
@@ -53,19 +53,18 @@ All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
   all-node protocol in 0.6.0.
 - Added repeatable public SAP release gates; strict OCPQ gates arrive in 0.6.0.
 - Raised SAP headline latency comparisons to ten warmups and 30 randomized,
-  exactness-checked samples while retaining historical p50 values only as
-  regression baselines.
+  exactness-checked samples. The historical p50 values introduced here were
+  subsequently withdrawn in 0.6.0.
 - Hardened public Python concurrency gates with persistent per-worker
   connections, verified worker warmups, three duration-bounded epochs,
   per-worker request floors, exact request parity, and concurrency-only artifact
   refreshes that preserve latency, storage, and memory evidence.
 - Removed public common-PM artifacts produced by the obsolete short-request
-  concurrency protocol. The 0.4 fixture, p50 latency, and storage regression
-  limits now live in a compact baseline that contains no concurrency fields.
+  concurrency protocol. The compact 0.4 contract introduced here was reduced
+  to source, fixture, and workload identity in 0.6.0.
 - Replaced the full historical SAP PM4Py staging result with a compact 0.4
-  regression baseline containing only comparable p50 latency, isolated RSS,
-  fixture/environment identity, and index/total storage evidence; raw samples
-  and obsolete concurrency measurements are not retained.
+  contract. Its performance values were subsequently removed in 0.6.0, leaving
+  only source counts, fixture identity, exact answers, and input shapes.
 - Raised the minimum supported extension version to `pg_ocpm 0.6.0`.
 
 ## 0.4.0 - 2026-07-18

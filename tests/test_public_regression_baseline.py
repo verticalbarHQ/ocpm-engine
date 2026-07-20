@@ -25,61 +25,81 @@ def load_baseline() -> dict:
     )
 
 
-def test_compact_public_baseline_has_only_latency_and_storage_evidence() -> None:
+def test_compact_public_baseline_retains_source_and_fixture_contract() -> None:
     baseline = load_baseline()
     CHECKER.validate_regression_baseline(baseline)
 
-    assert "concurrency" not in baseline
-    assert "drift_concurrency" not in baseline
-    assert "concurrency" not in baseline["method"]
-    assert "concurrency_model" not in baseline["method"]
+    assert set(baseline) == {
+        "schema_version",
+        "artifact_type",
+        "release",
+        "source",
+        "datasets",
+        "payload_sha256",
+    }
+    assert CHECKER.RELEASE_BRIDGE == (
+        ROOT / "docs/results/sap-release-bridge-0.4.0-to-0.6.0.json"
+    )
+    assert baseline["source"] == CHECKER.EXPECTED_SOURCE
+    assert (
+        tuple(dataset["fixture"]["name"] for dataset in baseline["datasets"])
+        == CHECKER.EXPECTED_DATASETS
+    )
     for dataset in baseline["datasets"]:
-        for workload in dataset["workloads"]:
-            assert set(workload["vanilla_postgres_python"]) == {"p50_ms"}
-            assert set(workload["pg_ocpm_rust"]) == {"p50_ms"}
-    for storage in baseline["storage"].values():
-        assert set(storage) == {"index_bytes", "total_bytes"}
+        assert set(dataset) == {"fixture", "workloads"}
+        assert set(dataset["fixture"]) == CHECKER.EXPECTED_FIXTURE_FIELDS
+        assert (
+            tuple(row["workload"] for row in dataset["workloads"])
+            == CHECKER.EXPECTED_WORKLOADS
+        )
+        assert all(set(row) == {"workload"} for row in dataset["workloads"])
 
 
-def test_public_baseline_contract_rejects_historical_concurrency() -> None:
+@pytest.mark.parametrize(
+    "field",
+    ("environment", "method", "storage", "concurrency", "drift_concurrency"),
+)
+def test_public_baseline_contract_rejects_historical_top_level_fields(
+    field: str,
+) -> None:
     baseline = copy.deepcopy(load_baseline())
-    baseline["concurrency"] = {"requests": 32}
+    baseline[field] = {"historical": 1}
 
     with pytest.raises(SystemExit, match="unexpected fields"):
         CHECKER.validate_regression_baseline(baseline)
 
 
-def test_public_baseline_contract_rejects_extra_latency_metrics() -> None:
+@pytest.mark.parametrize(
+    "field",
+    ("p50_ms", "memory", "vanilla_postgres_python", "pg_ocpm_rust"),
+)
+def test_public_baseline_contract_rejects_historical_workload_fields(
+    field: str,
+) -> None:
     baseline = copy.deepcopy(load_baseline())
-    baseline["datasets"][0]["workloads"][0]["pg_ocpm_rust"]["p95_ms"] = 1.2
+    baseline["datasets"][0]["workloads"][0][field] = {"historical": 1}
 
-    with pytest.raises(SystemExit, match="non-p50 latency fields"):
+    with pytest.raises(SystemExit, match="workload contains unexpected fields"):
         CHECKER.validate_regression_baseline(baseline)
 
 
-def test_historical_p50_is_not_used_as_current_latency_gate(monkeypatch) -> None:
-    baseline = load_baseline()
-    for dataset in baseline["datasets"]:
-        for workload in dataset["workloads"]:
-            workload["vanilla_postgres_python"]["p50_ms"] = 0.000001
-            workload["pg_ocpm_rust"]["p50_ms"] = 0.000001
-    result = {"storage": copy.deepcopy(baseline["storage"])}
+def test_matched_bridge_is_the_release_regression_gate(monkeypatch) -> None:
+    result = {"artifact_type": "public-common-test"}
     checked = []
 
-    def validate_bridge(bridge, public_result, *, allow_dirty):
-        checked.append((bridge, public_result, allow_dirty))
+    def validate_bridge(public_result, bridge, *, allow_dirty):
+        checked.append((public_result, bridge, allow_dirty))
 
     monkeypatch.setattr(
-        CHECKER.release_bridge_checker,
-        "validate_for_public",
+        CHECKER.release_regression_checker,
+        "validate_for_public_common",
         validate_bridge,
     )
     bridge = {"artifact_type": "matched-release-test"}
     CHECKER.validate_regressions(
         result,
-        baseline,
         bridge,
         allow_dirty=True,
     )
 
-    assert checked == [(bridge, result, True)]
+    assert checked == [(result, bridge, True)]

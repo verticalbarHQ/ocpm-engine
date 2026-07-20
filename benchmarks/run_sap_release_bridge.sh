@@ -6,7 +6,8 @@ compose="$root/benchmarks/bridge/docker-compose.yml"
 python="${PYTHON:-python3}"
 pg_ocpm_repository="${PG_OCPM_SOURCE:-$(cd "$root/.." && pwd)/pg_ocpm}"
 sources="$root/.benchmarks/sap-release-bridge-sources"
-result="$root/.benchmarks/sap-common-pm-release-bridge-0.4.0-to-0.6.0.json"
+result="$root/.benchmarks/sap-release-bridge-0.4.0-to-0.6.0.json"
+postgres_base_image="postgres:16@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20"
 
 prior_engine_revision="8427c36aa16da11b04ba642672df096d6f21e156"
 current_engine_revision="c44e9341ced643e0b777a18d7b0d26a43127caa0"
@@ -153,7 +154,11 @@ if [[ "$(image_label "$client_image_id" org.opencontainers.image.revision)" \
     || [[ "$(image_label "$prior_image_id" org.opencontainers.image.revision)" \
         != "$prior_pg_ocpm_revision" ]] \
     || [[ "$(image_label "$current_image_id" org.opencontainers.image.revision)" \
-        != "$current_pg_ocpm_revision" ]]; then
+        != "$current_pg_ocpm_revision" ]] \
+    || [[ "$(image_label "$prior_image_id" org.opencontainers.image.base.name)" \
+        != "$postgres_base_image" ]] \
+    || [[ "$(image_label "$current_image_id" org.opencontainers.image.base.name)" \
+        != "$postgres_base_image" ]]; then
     echo "built bridge image labels do not match the locked source revisions" >&2
     exit 2
 fi
@@ -177,6 +182,7 @@ bridge_exec() {
         -e OCPM_CURRENT_PG_OCPM_SOURCE_TREE_CLEAN=true \
         -e OCPM_PRIOR_LOADER_SHA256="$prior_loader_sha256" \
         -e OCPM_CURRENT_LOADER_SHA256="$current_loader_sha256" \
+        -e OCPM_POSTGRES_BASE_IMAGE="$postgres_base_image" \
         bridge "$@"
 }
 
@@ -202,14 +208,14 @@ bridge_exec \
     --output /results/sap-release-bridge-prior-prepare.json
 
 bridge_exec \
-    python benchmarks/sap_release_bridge.py \
+    python benchmarks/sap_release_regression.py \
     --oracle-host postgres_vanilla \
     --prior-host postgres_prior \
     --current-host postgres_current \
     --database ocel_benchmark \
-    --output /results/sap-common-pm-release-bridge-0.4.0-to-0.6.0.json
+    --output /results/sap-release-bridge-0.4.0-to-0.6.0.json
 
-"$python" "$root/benchmarks/check_sap_release_bridge.py" \
+"$python" "$root/benchmarks/check_sap_release_regression.py" \
     "$result" --preview
 
 echo "Validated staged SAP release bridge preview; published docs/results unchanged."

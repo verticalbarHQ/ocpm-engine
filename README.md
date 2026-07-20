@@ -77,9 +77,10 @@ pip install -e '.[dev]'
 pytest
 ```
 
-Run both self-contained public SAP benchmarks with `make perf-public` and
-validate the staged results with `make perf-public-preview-check`. After review
-and explicit promotion, validate committed artifacts with
+First run `make perf-sap-release-bridge-preview`, then run both self-contained
+current-versus-vanilla SAP benchmarks with `make perf-public` and validate the
+three staged artifacts with `make perf-public-preview-check`. After review and
+explicit promotion, validate committed artifacts with
 `make perf-public-release-check`. See
 [the benchmark guide](benchmarks/README.md) for the exact methodology.
 

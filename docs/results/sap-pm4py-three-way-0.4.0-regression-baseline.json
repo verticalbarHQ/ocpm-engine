@@ -14,43 +14,6 @@
       "sap_p2p"
     ]
   },
-  "environment": {
-    "client": {
-      "python": "3.11.15",
-      "platform": "Linux-7.0.11-orbstack-00360-gc9bc4d96ac70-aarch64-with-glibc2.36",
-      "machine": "aarch64",
-      "logical_cpus_visible": 18,
-      "pm4py_version": "2.7.23.3"
-    },
-    "database": {
-      "vanilla_pg": {
-        "postgres_version": "16.14 (Debian 16.14-1.pgdg13+1)",
-        "shared_buffers": "1GB",
-        "effective_cache_size": "4GB",
-        "work_mem": "16MB",
-        "max_parallel_workers_per_gather": "4",
-        "jit": "off"
-      },
-      "pg_ocpm": {
-        "postgres_version": "16.14 (Debian 16.14-1.pgdg13+1)",
-        "shared_buffers": "1GB",
-        "effective_cache_size": "4GB",
-        "work_mem": "16MB",
-        "max_parallel_workers_per_gather": "4",
-        "jit": "off"
-      }
-    }
-  },
-  "method": {
-    "random_seed": 20260718,
-    "train_fraction": 0.8,
-    "latency_scope": "database extraction plus client materialization, model construction, and scoring",
-    "execution_order": "randomized per measured three-way comparison",
-    "correctness_gate": "three-way canonical answer equality before sample acceptance",
-    "memory_model": "fresh process baseline and peak RSS including engine import and one request",
-    "vanilla_index_policy": "relational integrity indexes plus one workload secondary B-tree, ocel_e2o_object",
-    "result_cache_used": false
-  },
   "datasets": [
     {
       "dataset": "sap_o2c",
@@ -94,25 +57,6 @@
             "pg_ocpm_ocpm_engine": {
               "aggregate_rows": 59
             }
-          },
-          "p50_ms": {
-            "vanilla_pg_pm4py": 142.585,
-            "pg_ocpm_pm4py": 104.214,
-            "pg_ocpm_ocpm_engine": 12.057
-          },
-          "memory": {
-            "vanilla_pg_pm4py": {
-              "peak_rss_bytes": 198598656,
-              "incremental_peak_bytes": 161275904
-            },
-            "pg_ocpm_pm4py": {
-              "peak_rss_bytes": 198590464,
-              "incremental_peak_bytes": 161292288
-            },
-            "pg_ocpm_ocpm_engine": {
-              "peak_rss_bytes": 38170624,
-              "incremental_peak_bytes": 864256
-            }
           }
         },
         {
@@ -133,25 +77,6 @@
             },
             "pg_ocpm_ocpm_engine": {
               "aggregate_rows": 798
-            }
-          },
-          "p50_ms": {
-            "vanilla_pg_pm4py": 130.367,
-            "pg_ocpm_pm4py": 92.296,
-            "pg_ocpm_ocpm_engine": 16.334
-          },
-          "memory": {
-            "vanilla_pg_pm4py": {
-              "peak_rss_bytes": 193744896,
-              "incremental_peak_bytes": 156426240
-            },
-            "pg_ocpm_pm4py": {
-              "peak_rss_bytes": 193818624,
-              "incremental_peak_bytes": 156520448
-            },
-            "pg_ocpm_ocpm_engine": {
-              "peak_rss_bytes": 41074688,
-              "incremental_peak_bytes": 3796992
             }
           }
         },
@@ -174,25 +99,6 @@
             "pg_ocpm_ocpm_engine": {
               "aggregate_rows": 59
             }
-          },
-          "p50_ms": {
-            "vanilla_pg_pm4py": 140.007,
-            "pg_ocpm_pm4py": 101.932,
-            "pg_ocpm_ocpm_engine": 11.808
-          },
-          "memory": {
-            "vanilla_pg_pm4py": {
-              "peak_rss_bytes": 198561792,
-              "incremental_peak_bytes": 161251328
-            },
-            "pg_ocpm_pm4py": {
-              "peak_rss_bytes": 198606848,
-              "incremental_peak_bytes": 161304576
-            },
-            "pg_ocpm_ocpm_engine": {
-              "peak_rss_bytes": 38166528,
-              "incremental_peak_bytes": 864256
-            }
           }
         },
         {
@@ -213,25 +119,6 @@
             },
             "pg_ocpm_ocpm_engine": {
               "aggregate_rows": 60
-            }
-          },
-          "p50_ms": {
-            "vanilla_pg_pm4py": 193.568,
-            "pg_ocpm_pm4py": 147.809,
-            "pg_ocpm_ocpm_engine": 3.326
-          },
-          "memory": {
-            "vanilla_pg_pm4py": {
-              "peak_rss_bytes": 211140608,
-              "incremental_peak_bytes": 173838336
-            },
-            "pg_ocpm_pm4py": {
-              "peak_rss_bytes": 210944000,
-              "incremental_peak_bytes": 173629440
-            },
-            "pg_ocpm_ocpm_engine": {
-              "peak_rss_bytes": 38154240,
-              "incremental_peak_bytes": 860160
             }
           }
         }
@@ -279,25 +166,6 @@
             "pg_ocpm_ocpm_engine": {
               "aggregate_rows": 19
             }
-          },
-          "p50_ms": {
-            "vanilla_pg_pm4py": 126.297,
-            "pg_ocpm_pm4py": 98.569,
-            "pg_ocpm_ocpm_engine": 25.203
-          },
-          "memory": {
-            "vanilla_pg_pm4py": {
-              "peak_rss_bytes": 189579264,
-              "incremental_peak_bytes": 152293376
-            },
-            "pg_ocpm_pm4py": {
-              "peak_rss_bytes": 189571072,
-              "incremental_peak_bytes": 152276992
-            },
-            "pg_ocpm_ocpm_engine": {
-              "peak_rss_bytes": 38158336,
-              "incremental_peak_bytes": 864256
-            }
           }
         },
         {
@@ -318,25 +186,6 @@
             },
             "pg_ocpm_ocpm_engine": {
               "aggregate_rows": 38
-            }
-          },
-          "p50_ms": {
-            "vanilla_pg_pm4py": 120.356,
-            "pg_ocpm_pm4py": 92.724,
-            "pg_ocpm_ocpm_engine": 0.702
-          },
-          "memory": {
-            "vanilla_pg_pm4py": {
-              "peak_rss_bytes": 188739584,
-              "incremental_peak_bytes": 151441408
-            },
-            "pg_ocpm_pm4py": {
-              "peak_rss_bytes": 188837888,
-              "incremental_peak_bytes": 151519232
-            },
-            "pg_ocpm_ocpm_engine": {
-              "peak_rss_bytes": 38227968,
-              "incremental_peak_bytes": 946176
             }
           }
         },
@@ -359,25 +208,6 @@
             "pg_ocpm_ocpm_engine": {
               "aggregate_rows": 19
             }
-          },
-          "p50_ms": {
-            "vanilla_pg_pm4py": 122.921,
-            "pg_ocpm_pm4py": 95.851,
-            "pg_ocpm_ocpm_engine": 24.858
-          },
-          "memory": {
-            "vanilla_pg_pm4py": {
-              "peak_rss_bytes": 189566976,
-              "incremental_peak_bytes": 152260608
-            },
-            "pg_ocpm_pm4py": {
-              "peak_rss_bytes": 189587456,
-              "incremental_peak_bytes": 152297472
-            },
-            "pg_ocpm_ocpm_engine": {
-              "peak_rss_bytes": 38170624,
-              "incremental_peak_bytes": 876544
-            }
           }
         },
         {
@@ -399,39 +229,10 @@
             "pg_ocpm_ocpm_engine": {
               "aggregate_rows": 19
             }
-          },
-          "p50_ms": {
-            "vanilla_pg_pm4py": 127.011,
-            "pg_ocpm_pm4py": 102.769,
-            "pg_ocpm_ocpm_engine": 0.932
-          },
-          "memory": {
-            "vanilla_pg_pm4py": {
-              "peak_rss_bytes": 192684032,
-              "incremental_peak_bytes": 155381760
-            },
-            "pg_ocpm_pm4py": {
-              "peak_rss_bytes": 192651264,
-              "incremental_peak_bytes": 155377664
-            },
-            "pg_ocpm_ocpm_engine": {
-              "peak_rss_bytes": 38174720,
-              "incremental_peak_bytes": 876544
-            }
           }
         }
       ]
     }
   ],
-  "storage": {
-    "vanilla_pg_pm4py": {
-      "index_bytes": 69115904,
-      "total_bytes": 131350528
-    },
-    "shared_pg_ocpm": {
-      "index_bytes": 20668416,
-      "total_bytes": 107257856
-    }
-  },
-  "payload_sha256": "0b71b9bee489d0d5d39bc2e71f7a636bbe556c6333590ac21dd0235e24b57420"
+  "payload_sha256": "6530be1e72e249d022111f76283a4cb1393df726c0d413948b3689799c4e337b"
 }
