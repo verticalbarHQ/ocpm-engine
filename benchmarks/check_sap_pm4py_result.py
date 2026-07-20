@@ -12,9 +12,15 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from benchmark_provenance import validate_recorded_public_provenance
+    from benchmark_provenance import (
+        PUBLIC_BENCHMARK_SCHEMA_VERSION,
+        validate_recorded_public_provenance,
+    )
 except ModuleNotFoundError:  # loaded through importlib by unit tests
-    from benchmarks.benchmark_provenance import validate_recorded_public_provenance
+    from benchmarks.benchmark_provenance import (
+        PUBLIC_BENCHMARK_SCHEMA_VERSION,
+        validate_recorded_public_provenance,
+    )
 
 try:
     import check_sap_release_regression as release_regression_checker
@@ -94,6 +100,39 @@ EXPECTED_LATENCY_WARMUPS = 10
 EXPECTED_LATENCY_EPOCHS = 3
 EXPECTED_LATENCY_SAMPLES_PER_EPOCH = 30
 EXPECTED_LATENCY_RUNS = EXPECTED_LATENCY_EPOCHS * EXPECTED_LATENCY_SAMPLES_PER_EPOCH
+EXPECTED_RESULT_FIELDS = {
+    "schema_version",
+    "generated_at",
+    "source",
+    "environment",
+    "provenance",
+    "method",
+    "summary",
+    "datasets",
+    "storage",
+    "section_generated_at",
+    "payload_sha256",
+}
+EXPECTED_DATASET_FIELDS = {
+    "dataset",
+    "source_counts",
+    "fixture",
+    "summary",
+    "latency",
+    "concurrency",
+    "memory",
+}
+EXPECTED_LATENCY_FIELDS = {
+    "workload",
+    "correct",
+    "vanilla_pg_pm4py",
+    "pg_ocpm_pm4py",
+    "pg_ocpm_ocpm_engine",
+    "speedups",
+    "first_execution_counts",
+    "serial_epochs",
+    "answer_sha256",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -167,6 +206,27 @@ def dataset_map(result: dict[str, Any]) -> dict[str, dict[str, Any]]:
     if names != EXPECTED_DATASETS:
         fail("expected SAP O2C and P2P datasets in stable order")
     return {item["dataset"]: item for item in datasets}
+
+
+def validate_artifact_shape(result: dict[str, Any]) -> None:
+    """Reject fields outside the schema-5 producer's stable structural rows."""
+
+    if set(result) != EXPECTED_RESULT_FIELDS:
+        fail("SAP schema-5 top-level fields changed")
+    datasets = result.get("datasets")
+    if not isinstance(datasets, list):
+        fail("SAP schema-5 datasets must be a list")
+    for dataset in datasets:
+        if not isinstance(dataset, dict) or set(dataset) != EXPECTED_DATASET_FIELDS:
+            fail("SAP schema-5 dataset fields changed")
+        latency = dataset.get("latency")
+        if not isinstance(latency, list):
+            fail("SAP schema-5 latency rows must be a list")
+        if any(
+            not isinstance(row, dict) or set(row) != EXPECTED_LATENCY_FIELDS
+            for row in latency
+        ):
+            fail("SAP schema-5 latency row fields changed")
 
 
 def baseline_dataset_map(
@@ -526,7 +586,8 @@ def validate_contract(
     dict[str, dict[str, Any]],
     dict[str, dict[str, Any]],
 ]:
-    if result.get("schema_version") != 4:
+    validate_artifact_shape(result)
+    if result.get("schema_version") != PUBLIC_BENCHMARK_SCHEMA_VERSION:
         fail("unexpected SAP benchmark schema version")
     section_times = result.get("section_generated_at", {})
     if (

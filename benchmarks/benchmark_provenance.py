@@ -7,8 +7,11 @@ import re
 
 _REVISION = re.compile(r"[0-9a-f]{40}")
 _SHA256_ID = re.compile(r"sha256:[0-9a-f]{64}")
+PUBLIC_BENCHMARK_SCHEMA_VERSION = 5
 _FIELDS = {
     "benchmark_host_id",
+    "controller_source_revision",
+    "controller_source_tree_clean",
     "ocpm_engine_source_revision",
     "ocpm_engine_source_tree_clean",
     "pg_ocpm_source_revision",
@@ -54,6 +57,8 @@ def public_benchmark_provenance() -> dict[str, object]:
 
     return {
         "benchmark_host_id": _image_id("OCPM_BENCHMARK_HOST_ID"),
+        "controller_source_revision": _revision("OCPM_CONTROLLER_SOURCE_REVISION"),
+        "controller_source_tree_clean": _boolean("OCPM_CONTROLLER_SOURCE_TREE_CLEAN"),
         "ocpm_engine_source_revision": _revision("OCPM_ENGINE_SOURCE_REVISION"),
         "ocpm_engine_source_tree_clean": _boolean("OCPM_ENGINE_SOURCE_TREE_CLEAN"),
         "pg_ocpm_source_revision": _revision("OCPM_PG_OCPM_SOURCE_REVISION"),
@@ -71,7 +76,11 @@ def validate_recorded_public_provenance(
 
     if not isinstance(value, dict) or set(value) != _FIELDS:
         raise ValueError("public benchmark provenance fields changed")
-    for field in ("ocpm_engine_source_revision", "pg_ocpm_source_revision"):
+    for field in (
+        "controller_source_revision",
+        "ocpm_engine_source_revision",
+        "pg_ocpm_source_revision",
+    ):
         revision = value.get(field)
         if not isinstance(revision, str) or _REVISION.fullmatch(revision) is None:
             raise ValueError(f"invalid provenance revision: {field}")
@@ -85,6 +94,7 @@ def validate_recorded_public_provenance(
         if not isinstance(image_id, str) or _SHA256_ID.fullmatch(image_id) is None:
             raise ValueError(f"invalid provenance image ID: {field}")
     for field in (
+        "controller_source_tree_clean",
         "ocpm_engine_source_tree_clean",
         "pg_ocpm_source_tree_clean",
     ):

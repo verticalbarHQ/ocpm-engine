@@ -15,7 +15,9 @@ reports pooled p50/p95 together with the range of the three epoch p95s. The
 checker independently recomputes that evidence before applying the
 per-workload and geometric-mean 10x latency gates, three duration-bounded
 concurrency epochs, a 10x candidate-throughput ratio, storage ceilings, and
-clean source/image provenance.
+clean source/image provenance. Schema-5 evidence identifies the locked
+`ocpm-engine 0.6.0` product source, current benchmark controller source, and
+locked `pg_ocpm 0.7.0` source independently.
 
 Run `make perf-sap-release-bridge-preview`, then `make perf-public`. Inspect the
 ignored staging artifacts and run `make perf-public-preview-check`. Results will

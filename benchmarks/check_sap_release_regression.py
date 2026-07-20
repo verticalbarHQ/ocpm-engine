@@ -1649,6 +1649,14 @@ def _validate_public_current_provenance(
     if not isinstance(public_provenance, dict):
         fail("public result provenance is missing")
     bridge_provenance = bridge_result["provenance"]
+    controller_revision = public_provenance.get("controller_source_revision")
+    if (
+        not isinstance(controller_revision, str)
+        or REVISION.fullmatch(controller_revision) is None
+    ):
+        fail("public result controller revision is invalid")
+    if controller_revision != bridge_provenance["controller_source_revision"]:
+        fail("public result and bridge controller revisions differ")
     for public_field, bridge_field in (
         ("ocpm_engine_source_revision", "current_engine_source_revision"),
         ("pg_ocpm_source_revision", "current_pg_ocpm_source_revision"),
@@ -1656,6 +1664,7 @@ def _validate_public_current_provenance(
         if public_provenance.get(public_field) != bridge_provenance[bridge_field]:
             fail("public result and bridge current release revisions differ")
     for field in (
+        "controller_source_tree_clean",
         "ocpm_engine_source_tree_clean",
         "pg_ocpm_source_tree_clean",
     ):

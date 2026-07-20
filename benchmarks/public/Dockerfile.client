@@ -5,14 +5,15 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /source
-COPY . .
+COPY --from=engine_source . .
 RUN python3 -m venv /build-venv \
     && /build-venv/bin/pip install --no-cache-dir 'maturin==1.9.6' \
     && /build-venv/bin/maturin build --release --locked --out /wheels
 
 FROM python:3.11-slim-bookworm@sha256:b18992999dbe963a45a8a4da40ac2b1975be1a776d939d098c647482bcad5cba
 
-ARG SOURCE_REVISION=unknown
+ARG CONTROLLER_REVISION=unknown
+ARG ENGINE_REVISION=unknown
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libpq5 \
@@ -25,6 +26,7 @@ RUN pip install --no-cache-dir --require-hashes \
     && rm -rf /wheels
 
 WORKDIR /workspace
-COPY . .
-LABEL org.opencontainers.image.revision="${SOURCE_REVISION}"
+COPY benchmarks ./benchmarks
+LABEL org.opencontainers.image.revision="${CONTROLLER_REVISION}" \
+      org.opencontainers.image.ocpm-engine.revision="${ENGINE_REVISION}"
 CMD ["sleep", "infinity"]

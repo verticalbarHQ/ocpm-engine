@@ -12,9 +12,15 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from benchmark_provenance import validate_recorded_public_provenance
+    from benchmark_provenance import (
+        PUBLIC_BENCHMARK_SCHEMA_VERSION,
+        validate_recorded_public_provenance,
+    )
 except ModuleNotFoundError:  # loaded through importlib by unit tests
-    from benchmarks.benchmark_provenance import validate_recorded_public_provenance
+    from benchmarks.benchmark_provenance import (
+        PUBLIC_BENCHMARK_SCHEMA_VERSION,
+        validate_recorded_public_provenance,
+    )
 
 try:
     import check_sap_release_regression as release_regression_checker
@@ -80,6 +86,32 @@ EXPECTED_LATENCY_WARMUPS = 10
 EXPECTED_LATENCY_EPOCHS = 3
 EXPECTED_LATENCY_SAMPLES_PER_EPOCH = 30
 EXPECTED_LATENCY_RUNS = EXPECTED_LATENCY_EPOCHS * EXPECTED_LATENCY_SAMPLES_PER_EPOCH
+EXPECTED_RESULT_FIELDS = {
+    "schema_version",
+    "generated_at",
+    "release",
+    "source",
+    "environment",
+    "provenance",
+    "method",
+    "summary",
+    "datasets",
+    "storage",
+    "concurrency",
+    "drift_concurrency",
+    "section_generated_at",
+    "payload_sha256",
+}
+EXPECTED_DATASET_FIELDS = {"fixture", "workloads"}
+EXPECTED_WORKLOAD_FIELDS = {
+    "workload",
+    "vanilla_postgres_python",
+    "pg_ocpm_rust",
+    "speedup",
+    "correct",
+    "first_execution_counts",
+    "serial_epochs",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -159,6 +191,27 @@ def workload_map(result: dict[str, Any]) -> dict[tuple[str, str], dict[str, Any]
                 fail(f"duplicate workload row: {key}")
             rows[key] = workload
     return rows
+
+
+def validate_artifact_shape(result: dict[str, Any]) -> None:
+    """Reject fields outside the schema-5 producer's stable structural rows."""
+
+    if set(result) != EXPECTED_RESULT_FIELDS:
+        fail("public schema-5 top-level fields changed")
+    datasets = result.get("datasets")
+    if not isinstance(datasets, list):
+        fail("public schema-5 datasets must be a list")
+    for dataset in datasets:
+        if not isinstance(dataset, dict) or set(dataset) != EXPECTED_DATASET_FIELDS:
+            fail("public schema-5 dataset fields changed")
+        workloads = dataset.get("workloads")
+        if not isinstance(workloads, list):
+            fail("public schema-5 workloads must be a list")
+        if any(
+            not isinstance(workload, dict) or set(workload) != EXPECTED_WORKLOAD_FIELDS
+            for workload in workloads
+        ):
+            fail("public schema-5 workload fields changed")
 
 
 def validate_latency_sample_counts(method: dict[str, Any]) -> None:
@@ -473,7 +526,8 @@ def validate_concurrency_section(section_name: str, section: dict[str, Any]) -> 
 def validate_contract(
     result: dict[str, Any], baseline: dict[str, Any], *, allow_dirty: bool
 ) -> dict[tuple[str, str], dict[str, Any]]:
-    if result.get("schema_version") != 4:
+    validate_artifact_shape(result)
+    if result.get("schema_version") != PUBLIC_BENCHMARK_SCHEMA_VERSION:
         fail("unexpected public benchmark schema version")
     if result.get("release") != CURRENT_RELEASE:
         fail("unexpected public benchmark release versions")

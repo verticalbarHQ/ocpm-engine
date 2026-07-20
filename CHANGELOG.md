@@ -31,6 +31,10 @@ All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
   3x30 latency order, four fresh-process RSS samples per arm, duration-bounded
   concurrency epochs, and maintenance-stabilized relation-level storage across
   the native common-PM and PM4Py execution paths.
+- Split public SAP benchmark provenance between the current clean controller
+  checkout and clean, revision-locked `ocpm-engine 0.6.0` and `pg_ocpm 0.7.0`
+  product worktrees, preventing later harness changes from silently changing
+  the measured product.
 - Removed the historical two-warmup, nine-sample SAP latency, memory, and
   storage values. Compact committed files retain only source, fixture, input,
   and answer contracts; all release non-regression gates use the matched bridge.

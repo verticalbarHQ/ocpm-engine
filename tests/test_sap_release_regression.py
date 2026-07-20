@@ -530,9 +530,13 @@ def first_concurrency(result: dict[str, Any]) -> dict[str, Any]:
     return result["suites"]["common_pm"]["datasets"][0]["concurrency"][0]
 
 
-def public_provenance() -> dict[str, Any]:
+def public_provenance(bridge: dict[str, Any]) -> dict[str, Any]:
     return {
         "benchmark_host_id": IMAGE_ID,
+        "controller_source_revision": bridge["provenance"][
+            "controller_source_revision"
+        ],
+        "controller_source_tree_clean": True,
         "ocpm_engine_source_revision": checker.EXPECTED_RELEASES["current"][
             "ocpm_engine_revision"
         ],
@@ -593,7 +597,7 @@ def public_common_result(bridge: dict[str, Any]) -> dict[str, Any]:
             "pg_ocpm": checker.EXPECTED_RELEASES["current"]["pg_ocpm"],
         },
         "source": copy.deepcopy(checker.EXPECTED_SOURCE),
-        "provenance": public_provenance(),
+        "provenance": public_provenance(bridge),
         "datasets": datasets,
         "concurrency": concurrency_section("dfg_conformance_95pct"),
         "drift_concurrency": concurrency_section("dfg_frequency_drift"),
@@ -654,7 +658,7 @@ def public_pm4py_result(bridge: dict[str, Any]) -> dict[str, Any]:
                 }
             },
         },
-        "provenance": public_provenance(),
+        "provenance": public_provenance(bridge),
         "datasets": datasets,
     }
 
@@ -1089,6 +1093,16 @@ def test_public_common_helper_binds_current_bridge_evidence() -> None:
     bridge = artifact()
     public = public_common_result(bridge)
     checker.validate_for_public_common(public, bridge, allow_dirty=False)
+
+    dirty_controller = public_common_result(bridge)
+    dirty_controller["provenance"]["controller_source_tree_clean"] = False
+    with pytest.raises(SystemExit, match="clean public result sources"):
+        checker.validate_for_public_common(dirty_controller, bridge, allow_dirty=False)
+
+    wrong_controller = public_common_result(bridge)
+    wrong_controller["provenance"]["controller_source_revision"] = "1" * 40
+    with pytest.raises(SystemExit, match="controller revisions differ"):
+        checker.validate_for_public_common(wrong_controller, bridge, allow_dirty=False)
 
     public["drift_concurrency"]["pg_ocpm_rust"]["1"]["epochs"][0]["answer_sha256"] = (
         "0" * 64

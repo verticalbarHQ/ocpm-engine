@@ -57,8 +57,11 @@ services:
     build:
       context: ../..
       dockerfile: benchmarks/public/Dockerfile.client
+      additional_contexts:
+        engine_source: ${OCPM_ENGINE_PRODUCT_SOURCE}
       args:
-        SOURCE_REVISION: ${OCPM_ENGINE_SOURCE_REVISION}
+        CONTROLLER_REVISION: ${OCPM_CONTROLLER_SOURCE_REVISION}
+        ENGINE_REVISION: ${OCPM_ENGINE_SOURCE_REVISION}
     depends_on:
       postgres_vanilla:
         condition: service_healthy

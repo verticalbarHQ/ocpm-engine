@@ -29,9 +29,15 @@ import psutil
 import psycopg2
 
 try:
-    from benchmark_provenance import public_benchmark_provenance
+    from benchmark_provenance import (
+        PUBLIC_BENCHMARK_SCHEMA_VERSION,
+        public_benchmark_provenance,
+    )
 except ModuleNotFoundError:  # imported as benchmarks.sap_pm4py_three_way in tests
-    from benchmarks.benchmark_provenance import public_benchmark_provenance
+    from benchmarks.benchmark_provenance import (
+        PUBLIC_BENCHMARK_SCHEMA_VERSION,
+        public_benchmark_provenance,
+    )
 
 DATASETS = {
     "sap_o2c": {"object_type": "MATERIAL"},
@@ -1623,11 +1629,13 @@ def update_concurrency_only(args: argparse.Namespace) -> dict[str, Any]:
     output = Path(args.output)
     report = Path(args.report)
     result = load_verified_artifact(output)
-    if result.get("schema_version") != 4 or "serial_latency" not in result.get(
+    if result.get(
+        "schema_version"
+    ) != PUBLIC_BENCHMARK_SCHEMA_VERSION or "serial_latency" not in result.get(
         "method", {}
     ):
         raise SystemExit(
-            "concurrency-only refresh requires a schema-4 artifact with raw "
+            "concurrency-only refresh requires a schema-5 artifact with raw "
             "three-epoch serial latency evidence"
         )
     preserved_before = preserved_concurrency_only_payload(result)
@@ -1674,7 +1682,7 @@ def update_concurrency_only(args: argparse.Namespace) -> dict[str, Any]:
                 args, fixture, expected, dataset_index
             )
         original_generated_at = result["generated_at"]
-        result["schema_version"] = 4
+        result["schema_version"] = PUBLIC_BENCHMARK_SCHEMA_VERSION
         result["generated_at"] = datetime.now(timezone.utc).isoformat()
         result["section_generated_at"] = {
             "latency_storage_and_memory": result.get("section_generated_at", {}).get(
@@ -1834,7 +1842,7 @@ def benchmark(args: argparse.Namespace) -> dict[str, Any]:
     extension.close()
 
     result = {
-        "schema_version": 4,
+        "schema_version": PUBLIC_BENCHMARK_SCHEMA_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "source": {
             "title": (

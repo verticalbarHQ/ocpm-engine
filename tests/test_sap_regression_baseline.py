@@ -25,6 +25,15 @@ def load_baseline() -> dict:
     )
 
 
+def sap_schema5_shape() -> dict:
+    result = {field: None for field in CHECKER.EXPECTED_RESULT_FIELDS}
+    latency = {field: None for field in CHECKER.EXPECTED_LATENCY_FIELDS}
+    dataset = {field: None for field in CHECKER.EXPECTED_DATASET_FIELDS}
+    dataset["latency"] = [latency]
+    result["datasets"] = [dataset]
+    return result
+
+
 def test_compact_sap_baseline_retains_input_and_answer_contract() -> None:
     baseline = load_baseline()
     CHECKER.validate_regression_baseline(baseline)
@@ -58,6 +67,64 @@ def test_compact_sap_baseline_retains_input_and_answer_contract() -> None:
                 set(workload["input"][engine]) == fields
                 for engine, fields in CHECKER.EXPECTED_INPUT_FIELDS.items()
             )
+
+
+def test_sap_schema5_shape_matches_current_producer() -> None:
+    assert CHECKER.EXPECTED_RESULT_FIELDS == {
+        "schema_version",
+        "generated_at",
+        "source",
+        "environment",
+        "provenance",
+        "method",
+        "summary",
+        "datasets",
+        "storage",
+        "section_generated_at",
+        "payload_sha256",
+    }
+    assert CHECKER.EXPECTED_DATASET_FIELDS == {
+        "dataset",
+        "source_counts",
+        "fixture",
+        "summary",
+        "latency",
+        "concurrency",
+        "memory",
+    }
+    assert CHECKER.EXPECTED_LATENCY_FIELDS == {
+        "workload",
+        "correct",
+        "vanilla_pg_pm4py",
+        "pg_ocpm_pm4py",
+        "pg_ocpm_ocpm_engine",
+        "speedups",
+        "first_execution_counts",
+        "serial_epochs",
+        "answer_sha256",
+    }
+    CHECKER.validate_artifact_shape(sap_schema5_shape())
+
+
+@pytest.mark.parametrize(
+    ("level", "message"),
+    (
+        ("top_level", "top-level fields changed"),
+        ("dataset", "dataset fields changed"),
+        ("latency", "latency row fields changed"),
+    ),
+)
+def test_sap_schema5_contract_rejects_unknown_fields(level: str, message: str) -> None:
+    result = sap_schema5_shape()
+    targets = {
+        "top_level": result,
+        "dataset": result["datasets"][0],
+        "latency": result["datasets"][0]["latency"][0],
+    }
+    targets[level]["unexpected_schema5_field"] = True
+
+    with pytest.raises(SystemExit, match=message):
+        CHECKER.validate_contract(result, {}, allow_dirty=True)
 
 
 @pytest.mark.parametrize(

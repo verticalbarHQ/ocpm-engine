@@ -21,7 +21,9 @@ with the range of the three epoch p95s, and the release checker independently
 recomputes all pooled and epoch metrics. It also requires three duration-bounded
 concurrency epochs, at least a 3x engine-throughput ratio at every worker level,
 bounded total and incremental peak RSS, storage regression limits, clean
-source/image provenance, and exact benchmark package versions.
+source/image provenance, and exact benchmark package versions. Schema-5
+evidence identifies the locked product wheel source separately from the current
+benchmark controller source and the locked `pg_ocpm` source.
 
 Run `make perf-sap-release-bridge-preview`, then `make perf-public`. Inspect the
 ignored staging artifacts and generated reports, then run

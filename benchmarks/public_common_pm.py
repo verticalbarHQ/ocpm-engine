@@ -31,9 +31,15 @@ from typing import Any, Callable, Iterable
 import psycopg2
 
 try:
-    from benchmark_provenance import public_benchmark_provenance
+    from benchmark_provenance import (
+        PUBLIC_BENCHMARK_SCHEMA_VERSION,
+        public_benchmark_provenance,
+    )
 except ModuleNotFoundError:  # imported as benchmarks.public_common_pm in tests
-    from benchmarks.benchmark_provenance import public_benchmark_provenance
+    from benchmarks.benchmark_provenance import (
+        PUBLIC_BENCHMARK_SCHEMA_VERSION,
+        public_benchmark_provenance,
+    )
 
 from ocpm_engine import (
     TransitionCount,
@@ -1383,11 +1389,13 @@ def preserved_concurrency_only_payload(result: dict[str, Any]) -> dict[str, Any]
 def update_concurrency_only(args: argparse.Namespace) -> dict[str, Any]:
     target = Path(args.output)
     result = load_verified_artifact(target)
-    if result.get("schema_version") != 4 or "serial_latency" not in result.get(
+    if result.get(
+        "schema_version"
+    ) != PUBLIC_BENCHMARK_SCHEMA_VERSION or "serial_latency" not in result.get(
         "method", {}
     ):
         raise SystemExit(
-            "concurrency-only refresh requires a schema-4 artifact with raw "
+            "concurrency-only refresh requires a schema-5 artifact with raw "
             "three-epoch serial latency evidence"
         )
     preserved_before = preserved_concurrency_only_payload(result)
@@ -1443,7 +1451,7 @@ def update_concurrency_only(args: argparse.Namespace) -> dict[str, Any]:
             args, fixture, drift_expected, True
         )
         original_generated_at = result["generated_at"]
-        result["schema_version"] = 4
+        result["schema_version"] = PUBLIC_BENCHMARK_SCHEMA_VERSION
         result["generated_at"] = datetime.now(timezone.utc).isoformat()
         result["section_generated_at"] = {
             "latency_and_storage": result.get("section_generated_at", {}).get(
@@ -1597,7 +1605,7 @@ def benchmark(args: argparse.Namespace) -> dict:
         sum(math.log(value) for value in all_speedups) / len(all_speedups)
     )
     result = {
-        "schema_version": 4,
+        "schema_version": PUBLIC_BENCHMARK_SCHEMA_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "release": {
             "ocpm_engine": metadata.version("ocpm-engine"),

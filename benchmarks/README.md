@@ -37,14 +37,22 @@ make perf-public
 make perf-public-preview-check
 ```
 
-`PG_OCPM_SOURCE` must identify a local `pg_ocpm` checkout. Alternatively, set
-`PG_OCPM_REPOSITORY` to a public Git URL and the runner will clone tag `v0.7.0`
-into the ignored benchmark workspace.
+`PG_OCPM_SOURCE` must identify a local `pg_ocpm` repository containing the
+locked `0.7.0` commit. Alternatively, set `PG_OCPM_REPOSITORY` to a public Git
+URL and the runner will clone tag `v0.7.0` into the ignored benchmark workspace.
+In either case, the measured database image is built from a clean detached
+worktree at revision `279d81b3db0a0ae7470bf90824f1fbba9d188e70`.
 
-The runner builds a release-mode stable-ABI Rust wheel, recreates both database
-volumes, records three serial-latency epochs of 30 randomized measured rounds
-after ten warmups, runs 1/4/8/16 worker concurrency sweeps for DFG conformance
-and drift, writes
+The runner builds the release-mode stable-ABI Rust wheel from a clean detached
+`ocpm-engine` worktree at revision
+`c44e9341ced643e0b777a18d7b0d26a43127caa0`. The benchmark controller comes
+from the current clean checkout instead of the release worktree. Named Docker
+build contexts keep those sources separate, the runtime image contains only the
+current benchmark harness plus the installed release wheel, and schema-5
+provenance records both revisions and cleanliness states independently. The
+runner then recreates both database volumes, records three serial-latency epochs
+of 30 randomized measured rounds after ten warmups, runs 1/4/8/16 worker
+concurrency sweeps for DFG conformance and drift, writes
 `.benchmarks/public-common-pm-0.6.0.json` and
 `.benchmarks/sap-pm4py-three-way-0.6.0.json`, and stops its containers on exit.
 The preview check validates both ignored artifacts without changing
@@ -142,7 +150,9 @@ make perf-public-concurrency
 
 The target rebuilds the checksum-verified databases so the common-PM and PM4Py
 index policies remain independent, then updates only concurrency in both
-ignored `.benchmarks/` staging artifacts. It runs the epoch-level checkers in
+ignored schema-5 `.benchmarks/` staging artifacts. Older schema artifacts must
+be replaced by a complete run because they do not distinguish product and
+controller source provenance. The target runs the epoch-level checkers in
 preview mode after both artifacts finish. The published `docs/results/`
 artifacts are intentionally unchanged until the staged results have been
 reviewed, promoted, and their digest pins updated.
