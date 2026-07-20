@@ -18,6 +18,7 @@ class Endpoint(StrEnum):
     EDGE_INFO = "edge_info"
     CASE_LIST = "case_list"
     ENTIRE_PROCESS_MAP = "entire_process_map"
+    DYNAMIC_DFG = "dynamic_dfg"
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,6 +35,113 @@ class EdgeFilter:
             target=str(value["target"]),
             min_execution_time=float(value.get("min_execution_time", 0.0)),
             max_execution_time=float(value.get("max_execution_time", float("inf"))),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class EventAttributeFilter:
+    """Require a case event whose selected attribute equals one value.
+
+    ``actor`` and ``context`` address the first-class event columns. Every
+    other key addresses the source-neutral JSON attribute map.
+    """
+
+    key: str
+    value: str
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> EventAttributeFilter:
+        key = value.get("key") or value.get("name") or value.get("field")
+        if key is None:
+            raise ValueError("event attribute filters require a key")
+        return cls(key=str(key), value=str(value["value"]))
+
+
+@dataclass(frozen=True, slots=True)
+class DynamicFilter:
+    """Composable exact case predicates for dynamic DFG requests.
+
+    Every tuple is conjunctive. Included predicates must exist; excluded
+    predicates must not exist. Multiple statuses are alternatives.
+    """
+
+    statuses: tuple[str, ...] = ()
+    included_activities: tuple[str, ...] = ()
+    excluded_activities: tuple[str, ...] = ()
+    min_case_execution_time: float | None = None
+    max_case_execution_time: float | None = None
+    included_event_attributes: tuple[EventAttributeFilter, ...] = ()
+    excluded_event_attributes: tuple[EventAttributeFilter, ...] = ()
+    included_related_object_types: tuple[str, ...] = ()
+    excluded_related_object_types: tuple[str, ...] = ()
+    included_edges: tuple[EdgeFilter, ...] = ()
+    excluded_edges: tuple[EdgeFilter, ...] = ()
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any] | None) -> DynamicFilter:
+        if not value:
+            return cls()
+        activities = value.get("activities") or {}
+        attributes = value.get("event_attributes") or {}
+        related = value.get("related_object_types") or {}
+        edges = value.get("edges") or {}
+        execution_range = value.get("case_execution_time_range") or {}
+        statuses = value.get("statuses") or value.get("status") or ()
+        if isinstance(statuses, str):
+            statuses = (statuses,)
+        return cls(
+            statuses=tuple(str(item) for item in statuses),
+            included_activities=tuple(
+                str(item) for item in activities.get("include", ())
+            ),
+            excluded_activities=tuple(
+                str(item) for item in activities.get("exclude", ())
+            ),
+            min_case_execution_time=execution_range.get("min_execution_time"),
+            max_case_execution_time=execution_range.get("max_execution_time"),
+            included_event_attributes=tuple(
+                EventAttributeFilter.from_mapping(item)
+                for item in attributes.get("include", ())
+            ),
+            excluded_event_attributes=tuple(
+                EventAttributeFilter.from_mapping(item)
+                for item in attributes.get("exclude", ())
+            ),
+            included_related_object_types=tuple(
+                str(item) for item in related.get("include", ())
+            ),
+            excluded_related_object_types=tuple(
+                str(item) for item in related.get("exclude", ())
+            ),
+            included_edges=tuple(
+                EdgeFilter.from_mapping(item) for item in edges.get("include", ())
+            ),
+            excluded_edges=tuple(
+                EdgeFilter.from_mapping(item) for item in edges.get("exclude", ())
+            ),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class DynamicDfgRequest:
+    """A dynamic, exact directly-follows graph request."""
+
+    backbone_type: str
+    from_date: datetime
+    to_date: datetime
+    filter: DynamicFilter = field(default_factory=DynamicFilter)
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> DynamicDfgRequest:
+        from_date = _parse_datetime(value.get("from_date"))
+        to_date = _parse_datetime(value.get("to_date"))
+        if from_date is None or to_date is None:
+            raise ValueError("dynamic DFG requests require from_date and to_date")
+        return cls(
+            backbone_type=str(value["backbone_type"]),
+            from_date=from_date,
+            to_date=to_date,
+            filter=DynamicFilter.from_mapping(value.get("filter")),
         )
 
 

@@ -6,7 +6,15 @@ from datetime import UTC, datetime
 from typing import Any, Protocol
 
 from . import queries
-from .models import Endpoint, ProcessMiningRequest, QueryPlan
+from .analytics import bottleneck_order
+from .dynamic_queries import Projection, compile_dynamic_dfg
+from .models import (
+    DynamicDfgRequest,
+    DynamicFilter,
+    Endpoint,
+    ProcessMiningRequest,
+    QueryPlan,
+)
 
 
 class Cursor(Protocol):
@@ -14,11 +22,39 @@ class Cursor(Protocol):
 
     def fetchone(self) -> Any: ...
 
+    def fetchall(self) -> Any: ...
+
 
 _MIN_TIMESTAMP = datetime(1, 1, 1, tzinfo=UTC)
 _MAX_TIMESTAMP = datetime(9999, 12, 31, 23, 59, 59, 999999, tzinfo=UTC)
 _TIMELINE_PERIODS = frozenset({"hour", "day", "week", "month", "quarter", "year"})
-_MINIMUM_PG_OCPM_VERSION = (0, 7, 0)
+_MINIMUM_PG_OCPM_VERSION = (0, 8, 0)
+
+
+def score_dynamic_dfg_rows(rows: list[tuple[Any, ...]]) -> dict[str, Any]:
+    """Canonicalize DFG rows and rank bottlenecks with the Rust kernel."""
+
+    if not rows:
+        raise RuntimeError("dynamic DFG returned no count row")
+    selected_counts = {int(row[0]) for row in rows}
+    if len(selected_counts) != 1:
+        raise RuntimeError("dynamic DFG returned inconsistent selected counts")
+    transitions = sorted(
+        [
+            [str(row[1]), str(row[2]), int(row[3]), round(float(row[4]), 6)]
+            for row in rows
+            if row[1] is not None
+        ]
+    )
+    order = bottleneck_order(
+        [transition[2] for transition in transitions],
+        [transition[3] for transition in transitions],
+    )
+    return {
+        "selected_count": selected_counts.pop(),
+        "dfg": transitions,
+        "bottleneck_order": [transitions[index] for index in order],
+    }
 
 
 class OcpmEngine:
@@ -53,8 +89,55 @@ class OcpmEngine:
         except ValueError as error:
             raise RuntimeError(f"invalid pg_ocpm version: {version}") from error
         if parsed < _MINIMUM_PG_OCPM_VERSION:
-            raise RuntimeError("ocpm-engine requires pg_ocpm 0.7.0 or later")
+            raise RuntimeError("ocpm-engine requires pg_ocpm 0.8.0 or later")
         return version
+
+    def build_dynamic_case_ids(self, request: DynamicDfgRequest) -> QueryPlan:
+        """Build the exact selected-case projection for a dynamic request."""
+
+        return self._build_dynamic(request, projection="case_ids")
+
+    def build_dynamic_dfg(self, request: DynamicDfgRequest) -> QueryPlan:
+        """Build an exact filtered DFG using one uniform filter contract."""
+
+        return self._build_dynamic(request, projection="dfg")
+
+    def execute_dynamic_dfg(
+        self,
+        cursor: Cursor,
+        request_or_plan: DynamicDfgRequest | QueryPlan,
+    ) -> dict[str, Any]:
+        """Execute a dynamic DFG plan and apply the shared Rust ranking kernel."""
+
+        plan = (
+            request_or_plan
+            if isinstance(request_or_plan, QueryPlan)
+            else self.build_dynamic_dfg(request_or_plan)
+        )
+        if plan.endpoint is not Endpoint.DYNAMIC_DFG:
+            raise ValueError("execute_dynamic_dfg requires a dynamic DFG plan")
+        cursor.execute(plan.sql, plan.params)
+        return score_dynamic_dfg_rows(list(cursor.fetchall()))
+
+    def _build_dynamic(
+        self,
+        request: DynamicDfgRequest,
+        *,
+        projection: Projection,
+    ) -> QueryPlan:
+        self._validate_dynamic(request)
+        sql, params, strategy = compile_dynamic_dfg(
+            request,
+            dataset_id=self.dataset_id,
+            tenant_id=self.tenant_id,
+            projection=projection,
+        )
+        return QueryPlan(
+            Endpoint.DYNAMIC_DFG,
+            sql,
+            params,
+            f"{strategy} dynamic {projection}",
+        )
 
     def build(self, request: ProcessMiningRequest) -> QueryPlan:
         endpoint = Endpoint(request.endpoint)
@@ -228,3 +311,34 @@ class OcpmEngine:
             raise ValueError("limit must be between 1 and 1000")
         if request.offset < 0:
             raise ValueError("offset must be non-negative")
+
+    @staticmethod
+    def _validate_dynamic(request: DynamicDfgRequest) -> None:
+        if not request.backbone_type.strip():
+            raise ValueError("dynamic DFG backbone_type must not be empty")
+        if request.from_date > request.to_date:
+            raise ValueError("from_date must not be after to_date")
+        dynamic_filter: DynamicFilter = request.filter
+        paired_ranges = (
+            (
+                dynamic_filter.min_case_execution_time,
+                dynamic_filter.max_case_execution_time,
+                "case execution-time",
+            ),
+        )
+        for minimum, maximum, label in paired_ranges:
+            if (minimum is None) != (maximum is None):
+                raise ValueError(f"{label} filters require both minimum and maximum")
+            if minimum is not None and maximum is not None and minimum > maximum:
+                raise ValueError(f"{label} minimum must not exceed maximum")
+        for edge in (*dynamic_filter.included_edges, *dynamic_filter.excluded_edges):
+            if not edge.source.strip() or not edge.target.strip():
+                raise ValueError("edge activities must not be empty")
+            if edge.min_execution_time > edge.max_execution_time:
+                raise ValueError("edge execution-time minimum must not exceed maximum")
+        for attribute in (
+            *dynamic_filter.included_event_attributes,
+            *dynamic_filter.excluded_event_attributes,
+        ):
+            if not attribute.key.strip():
+                raise ValueError("event attribute keys must not be empty")

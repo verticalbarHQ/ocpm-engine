@@ -18,10 +18,13 @@ from .bindings import (
     binding_capsule_info,
     decode_binding_capsule,
 )
-from .engine import OcpmEngine
+from .engine import OcpmEngine, score_dynamic_dfg_rows
 from .models import (
+    DynamicDfgRequest,
+    DynamicFilter,
     EdgeFilter,
     Endpoint,
+    EventAttributeFilter,
     NetworkFilter,
     ProcessMiningRequest,
     QueryPlan,
@@ -29,9 +32,12 @@ from .models import (
 
 __all__ = [
     "EdgeFilter",
+    "DynamicDfgRequest",
+    "DynamicFilter",
     "BindingCapsuleInfo",
     "BindingRow",
     "Endpoint",
+    "EventAttributeFilter",
     "NetworkFilter",
     "OcpmEngine",
     "ProcessMiningRequest",
@@ -47,5 +53,6 @@ __all__ = [
     "dfg_conformance",
     "frequency_drift",
     "next_activity",
+    "score_dynamic_dfg_rows",
     "variant_conformance",
 ]

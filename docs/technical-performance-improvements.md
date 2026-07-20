@@ -2,7 +2,7 @@
 
 ## Scope
 
-`ocpm-engine` is the application query planner for `pg_ocpm >= 0.7.0`. It does
+`ocpm-engine` is the application query planner for `pg_ocpm >= 0.8.0`. It does
 not create tables, indexes, materialized views, or another PostgreSQL
 extension. Its performance contribution is to translate a small set of
 process-mining request shapes into parameterized SQL that selects the most
@@ -35,12 +35,17 @@ flowchart LR
     S -->|narrow graph window| OH[one-hop object traversal]
     S -->|wide graph window| CL[transitive closure]
     S -->|whole dataset| RU[stable rollups]
+    S -->|dynamic case predicates| DF[set-composed dynamic filter]
+    DF -->|ordinary predicates| EB[edge buckets]
+    DF -->|edge predicates| ES[native event stream]
 
     CW --> N[Native summaries and compact arrays]
     CB --> N
     OH --> N
     CL --> N
     RU --> N
+    EB --> N
+    ES --> N
     N --> J[Single JSON response]
 
     subgraph Vanilla PostgreSQL request path
@@ -69,6 +74,8 @@ SQL focused on selection, aggregation, and response construction.
 | Whole-dataset rollups | Recomputing the complete process map | Read finalized edge/day summaries |
 | Database-side result shaping | Multiple result sets and application-side grouping | One ordered JSON value |
 | Parameterized plans | SQL text variation and unsafe interpolation | Stable SQL plus bound parameters |
+| Uniform dynamic filtering | Endpoint-specific filter SQL and repeated joins | Typed predicates composed as materialized case sets |
+| Edge-aware DFG routing | Re-expand or join normalized event rows for every request | Edge buckets normally; native event stream when edge predicates require it |
 
 ## 1. Typed request normalization
 
@@ -98,7 +105,7 @@ request to the optimized database primitive.
 ## 2. Fail-fast `pg_ocpm` capability gate
 
 At application startup, `verify_pg_ocpm()` calls `ocpm.version()` and requires
-version 0.7.0 or later. An incompatible database is rejected before serving
+version 0.8.0 or later. An incompatible database is rejected before serving
 queries.
 
 Code:
