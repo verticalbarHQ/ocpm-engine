@@ -29,6 +29,13 @@ results remain factorized and expand through an exact-size lazy iterator.
 Multi-window requests retrieve aligned training, test, comparison-period, or
 drift statistics in one database request.
 
+For algorithms that genuinely require individual events, `ocpm-postgres`
+provides a prepared adapter over `pg_ocpm >= 0.8.0`'s native event table
+function. It exposes PostgreSQL's asynchronous row stream directly, preserving
+backpressure and avoiding SQL array expansion, joins, event-level sorting, and
+whole-log allocation in the engine. Aggregate-native algorithms continue to
+use sufficient statistics because that path transfers far less data.
+
 The existing Python query planner remains available for these request shapes:
 
 - Filtered process maps with date, case status, variant, activity, case-duration,

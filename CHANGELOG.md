@@ -2,6 +2,16 @@
 
 All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
 
+## 0.7.0 - 2026-07-20
+
+- Added `PreparedEventLogQuery`, an asynchronous adapter over the storage-neutral
+  native event stream introduced by `pg_ocpm 0.8.0`.
+- Exposed PostgreSQL's `RowStream` directly so event-consuming algorithms can
+  apply backpressure without allocating a complete event log in middleware.
+- Kept aggregate-native DFG, variant, conformance, prediction, bottleneck, and
+  drift paths unchanged; they continue to use bounded sufficient statistics
+  and retain compatibility with `pg_ocpm 0.7.0`.
+
 ## 0.6.0 - 2026-07-19
 
 - Replaced the withdrawn root-only OCPQ comparison with a strict all-node
