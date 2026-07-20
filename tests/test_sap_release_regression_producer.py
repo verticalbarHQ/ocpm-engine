@@ -157,7 +157,15 @@ def test_concurrency_epoch_retains_raw_roundtrip_and_internal_samples(
     assert epoch["throughput_qps"] > 0
     assert epoch["roundtrip"]["runs"] == epoch["requests"]
     assert epoch["worker_internal"]["runs"] == epoch["requests"]
-    assert sum(item["exact_requests"] for item in epoch["workers"]) == epoch["requests"]
+    assert (
+        sum(len(item["answer_sha256s"]) for item in epoch["workers"])
+        == epoch["requests"]
+    )
+    assert all(
+        answer == digest
+        for worker in epoch["workers"]
+        for answer in worker["answer_sha256s"]
+    )
 
 
 def test_concurrency_aggregate_uses_population_cv() -> None:

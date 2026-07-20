@@ -75,7 +75,7 @@ EXPECTED_RELEASES = {
     },
 }
 EXPECTED_HARNESS_SHA256 = {
-    "controller": "0fc2930c6f0e21ce3a5323c7ae31d31b596c394c6f51ab4b5019bf5be8ce7e1f",
+    "controller": "e3dc62c0091fbf528d3e3cc466cf8cb327fe4ca594f52cca0f5dc017778a5ea6",
     "support": "eed18acd3b4b2d2d9511b7783ba9cc5ebe1df8fc5998ed4be22f380c06beecf0",
     "worker": "bf2772136b1f8f2e0580e4533ce7556c13c57343aed99301657b2fb0f0ac31ce",
     "common_pm": "7a21984ff0eaf4d349b251c7a6aea1205cf22587cb85a0626b1cc9fd8623cf27",

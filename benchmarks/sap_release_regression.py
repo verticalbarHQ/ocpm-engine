@@ -567,6 +567,7 @@ def run_concurrency_epoch(
             raise RuntimeError("concurrency start signal timed out")
         roundtrip_samples = []
         internal_samples = []
+        answer_sha256s = []
         while (
             len(roundtrip_samples) < CONCURRENCY_MIN_REQUESTS_PER_WORKER
             or time.perf_counter() < deadline["value"]
@@ -596,12 +597,12 @@ def run_concurrency_epoch(
                 )
             roundtrip_samples.append(roundtrip_ns)
             internal_samples.append(internal_ns)
+            answer_sha256s.append(result["answer_sha256"])
         return {
             "worker_pid": worker.process.pid,
             "roundtrip_samples_ns": roundtrip_samples,
             "internal_samples_ns": internal_samples,
-            "answer_sha256": oracle_sha256,
-            "exact_requests": len(roundtrip_samples),
+            "answer_sha256s": answer_sha256s,
         }
 
     with ThreadPoolExecutor(max_workers=len(pool)) as executor:
