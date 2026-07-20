@@ -1,8 +1,9 @@
+use futures_util::TryStreamExt;
 use ocpm_core::binding::BindingSchema;
 use ocpm_postgres::{
     ActivityProfileFilter, AdapterError, PreparedBindingQuery, PreparedBindingTreeQuery,
-    RelationBindingSpec, activity_profile, binding_relation_universal_equal, dfg_counts,
-    dfg_window_counts, variant_counts, variant_window_counts,
+    PreparedEventLogQuery, RelationBindingSpec, activity_profile, binding_relation_universal_equal,
+    dfg_counts, dfg_window_counts, variant_counts, variant_window_counts,
 };
 use std::time::{Duration, SystemTime};
 
@@ -50,6 +51,111 @@ async fn public_adapters_prepare_and_bind_against_pg_ocpm_0_7() {
             .unwrap()
             .is_empty()
     );
+}
+
+#[tokio::test]
+async fn native_event_adapter_streams_pg_ocpm_0_8_rows_in_case_order() {
+    let Ok(database_url) = std::env::var("OCPM_TEST_DATABASE_URL") else {
+        return;
+    };
+    let (client, connection) = tokio_postgres::connect(&database_url, tokio_postgres::NoTls)
+        .await
+        .expect("connect to pg_ocpm event-stream test database");
+    tokio::spawn(async move {
+        connection.await.expect("drive PostgreSQL connection");
+    });
+    let version: String = client
+        .query_one("SELECT ocpm.version()", &[])
+        .await
+        .expect("read pg_ocpm version")
+        .get(0);
+    if version
+        .split('.')
+        .next()
+        .and_then(|value| value.parse::<u32>().ok())
+        == Some(0)
+        && version
+            .split('.')
+            .nth(1)
+            .and_then(|value| value.parse::<u32>().ok())
+            .is_some_and(|minor| minor < 8)
+    {
+        return;
+    }
+
+    let dataset_key = format!("ocpm-engine-event-stream-{}", std::process::id());
+    let dataset_id: i64 = client
+        .query_one(
+            "SELECT ocpm.register_dataset($1, 0, '{}'::jsonb)",
+            &[&dataset_key],
+        )
+        .await
+        .expect("register event-stream test dataset")
+        .get(0);
+    client
+        .execute(
+            r#"
+            INSERT INTO ocpm.case_summary (
+                dataset_id, tenant_id, case_id, object_type, status,
+                start_time, end_time, execution_time,
+                activity_path, path_text, path_hash,
+                activities, event_timestamps
+            ) VALUES (
+                $1, 0, 11, 'Order', 'complete',
+                '2026-01-01 00:00:00+00', '2026-01-01 00:00:01+00', 1.0,
+                '["Create","Complete"]', 'Create > Complete', 'stream-path',
+                ARRAY['Create','Complete'],
+                ARRAY['2026-01-01 00:00:00+00',
+                      '2026-01-01 00:00:01+00']::timestamptz[]
+            )
+            "#,
+            &[&dataset_id],
+        )
+        .await
+        .expect("insert event-stream case");
+    client
+        .execute("SELECT ocpm.finish_load($1)", &[&dataset_id])
+        .await
+        .expect("finalize event-stream case");
+
+    let query = PreparedEventLogQuery::prepare(&client)
+        .await
+        .expect("prepare native event stream");
+    let mut stream = std::pin::pin!(
+        query
+            .query(
+                &client,
+                dataset_id,
+                0,
+                "Order",
+                SystemTime::UNIX_EPOCH,
+                SystemTime::UNIX_EPOCH + Duration::from_secs(4_102_444_800),
+            )
+            .await
+            .expect("start native event stream")
+    );
+    let mut events = Vec::new();
+    while let Some(row) = stream.try_next().await.expect("read native event row") {
+        events.push(PreparedEventLogQuery::decode(&row).expect("decode event row"));
+    }
+    assert_eq!(events.len(), 2);
+    assert_eq!(events[0].case_id, 11);
+    assert_eq!(events[0].activity, "Create");
+    assert_eq!(events[0].event_ordinal, 1);
+    assert_eq!(events[1].activity, "Complete");
+    assert_eq!(events[1].event_ordinal, 2);
+
+    client
+        .execute("SELECT ocpm.clear_dataset($1)", &[&dataset_id])
+        .await
+        .expect("clear event-stream test dataset");
+    client
+        .execute(
+            "DELETE FROM ocpm.dataset WHERE dataset_id=$1",
+            &[&dataset_id],
+        )
+        .await
+        .expect("delete event-stream test dataset");
 }
 
 #[tokio::test]

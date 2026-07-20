@@ -2,6 +2,37 @@
 
 All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
 
+## 0.8.0 - 2026-07-20
+
+- Added the public `DynamicFilter` and `DynamicDfgRequest` contract so status,
+  activity existence/nonexistence, case duration, arbitrary event attributes,
+  related-object types, and directly-follows duration predicates compose
+  through one engine API.
+- Added exact included and excluded predicates for event attributes, related
+  object types, and directly-follows edges. Multiple predicates compose with
+  materialized set intersection and exclusion rather than endpoint-specific
+  query fragments.
+- Added a dual dynamic DFG strategy: ordinary filters aggregate finalized edge
+  buckets, while edge predicates reuse `pg_ocpm`'s native event stream for both
+  case selection and directly-follows aggregation.
+- Materialized the bounded edge expansion once before joining dynamic case
+  sets, preventing PostgreSQL row-estimation errors from selecting a nested
+  loop that repeatedly decodes the same buckets.
+- Added case-ID query plans and canonical DFG execution/scoring so callers and
+  regression suites can verify exact selected-case parity independently of
+  aggregate results.
+- Raised the minimum supported extension version to `pg_ocpm 0.8.0`.
+
+## 0.7.0 - 2026-07-20
+
+- Added `PreparedEventLogQuery`, an asynchronous adapter over the storage-neutral
+  native event stream introduced by `pg_ocpm 0.8.0`.
+- Exposed PostgreSQL's `RowStream` directly so event-consuming algorithms can
+  apply backpressure without allocating a complete event log in middleware.
+- Kept aggregate-native DFG, variant, conformance, prediction, bottleneck, and
+  drift paths unchanged; they continue to use bounded sufficient statistics
+  and retain compatibility with `pg_ocpm 0.7.0`.
+
 ## 0.6.0 - 2026-07-19
 
 - Replaced the withdrawn root-only OCPQ comparison with a strict all-node

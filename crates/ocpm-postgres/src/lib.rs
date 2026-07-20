@@ -1,4 +1,5 @@
-//! Thin asynchronous adapter over pg_ocpm 0.7 aggregate and binding interfaces.
+//! Thin asynchronous adapter over pg_ocpm aggregate, binding, and event-stream
+//! interfaces.
 
 use ocpm_core::{
     TransitionKey,
@@ -7,7 +8,7 @@ use ocpm_core::{
 use std::time::SystemTime;
 use thiserror::Error;
 use tokio_postgres::{
-    Client, Statement,
+    Client, Row, RowStream, Statement,
     types::{ToSql, Type},
 };
 
@@ -50,6 +51,11 @@ FROM ocpm.activity_profile(
 ORDER BY object_type, activity
 "#;
 
+pub const EVENT_LOG_ROWS_SQL: &str = r#"
+SELECT case_id, activity, event_timestamp, event_ordinal
+FROM ocpm.event_log_rows($1, $2, $3, $4, $5)
+"#;
+
 pub const BINDING_OBJECT_ACTIVITY_COUNT_SQL: &str =
     "SELECT ocpm.binding_object_activity_count($1, $2, $3, $4, $5, $6)";
 pub const BINDING_REQUIRES_ACTIVITY_SQL: &str =
@@ -83,6 +89,8 @@ pub enum AdapterError {
     NullBindingTreeCapsule(usize),
     #[error("the requested materialized relation summary has not been declared or rebuilt")]
     MissingRelationSummary,
+    #[error("event-log query must return bigint, text, timestamptz, integer")]
+    InvalidEventLogResultShape,
 }
 
 /// A decoded binding capsule plus its encoded wire size.
@@ -119,6 +127,115 @@ pub struct PreparedBindingQuery {
 pub struct PreparedBindingTreeQuery {
     statement: Statement,
     node_count: usize,
+}
+
+/// One event decoded from pg_ocpm's native case-bucket stream.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EventLogRow {
+    pub case_id: i64,
+    pub activity: String,
+    pub event_timestamp: SystemTime,
+    pub event_ordinal: i32,
+}
+
+/// A connection-specific prepared native event-log stream.
+///
+/// `query` returns PostgreSQL's asynchronous `RowStream`; callers apply
+/// backpressure by polling it and never need to allocate a complete event log.
+#[derive(Clone, Debug)]
+pub struct PreparedEventLogQuery {
+    statement: Statement,
+}
+
+fn validate_event_log_result_shape<'a>(
+    column_types: impl IntoIterator<Item = &'a Type>,
+) -> Result<(), AdapterError> {
+    let actual = column_types.into_iter().collect::<Vec<_>>();
+    let expected = [Type::INT8, Type::TEXT, Type::TIMESTAMPTZ, Type::INT4];
+    if actual.len() != expected.len()
+        || actual
+            .into_iter()
+            .zip(expected)
+            .any(|(actual_type, expected_type)| *actual_type != expected_type)
+    {
+        return Err(AdapterError::InvalidEventLogResultShape);
+    }
+    Ok(())
+}
+
+impl PreparedEventLogQuery {
+    /// Prepare the pg_ocpm 0.8 native event stream and validate its row shape.
+    pub async fn prepare(client: &Client) -> Result<Self, AdapterError> {
+        let statement = client.prepare(EVENT_LOG_ROWS_SQL).await?;
+        validate_event_log_result_shape(statement.columns().iter().map(|column| column.type_()))?;
+        Ok(Self { statement })
+    }
+
+    /// Start a storage-neutral event stream for cases fully contained in the
+    /// inclusive time window.
+    pub async fn query(
+        &self,
+        client: &Client,
+        dataset_id: i64,
+        tenant_id: i64,
+        object_type: &str,
+        from_timestamp: SystemTime,
+        to_timestamp: SystemTime,
+    ) -> Result<RowStream, AdapterError> {
+        Ok(client
+            .query_raw(
+                &self.statement,
+                [
+                    &dataset_id as &(dyn ToSql + Sync),
+                    &tenant_id,
+                    &object_type,
+                    &from_timestamp,
+                    &to_timestamp,
+                ],
+            )
+            .await?)
+    }
+
+    /// Decode one borrowed PostgreSQL row into an owned event.
+    pub fn decode(row: &Row) -> Result<EventLogRow, AdapterError> {
+        Ok(EventLogRow {
+            case_id: row.try_get(0)?,
+            activity: row.try_get(1)?,
+            event_timestamp: row.try_get(2)?,
+            event_ordinal: row.try_get(3)?,
+        })
+    }
+}
+
+#[cfg(test)]
+mod event_log_tests {
+    use super::*;
+
+    #[test]
+    fn event_log_shape_is_exact() {
+        assert!(
+            validate_event_log_result_shape([
+                &Type::INT8,
+                &Type::TEXT,
+                &Type::TIMESTAMPTZ,
+                &Type::INT4,
+            ])
+            .is_ok()
+        );
+        assert!(matches!(
+            validate_event_log_result_shape([
+                &Type::INT8,
+                &Type::TEXT,
+                &Type::TIMESTAMP,
+                &Type::INT4,
+            ]),
+            Err(AdapterError::InvalidEventLogResultShape)
+        ));
+        assert!(matches!(
+            validate_event_log_result_shape([&Type::INT8, &Type::TEXT]),
+            Err(AdapterError::InvalidEventLogResultShape)
+        ));
+    }
 }
 
 fn validate_binding_tree_result_shape<'a>(

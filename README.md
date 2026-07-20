@@ -9,7 +9,7 @@ This package does not install another PostgreSQL extension or create database
 objects. PostgreSQL must already have `pg_ocpm` installed and the target dataset
 must already be finalized with `ocpm.finish_load(...)`.
 
-Required extension version: `pg_ocpm >= 0.7.0`. See the
+Required extension version: `pg_ocpm >= 0.8.0`. See the
 [release notes](CHANGELOG.md) for every library version.
 
 ## Native analytics
@@ -29,8 +29,18 @@ results remain factorized and expand through an exact-size lazy iterator.
 Multi-window requests retrieve aligned training, test, comparison-period, or
 drift statistics in one database request.
 
+For algorithms that genuinely require individual events, `ocpm-postgres`
+provides a prepared adapter over `pg_ocpm >= 0.8.0`'s native event table
+function. It exposes PostgreSQL's asynchronous row stream directly, preserving
+backpressure and avoiding SQL array expansion, joins, event-level sorting, and
+whole-log allocation in the engine. Aggregate-native algorithms continue to
+use sufficient statistics because that path transfers far less data.
+
 The existing Python query planner remains available for these request shapes:
 
+- Dynamically filtered directly-follows graphs with composable status,
+  activity existence/nonexistence, case-duration, event-attribute,
+  related-object, and edge-duration predicates
 - Filtered process maps with date, case status, variant, activity, case-duration,
   and edge-duration filters
 - Variant distribution
@@ -126,6 +136,48 @@ Existing API dictionaries can be translated directly:
 request = ProcessMiningRequest.from_mapping(request_body)
 payload = engine.execute(cursor, request)
 ```
+
+Dynamic filters use one source-neutral request contract. Included tuple
+members are conjunctive, excluded members must not occur, and multiple status
+values are alternatives:
+
+```python
+from ocpm_engine import DynamicDfgRequest
+
+request = DynamicDfgRequest.from_mapping(
+    {
+        "backbone_type": "Order",
+        "from_date": "2026-01-01T00:00:00Z",
+        "to_date": "2026-02-01T00:00:00Z",
+        "filter": {
+            "statuses": ["complete"],
+            "activities": {
+                "include": ["Order:Approved"],
+                "exclude": ["Order:Rejected"],
+            },
+            "event_attributes": {
+                "include": [{"key": "region", "value": "west"}],
+            },
+            "related_object_types": {"include": ["Invoice"]},
+            "edges": {
+                "include": [
+                    {
+                        "source": "Order:Created",
+                        "target": "Order:Approved",
+                        "min_execution_time": 0,
+                        "max_execution_time": 86400,
+                    }
+                ]
+            },
+        },
+    }
+)
+plan = engine.build_dynamic_dfg(request)
+answer = engine.execute_dynamic_dfg(cursor, plan)
+```
+
+`build_dynamic_case_ids(request)` exposes the same selection as an ordered ID
+projection for correctness checks, pagination seeds, and downstream analysis.
 
 At application startup, verify that the dependency is present:
 
