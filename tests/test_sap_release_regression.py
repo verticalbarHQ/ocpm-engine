@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import base64
 import copy
 import hashlib
 import itertools
 import json
+import struct
+import zlib
 from pathlib import Path
 from typing import Any, Callable
 
@@ -21,6 +24,20 @@ def sign(payload: dict[str, Any]) -> dict[str, Any]:
     encoded = json.dumps(payload, indent=2, default=str) + "\n"
     payload["payload_sha256"] = hashlib.sha256(encoded.encode()).hexdigest()
     return payload
+
+
+def encode_samples(samples: list[int]) -> dict[str, Any]:
+    raw = b"".join(struct.pack("<Q", sample) for sample in samples)
+    return {
+        "encoding": checker.CONCURRENCY_SAMPLE_ENCODING,
+        "count": len(samples),
+        "data": base64.b64encode(zlib.compress(raw)).decode("ascii"),
+    }
+
+
+def decode_samples(encoded: dict[str, Any]) -> list[int]:
+    raw = zlib.decompress(base64.b64decode(encoded["data"], validate=True))
+    return [item[0] for item in struct.iter_unpack("<Q", raw)]
 
 
 def latency_row(path: str, workload: str) -> dict[str, Any]:
@@ -103,26 +120,29 @@ def concurrency_epoch(
 ) -> dict[str, Any]:
     workers = []
     for _ in range(worker_count):
+        roundtrip = [10_000_000] * checker.CONCURRENCY_MIN_REQUESTS_PER_WORKER
+        internal = [9_000_000] * checker.CONCURRENCY_MIN_REQUESTS_PER_WORKER
         workers.append(
             {
                 "worker_pid": next(_PIDS),
-                "roundtrip_samples_ns": [10_000_000]
-                * checker.CONCURRENCY_MIN_REQUESTS_PER_WORKER,
-                "internal_samples_ns": [9_000_000]
-                * checker.CONCURRENCY_MIN_REQUESTS_PER_WORKER,
-                "answer_sha256s": [ANSWER_HASH]
-                * checker.CONCURRENCY_MIN_REQUESTS_PER_WORKER,
+                "roundtrip_samples_ns": encode_samples(roundtrip),
+                "internal_samples_ns": encode_samples(internal),
+                "answer_sha256_counts": {ANSWER_HASH: len(roundtrip)},
             }
         )
     roundtrip = [
-        sample for worker in workers for sample in worker["roundtrip_samples_ns"]
+        sample
+        for worker in workers
+        for sample in decode_samples(worker["roundtrip_samples_ns"])
     ]
     internal = [
-        sample for worker in workers for sample in worker["internal_samples_ns"]
+        sample
+        for worker in workers
+        for sample in decode_samples(worker["internal_samples_ns"])
     ]
     wall_ns = checker.CONCURRENCY_MIN_WALL_NS
     requests = len(roundtrip)
-    counts = [len(worker["roundtrip_samples_ns"]) for worker in workers]
+    counts = [worker["roundtrip_samples_ns"]["count"] for worker in workers]
     pids = [worker["worker_pid"] for worker in workers]
     return {
         "requests": requests,
@@ -279,6 +299,7 @@ def method() -> dict[str, Any]:
             ),
             "connection_model": "one persistent connection per worker",
             "timing_scope": "controller round trip and worker internal",
+            "sample_encoding": checker.CONCURRENCY_SAMPLE_ENCODING,
         },
         "storage": {
             "autovacuum": "disabled during bridge",
@@ -685,22 +706,34 @@ def refresh_concurrency_epoch(epoch: dict[str, Any]) -> None:
     roundtrip = [
         sample
         for worker in epoch["workers"]
-        for sample in worker["roundtrip_samples_ns"]
+        for sample in decode_samples(worker["roundtrip_samples_ns"])
     ]
     internal = [
         sample
         for worker in epoch["workers"]
-        for sample in worker["internal_samples_ns"]
+        for sample in decode_samples(worker["internal_samples_ns"])
     ]
     epoch["requests"] = len(roundtrip)
     epoch["worker_request_counts"] = sorted(
-        len(worker["roundtrip_samples_ns"]) for worker in epoch["workers"]
+        worker["roundtrip_samples_ns"]["count"] for worker in epoch["workers"]
     )
     epoch["throughput_qps"] = round(
         len(roundtrip) / (epoch["wall_ns"] / 1_000_000_000), 3
     )
     epoch["roundtrip"] = checker._concurrency_metrics_ns(roundtrip)
     epoch["worker_internal"] = checker._concurrency_metrics_ns(internal)
+
+
+def replace_first_roundtrip_sample(level: dict[str, Any], value: int) -> None:
+    worker = level["current"]["epochs"][0]["workers"][0]
+    samples = decode_samples(worker["roundtrip_samples_ns"])
+    samples[0] = value
+    worker["roundtrip_samples_ns"] = encode_samples(samples)
+
+
+def add_trailing_compressed_data(encoded: dict[str, Any]) -> None:
+    compressed = base64.b64decode(encoded["data"], validate=True)
+    encoded["data"] = base64.b64encode(compressed + b"trailing").decode("ascii")
 
 
 def refresh_concurrency_arm(level: dict[str, Any], arm: str) -> None:
@@ -901,9 +934,7 @@ def test_memory_relative_and_absolute_bounds() -> None:
     ("mutation", "message"),
     [
         (
-            lambda level: level["current"]["epochs"][0]["workers"][0][
-                "roundtrip_samples_ns"
-            ].__setitem__(0, 20_000_000),
+            lambda level: replace_first_roundtrip_sample(level, 20_000_000),
             "round-trip metrics differ",
         ),
         (
@@ -920,9 +951,9 @@ def test_memory_relative_and_absolute_bounds() -> None:
         ),
         (
             lambda level: level["current"]["epochs"][0]["workers"][0][
-                "answer_sha256s"
-            ].__setitem__(0, "0" * 64),
-            "raw request evidence",
+                "answer_sha256_counts"
+            ].__setitem__("0" * 64, 1),
+            "answer hash histogram",
         ),
         (
             lambda level: level["epoch_arm_orders"].reverse(),
@@ -940,6 +971,61 @@ def test_concurrency_raw_protocol_is_recomputed(
         checker.validate_contract(result, allow_dirty=False)
 
 
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        (
+            lambda encoded: encoded.__setitem__("encoding", "plain-json"),
+            "sample encoding changed",
+        ),
+        (
+            lambda encoded: encoded.__setitem__("data", "not!base64"),
+            "invalid base64",
+        ),
+        (
+            lambda encoded: encoded.__setitem__(
+                "data", base64.b64encode(b"not-zlib").decode("ascii")
+            ),
+            "invalid zlib",
+        ),
+        (
+            lambda encoded: encoded.__setitem__("count", encoded["count"] + 1),
+            "decoded sample count",
+        ),
+        (add_trailing_compressed_data, "trailing compressed sample data"),
+        (
+            lambda encoded: encoded.update(
+                encode_samples(
+                    [0]
+                    + [10_000_000] * (checker.CONCURRENCY_MIN_REQUESTS_PER_WORKER - 1)
+                )
+            ),
+            "positive unsigned 64-bit",
+        ),
+    ],
+)
+def test_compact_concurrency_samples_fail_closed(
+    mutation: Callable[[dict[str, Any]], None], message: str
+) -> None:
+    result = artifact()
+    worker = first_concurrency(result)["levels"]["1"]["current"]["epochs"][0][
+        "workers"
+    ][0]
+    mutation(worker["roundtrip_samples_ns"])
+    with pytest.raises(SystemExit, match=message):
+        checker.validate_contract(result, allow_dirty=False)
+
+
+def test_compact_concurrency_hash_histogram_count_is_exact() -> None:
+    result = artifact()
+    worker = first_concurrency(result)["levels"]["1"]["current"]["epochs"][0][
+        "workers"
+    ][0]
+    worker["answer_sha256_counts"][ANSWER_HASH] -= 1
+    with pytest.raises(SystemExit, match="answer hash histogram"):
+        checker.validate_contract(result, allow_dirty=False)
+
+
 def test_concurrency_qps_and_p95_non_regression() -> None:
     qps_result = artifact()
     qps_level = first_concurrency(qps_result)["levels"]["1"]
@@ -954,8 +1040,8 @@ def test_concurrency_qps_and_p95_non_regression() -> None:
     p95_level = first_concurrency(p95_result)["levels"]["1"]
     for epoch in p95_level["current"]["epochs"]:
         for worker in epoch["workers"]:
-            worker["roundtrip_samples_ns"] = [11_001_000] * len(
-                worker["roundtrip_samples_ns"]
+            worker["roundtrip_samples_ns"] = encode_samples(
+                [11_001_000] * worker["roundtrip_samples_ns"]["count"]
             )
         refresh_concurrency_epoch(epoch)
     refresh_concurrency_arm(p95_level, "current")

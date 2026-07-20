@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import base64
+import struct
+import zlib
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -7,6 +10,13 @@ from typing import Any
 import pytest
 
 from benchmarks import sap_release_regression as regression
+
+
+def decode_samples(evidence: dict[str, Any]) -> list[int]:
+    assert evidence["encoding"] == regression.SAMPLE_ENCODING
+    packed = zlib.decompress(base64.b64decode(evidence["data"], validate=True))
+    assert len(packed) == evidence["count"] * 8
+    return list(struct.unpack(f"<{evidence['count']}Q", packed))
 
 
 class FakeWorker:
@@ -157,14 +167,21 @@ def test_concurrency_epoch_retains_raw_roundtrip_and_internal_samples(
     assert epoch["throughput_qps"] > 0
     assert epoch["roundtrip"]["runs"] == epoch["requests"]
     assert epoch["worker_internal"]["runs"] == epoch["requests"]
-    assert (
-        sum(len(item["answer_sha256s"]) for item in epoch["workers"])
-        == epoch["requests"]
-    )
-    assert all(
-        answer == digest
+    roundtrip = [
+        sample
         for worker in epoch["workers"]
-        for answer in worker["answer_sha256s"]
+        for sample in decode_samples(worker["roundtrip_samples_ns"])
+    ]
+    internal = [
+        sample
+        for worker in epoch["workers"]
+        for sample in decode_samples(worker["internal_samples_ns"])
+    ]
+    assert len(roundtrip) == len(internal) == epoch["requests"]
+    assert all(
+        worker["answer_sha256_counts"]
+        == {digest: worker["roundtrip_samples_ns"]["count"]}
+        for worker in epoch["workers"]
     )
 
 

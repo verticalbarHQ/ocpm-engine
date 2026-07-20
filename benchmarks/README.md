@@ -84,6 +84,13 @@ worker level retain raw controller round-trip and worker-internal samples. The
 independent checker recomputes every latency, RSS, QPS, p50, p95, p99, order,
 and correctness claim before applying the matched-release non-inferiority gates.
 
+Concurrency timings are retained losslessly as little-endian unsigned 64-bit
+integers compressed with zlib and encoded with base64. Each worker also records
+an exact-answer SHA-256 histogram whose count must equal its decoded timing
+count. The checker implements its own strict decoder and recomputes all metrics;
+this representation reduces artifact size without using a sketch or dropping a
+request.
+
 Autovacuum is disabled in the release-bridge containers. Both `pg_ocpm` arms
 receive an explicit database-wide `VACUUM (ANALYZE)` before the structural
 storage snapshot. The artifact records each relation's main, FSM, VM, index,

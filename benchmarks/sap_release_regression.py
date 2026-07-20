@@ -11,14 +11,17 @@ is used only as an untimed correctness oracle.
 from __future__ import annotations
 
 import argparse
+import base64
 import math
 import os
 import platform
 import random
 import statistics
+import struct
 import sys
 import threading
 import time
+import zlib
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
@@ -78,6 +81,7 @@ STORAGE_CEILING = 1.01
 MAX_ENGINE_INCREMENTAL_PEAK_BYTES = 8 * 1024 * 1024
 MAX_ENGINE_PEAK_RSS_BYTES = 64 * 1024 * 1024
 MAX_PM4PY_PEAK_RSS_BYTES = 256 * 1024 * 1024
+SAMPLE_ENCODING = "u64le+zlib+base64-v1"
 
 
 def parse_args() -> argparse.Namespace:
@@ -537,6 +541,18 @@ def _concurrency_metrics_ns(samples: list[int]) -> dict[str, Any]:
     }
 
 
+def encode_u64_samples(samples: list[int]) -> dict[str, Any]:
+    if not samples or any(type(sample) is not int or sample <= 0 for sample in samples):
+        raise ValueError("concurrency samples must be positive integers")
+    packed = struct.pack(f"<{len(samples)}Q", *samples)
+    compressed = zlib.compress(packed, level=9)
+    return {
+        "encoding": SAMPLE_ENCODING,
+        "count": len(samples),
+        "data": base64.b64encode(compressed).decode("ascii"),
+    }
+
+
 def run_concurrency_epoch(
     *,
     pool: list[bridge.BridgeWorker],
@@ -567,7 +583,7 @@ def run_concurrency_epoch(
             raise RuntimeError("concurrency start signal timed out")
         roundtrip_samples = []
         internal_samples = []
-        answer_sha256s = []
+        answer_sha256_counts: dict[str, int] = {}
         while (
             len(roundtrip_samples) < CONCURRENCY_MIN_REQUESTS_PER_WORKER
             or time.perf_counter() < deadline["value"]
@@ -597,12 +613,15 @@ def run_concurrency_epoch(
                 )
             roundtrip_samples.append(roundtrip_ns)
             internal_samples.append(internal_ns)
-            answer_sha256s.append(result["answer_sha256"])
+            answer_sha256 = result["answer_sha256"]
+            answer_sha256_counts[answer_sha256] = (
+                answer_sha256_counts.get(answer_sha256, 0) + 1
+            )
         return {
             "worker_pid": worker.process.pid,
             "roundtrip_samples_ns": roundtrip_samples,
             "internal_samples_ns": internal_samples,
-            "answer_sha256s": answer_sha256s,
+            "answer_sha256_counts": dict(sorted(answer_sha256_counts.items())),
         }
 
     with ThreadPoolExecutor(max_workers=len(pool)) as executor:
@@ -628,6 +647,15 @@ def run_concurrency_epoch(
         raise RuntimeError("concurrency request floor was not met")
     if wall_ns < int(CONCURRENCY_MIN_SECONDS * 1_000_000_000):
         raise RuntimeError("concurrency duration floor was not met")
+    encoded_workers = [
+        {
+            "worker_pid": item["worker_pid"],
+            "roundtrip_samples_ns": encode_u64_samples(item["roundtrip_samples_ns"]),
+            "internal_samples_ns": encode_u64_samples(item["internal_samples_ns"]),
+            "answer_sha256_counts": item["answer_sha256_counts"],
+        }
+        for item in worker_results
+    ]
     return {
         "requests": len(roundtrip),
         "wall_ns": wall_ns,
@@ -637,7 +665,7 @@ def run_concurrency_epoch(
         "worker_count": len(pool),
         "worker_pids": sorted(worker_pids),
         "worker_request_counts": sorted(request_counts),
-        "workers": worker_results,
+        "workers": encoded_workers,
         "answer_sha256": oracle_sha256,
         "correct": True,
     }
@@ -1102,6 +1130,7 @@ def benchmark(args: argparse.Namespace) -> dict[str, Any]:
                     "minimum_requests_per_worker": (
                         CONCURRENCY_MIN_REQUESTS_PER_WORKER
                     ),
+                    "sample_encoding": SAMPLE_ENCODING,
                     "connection_model": (
                         "prestarted release-isolated processes with one persistent "
                         "PostgreSQL connection each"

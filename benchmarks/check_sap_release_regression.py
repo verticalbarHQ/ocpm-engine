@@ -4,11 +4,15 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
 import hashlib
 import json
 import math
 import re
 import statistics
+import struct
+import zlib
 from pathlib import Path
 from typing import Any
 
@@ -75,7 +79,7 @@ EXPECTED_RELEASES = {
     },
 }
 EXPECTED_HARNESS_SHA256 = {
-    "controller": "e3dc62c0091fbf528d3e3cc466cf8cb327fe4ca594f52cca0f5dc017778a5ea6",
+    "controller": "874a5fcc081040a0ac9c99c1bbf48d3240ffcfa25b2bfef75fd8b298fd1ace22",
     "support": "eed18acd3b4b2d2d9511b7783ba9cc5ebe1df8fc5998ed4be22f380c06beecf0",
     "worker": "bf2772136b1f8f2e0580e4533ce7556c13c57343aed99301657b2fb0f0ac31ce",
     "common_pm": "7a21984ff0eaf4d349b251c7a6aea1205cf22587cb85a0626b1cc9fd8623cf27",
@@ -109,6 +113,7 @@ CONCURRENCY_EPOCHS = 4
 CONCURRENCY_MIN_SECONDS = 5.0
 CONCURRENCY_MIN_WALL_NS = int(CONCURRENCY_MIN_SECONDS * 1_000_000_000)
 CONCURRENCY_MIN_REQUESTS_PER_WORKER = 32
+CONCURRENCY_SAMPLE_ENCODING = "u64le+zlib+base64-v1"
 MAX_CONCURRENCY_QPS_CV = 0.15
 CONCURRENCY_QPS_CEILING = 1.10
 CONCURRENCY_P95_CEILING = 1.10
@@ -530,6 +535,7 @@ def validate_method(method: object) -> None:
             "minimum_requests_per_worker",
             "connection_model",
             "timing_scope",
+            "sample_encoding",
         },
         "method/concurrency",
     )
@@ -547,6 +553,7 @@ def validate_method(method: object) -> None:
         or concurrency["minimum_epoch_seconds"] != CONCURRENCY_MIN_SECONDS
         or concurrency["minimum_requests_per_worker"]
         != CONCURRENCY_MIN_REQUESTS_PER_WORKER
+        or concurrency["sample_encoding"] != CONCURRENCY_SAMPLE_ENCODING
         or any(
             not isinstance(concurrency[field], str) or not concurrency[field]
             for field in ("connection_model", "timing_scope")
@@ -898,6 +905,42 @@ def _expected_concurrency_orders(
     ]
 
 
+def _decode_concurrency_samples(value: object, label: str) -> list[int]:
+    encoded = _keys(value, {"encoding", "count", "data"}, label)
+    count = encoded["count"]
+    data = encoded["data"]
+    if encoded["encoding"] != CONCURRENCY_SAMPLE_ENCODING:
+        fail(f"{label}: sample encoding changed")
+    if not _positive_int(count) or not isinstance(data, str) or not data:
+        fail(f"{label}: invalid encoded sample metadata")
+    try:
+        compressed = base64.b64decode(data, validate=True)
+    except (binascii.Error, ValueError):
+        fail(f"{label}: invalid base64 sample payload")
+    if base64.b64encode(compressed).decode("ascii") != data:
+        fail(f"{label}: non-canonical base64 sample payload")
+    expected_bytes = count * 8
+    decompressor = zlib.decompressobj()
+    try:
+        raw = decompressor.decompress(compressed, expected_bytes + 1)
+    except (OverflowError, ValueError, zlib.error):
+        fail(f"{label}: invalid zlib sample payload")
+    if len(raw) > expected_bytes or decompressor.unconsumed_tail:
+        fail(f"{label}: decoded sample count differs from metadata")
+    try:
+        raw += decompressor.flush()
+    except zlib.error:
+        fail(f"{label}: invalid zlib sample payload")
+    if not decompressor.eof or decompressor.unused_data or decompressor.unconsumed_tail:
+        fail(f"{label}: incomplete or trailing compressed sample data")
+    if len(raw) != expected_bytes:
+        fail(f"{label}: decoded sample count differs from metadata")
+    samples = [item[0] for item in struct.iter_unpack("<Q", raw)]
+    if len(samples) != count or any(not _positive_int(sample) for sample in samples):
+        fail(f"{label}: decoded samples must be positive unsigned 64-bit integers")
+    return samples
+
+
 def _validate_concurrency_epoch(
     epoch_raw: object,
     *,
@@ -943,28 +986,33 @@ def _validate_concurrency_epoch(
         "worker_pid",
         "roundtrip_samples_ns",
         "internal_samples_ns",
-        "answer_sha256s",
+        "answer_sha256_counts",
     }
     for worker_index, worker_raw in enumerate(workers, start=1):
         worker = _keys(worker_raw, worker_fields, f"{label}/worker-{worker_index}")
         pid = worker["worker_pid"]
-        roundtrip = worker["roundtrip_samples_ns"]
-        internal = worker["internal_samples_ns"]
-        hashes = worker["answer_sha256s"]
+        roundtrip = _decode_concurrency_samples(
+            worker["roundtrip_samples_ns"],
+            f"{label}/worker-{worker_index}/roundtrip_samples_ns",
+        )
+        internal = _decode_concurrency_samples(
+            worker["internal_samples_ns"],
+            f"{label}/worker-{worker_index}/internal_samples_ns",
+        )
+        hash_counts = worker["answer_sha256_counts"]
         if not _positive_int(pid):
             fail(f"{label}/worker-{worker_index}: invalid PID")
-        if (
-            not isinstance(roundtrip, list)
-            or len(roundtrip) < CONCURRENCY_MIN_REQUESTS_PER_WORKER
-            or any(not _positive_int(sample) for sample in roundtrip)
-            or not isinstance(internal, list)
-            or len(internal) != len(roundtrip)
-            or any(not _positive_int(sample) for sample in internal)
-            or not isinstance(hashes, list)
-            or len(hashes) != len(roundtrip)
-            or any(item != oracle_hash for item in hashes)
+        if len(roundtrip) < CONCURRENCY_MIN_REQUESTS_PER_WORKER or len(internal) != len(
+            roundtrip
         ):
             fail(f"{label}/worker-{worker_index}: invalid raw request evidence")
+        if (
+            not isinstance(hash_counts, dict)
+            or set(hash_counts) != {oracle_hash}
+            or type(hash_counts[oracle_hash]) is not int
+            or hash_counts[oracle_hash] != len(roundtrip)
+        ):
+            fail(f"{label}/worker-{worker_index}: invalid answer hash histogram")
         pids.append(pid)
         counts.append(len(roundtrip))
         raw_roundtrip.extend(roundtrip)

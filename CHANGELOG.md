@@ -17,6 +17,9 @@ All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
   concurrency request retains its integer-nanosecond latency and deterministic
   client/request/query identity so the checker independently recomputes tail
   percentiles.
+- Encoded high-volume SAP concurrency samples losslessly as little-endian
+  unsigned 64-bit integers with zlib and base64, and retained exact-answer hash
+  histograms, so public artifacts remain practical without dropping evidence.
 - Corrected the even-sample p50 estimator to average the two middle samples and
   labels ten-sample nearest-rank p95 as the maximum observation.
 - Replaced single-batch SAP tail latency with three 30-round epochs, retaining
