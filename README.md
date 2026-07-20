@@ -9,7 +9,7 @@ This package does not install another PostgreSQL extension or create database
 objects. PostgreSQL must already have `pg_ocpm` installed and the target dataset
 must already be finalized with `ocpm.finish_load(...)`.
 
-Required extension version: `pg_ocpm >= 0.4.0`. See the
+Required extension version: `pg_ocpm >= 0.7.0`. See the
 [release notes](CHANGELOG.md) for every library version.
 
 ## Native analytics
@@ -22,8 +22,12 @@ Required extension version: `pg_ocpm >= 0.4.0`. See the
 - Python 3.11+ stable-ABI bindings that release the GIL during native work.
 
 The `ocpm-postgres` crate provides an asynchronous adapter for activity profiles
-and single-window and multi-window DFG/variant counts. Multi-window requests retrieve aligned
-training, test, comparison-period, or drift statistics in one database request.
+and single-window and multi-window DFG/variant counts. It also retrieves and
+decodes generic binding-result capsules for cardinality, required-activity,
+eventually-follows, actor, delay, and related-object pair operations. Pair
+results remain factorized and expand through an exact-size lazy iterator.
+Multi-window requests retrieve aligned training, test, comparison-period, or
+drift statistics in one database request.
 
 The existing Python query planner remains available for these request shapes:
 
@@ -47,6 +51,11 @@ concurrency, correctness gates, and published context, see
 For the three-way comparison of lightly indexed PostgreSQL with PM4Py,
 `pg_ocpm` with PM4Py, and `pg_ocpm` with ocpm-engine, see
 [SAP PM4Py three-way performance](docs/sap-pm4py-three-way-performance.md).
+The previous seven-query OCPQ result was withdrawn because it compared only
+root output with OCPQ's complete evaluation tree. Its replacement uses zero
+warmups, ten same-host measured runs per query, and exact duplicate-preserving
+parity for every node. No corrected numbers are published until all resource
+and provenance gates pass; see [OCPQ benchmark status](docs/ocpq-performance.md).
 For the detailed application read-path design and code references, see
 [Application query performance improvements](docs/technical-performance-improvements.md).
 For the open-source capability survey, license boundary, research review, and
@@ -68,8 +77,11 @@ pip install -e '.[dev]'
 pytest
 ```
 
-Run both self-contained public SAP benchmarks with `make perf-public` and
-validate the committed results with `make perf-public-check`. See
+First run `make perf-sap-release-bridge-preview`, then run both self-contained
+current-versus-vanilla SAP benchmarks with `make perf-public` and validate the
+three staged artifacts with `make perf-public-preview-check`. After review and
+explicit promotion, validate committed artifacts with
+`make perf-public-release-check`. See
 [the benchmark guide](benchmarks/README.md) for the exact methodology.
 
 ## Use

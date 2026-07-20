@@ -1,0 +1,105 @@
+name: ocpm-engine-sap-release-bridge
+
+x-postgres-environment: &postgres-environment
+  POSTGRES_DB: postgres
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: pg
+
+x-postgres-command: &postgres-command
+  - postgres
+  - -c
+  - shared_buffers=1GB
+  - -c
+  - effective_cache_size=4GB
+  - -c
+  - work_mem=16MB
+  - -c
+  - maintenance_work_mem=1GB
+  - -c
+  - max_parallel_workers_per_gather=4
+  - -c
+  - random_page_cost=1.1
+  - -c
+  - jit=off
+  - -c
+  - autovacuum=off
+
+x-postgres-healthcheck: &postgres-healthcheck
+  test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+  interval: 2s
+  timeout: 3s
+  retries: 60
+
+services:
+  postgres_vanilla:
+    image: postgres:16@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20
+    environment: *postgres-environment
+    command: *postgres-command
+    shm_size: 1gb
+    healthcheck: *postgres-healthcheck
+    volumes:
+      - vanilla-data:/var/lib/postgresql/data
+
+  postgres_prior:
+    build:
+      context: ../..
+      dockerfile: benchmarks/bridge/Dockerfile.postgres
+      additional_contexts:
+        pg_source: ${PRIOR_PG_OCPM_SOURCE}
+      args:
+        PG_MAJOR: "16"
+        POSTGRES_IMAGE: postgres:16@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20
+        SOURCE_REVISION: ${PRIOR_PG_OCPM_REVISION}
+        PG_OCPM_VERSION: "0.5.0"
+    environment: *postgres-environment
+    command: *postgres-command
+    shm_size: 1gb
+    healthcheck: *postgres-healthcheck
+    volumes:
+      - prior-data:/var/lib/postgresql/data
+
+  postgres_current:
+    build:
+      context: ../..
+      dockerfile: benchmarks/bridge/Dockerfile.postgres
+      additional_contexts:
+        pg_source: ${CURRENT_PG_OCPM_SOURCE}
+      args:
+        PG_MAJOR: "16"
+        POSTGRES_IMAGE: postgres:16@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20
+        SOURCE_REVISION: ${CURRENT_PG_OCPM_REVISION}
+        PG_OCPM_VERSION: "0.7.0"
+    environment: *postgres-environment
+    command: *postgres-command
+    shm_size: 1gb
+    healthcheck: *postgres-healthcheck
+    volumes:
+      - current-data:/var/lib/postgresql/data
+
+  bridge:
+    build:
+      context: ../..
+      dockerfile: benchmarks/bridge/Dockerfile.client
+      additional_contexts:
+        prior_engine: ${PRIOR_ENGINE_SOURCE}
+        current_engine: ${CURRENT_ENGINE_SOURCE}
+      args:
+        CONTROLLER_REVISION: ${CONTROLLER_REVISION}
+        PRIOR_ENGINE_REVISION: ${PRIOR_ENGINE_REVISION}
+        CURRENT_ENGINE_REVISION: ${CURRENT_ENGINE_REVISION}
+    depends_on:
+      postgres_vanilla:
+        condition: service_healthy
+      postgres_prior:
+        condition: service_healthy
+      postgres_current:
+        condition: service_healthy
+    volumes:
+      - ../../.benchmarks:/results
+      - ../../.benchmarks/public-data:/data
+    command: ["sleep", "infinity"]
+
+volumes:
+  vanilla-data:
+  prior-data:
+  current-data:

@@ -30,7 +30,7 @@ x-postgres-healthcheck: &postgres-healthcheck
 
 services:
   postgres_vanilla:
-    image: postgres:16
+    image: postgres:16@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20
     environment: *postgres-environment
     command: *postgres-command
     shm_size: 1gb
@@ -44,6 +44,8 @@ services:
       dockerfile: Dockerfile
       args:
         PG_MAJOR: "16"
+        POSTGRES_IMAGE: postgres:16@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20
+        SOURCE_REVISION: ${OCPM_PG_OCPM_SOURCE_REVISION}
     environment: *postgres-environment
     command: *postgres-command
     shm_size: 1gb
@@ -55,6 +57,11 @@ services:
     build:
       context: ../..
       dockerfile: benchmarks/public/Dockerfile.client
+      additional_contexts:
+        engine_source: ${OCPM_ENGINE_PRODUCT_SOURCE}
+      args:
+        CONTROLLER_REVISION: ${OCPM_CONTROLLER_SOURCE_REVISION}
+        ENGINE_REVISION: ${OCPM_ENGINE_SOURCE_REVISION}
     depends_on:
       postgres_vanilla:
         condition: service_healthy

@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "artifact_type": "public_common_pm_latency_storage_regression_baseline",
+  "release": {
+    "ocpm_engine": "0.4.0",
+    "pg_ocpm": "0.5.0"
+  },
+  "source": {
+    "title": "Collection of Object-Centric Event Logs (SAP IDES O2C and P2P)",
+    "doi": "10.5281/zenodo.8261133",
+    "license": "CC BY 4.0"
+  },
+  "datasets": [
+    {
+      "fixture": {
+        "name": "sap_o2c",
+        "baseline_dataset_id": 1,
+        "extension_dataset_id": 1,
+        "object_type": "MATERIAL",
+        "from_time": "1992-06-23 23:59:59.999999+00:00",
+        "train_to": "2011-04-04 12:49:23+00:00",
+        "test_from": "2011-04-04 12:49:23.000001+00:00",
+        "to_time": "2020-04-28 00:00:00.000001+00:00",
+        "source_activity": "Create Purchase Order",
+        "target_activity": "Create Purchase Order",
+        "slow_threshold": 2419200.0
+      },
+      "workloads": [
+        {
+          "workload": "dfg_conformance_95pct"
+        },
+        {
+          "workload": "variant_conformance_95pct"
+        },
+        {
+          "workload": "next_activity_prediction"
+        },
+        {
+          "workload": "dfg_frequency_drift"
+        },
+        {
+          "workload": "repeated_transition_rework"
+        },
+        {
+          "workload": "edge_bottleneck_ranking"
+        },
+        {
+          "workload": "edge_bottleneck_prediction"
+        },
+        {
+          "workload": "edge_duration_time_series"
+        },
+        {
+          "workload": "activity_profile"
+        }
+      ]
+    },
+    {
+      "fixture": {
+        "name": "sap_p2p",
+        "baseline_dataset_id": 2,
+        "extension_dataset_id": 2,
+        "object_type": "EBELN_EBELP",
+        "from_time": "1994-11-10 23:59:59.999999+00:00",
+        "train_to": "2004-05-06 00:00:00+00:00",
+        "test_from": "2004-05-06 00:00:00.000001+00:00",
+        "to_time": "2020-06-04 00:00:00.000001+00:00",
+        "source_activity": "Create Purchase Order",
+        "target_activity": "Enter Incoming Invoice",
+        "slow_threshold": 1227737.0
+      },
+      "workloads": [
+        {
+          "workload": "dfg_conformance_95pct"
+        },
+        {
+          "workload": "variant_conformance_95pct"
+        },
+        {
+          "workload": "next_activity_prediction"
+        },
+        {
+          "workload": "dfg_frequency_drift"
+        },
+        {
+          "workload": "repeated_transition_rework"
+        },
+        {
+          "workload": "edge_bottleneck_ranking"
+        },
+        {
+          "workload": "edge_bottleneck_prediction"
+        },
+        {
+          "workload": "edge_duration_time_series"
+        },
+        {
+          "workload": "activity_profile"
+        }
+      ]
+    }
+  ],
+  "payload_sha256": "bff5956359d45f070905408081dcb466b9d7ec7bb5115271cc0d8347a5c9a60a"
+}

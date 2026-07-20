@@ -2,7 +2,7 @@
 
 ## Scope
 
-`ocpm-engine` is the application query planner for `pg_ocpm >= 0.4.0`. It does
+`ocpm-engine` is the application query planner for `pg_ocpm >= 0.7.0`. It does
 not create tables, indexes, materialized views, or another PostgreSQL
 extension. Its performance contribution is to translate a small set of
 process-mining request shapes into parameterized SQL that selects the most
@@ -16,8 +16,11 @@ The comparison in this document is architectural:
   choose a bounded execution strategy, and return the API result as one compact
   JSON value.
 
-Measured extension-level comparisons against vanilla PostgreSQL are maintained
-in the `pg_ocpm` repository's `docs/benchmarks.md` report.
+End-to-end workload benchmarks belong in this repository because
+`ocpm-engine` owns the executable algorithms, client materialization boundary,
+concurrency harnesses, and correctness gates. The `pg_ocpm` repository should
+document extension-local storage primitives and tests, then link here for
+complete system comparisons.
 
 ## Read-path architecture
 
@@ -95,7 +98,7 @@ request to the optimized database primitive.
 ## 2. Fail-fast `pg_ocpm` capability gate
 
 At application startup, `verify_pg_ocpm()` calls `ocpm.version()` and requires
-version 0.4.0 or later. An incompatible database is rejected before serving
+version 0.7.0 or later. An incompatible database is rejected before serving
 queries.
 
 Code:
@@ -363,5 +366,7 @@ application request translation and execution-strategy selection. Keeping that
 boundary prevents endpoint-specific behavior from expanding the extension's
 schema while still ensuring each request uses the lowest-cost exact primitive.
 
-For the database internals, storage comparison, and measured public benchmark,
-see `docs/technical-performance-improvements.md` in the `pg_ocpm` repository.
+For database internals and extension-local storage design, see
+`docs/technical-performance-improvements.md` in the `pg_ocpm` repository. For
+measured public workload comparisons, use this repository's benchmark suites
+and reports.

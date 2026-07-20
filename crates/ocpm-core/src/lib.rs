@@ -10,6 +10,8 @@ use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+pub mod binding;
+
 #[derive(Debug, Error, PartialEq)]
 pub enum AnalyticsError {
     #[error("coverage must be finite and in the interval (0, 1]")]

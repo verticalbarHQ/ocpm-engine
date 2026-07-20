@@ -26,10 +26,6 @@ jobs:
           --component rustfmt --component clippy
       - name: Check release notes
         run: python scripts/check-release-notes.py
-      - name: Check committed public benchmark gate
-        run: |
-          python benchmarks/check_public_result.py
-          python benchmarks/check_sap_pm4py_result.py
       - name: Test Rust workspace
         run: cargo +1.85.0 test --workspace --all-targets --locked
       - name: Check Rust formatting

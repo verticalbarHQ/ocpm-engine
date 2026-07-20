@@ -4,7 +4,9 @@ import pytest
 
 from ocpm_engine import (
     TransitionCount,
+    binding_capsule_info,
     bottleneck_order,
+    decode_binding_capsule,
     dfg_conformance,
     frequency_drift,
     next_activity,
@@ -19,6 +21,19 @@ ROWS = (
     TransitionCount("B", "C", "Order", 15, 1),
     TransitionCount("B", "D", "Order", 5, 1),
 )
+
+
+def _varint(value: int) -> bytes:
+    output = bytearray()
+    while value >= 0x80:
+        output.append((value & 0x7F) | 0x80)
+        value >>= 7
+    output.append(value)
+    return bytes(output)
+
+
+def _signed(value: int) -> bytes:
+    return _varint((value << 1) ^ (value >> 63))
 
 
 def test_native_dfg_conformance() -> None:
@@ -72,3 +87,31 @@ def test_native_frequency_drift_validates_column_lengths_and_limit() -> None:
         frequency_drift(["A"], [1], [])
     with pytest.raises(ValueError, match="nonnegative"):
         frequency_drift([], [], [], top_n=-1)
+
+
+def test_native_binding_capsule_metadata_and_rows() -> None:
+    capsule = b"OCPB" + bytes((1, 1)) + _varint(3)
+    capsule += b"".join(_signed(delta) for delta in (10, 2, -1))
+    capsule += bytes((0b0000_0101,))
+
+    info = binding_capsule_info(capsule)
+    assert (info.schema, info.row_count, info.factorized) == (1, 3, False)
+    rows = decode_binding_capsule(capsule)
+    assert tuple(row.ids for row in rows) == ((10,), (12,), (11,))
+    assert tuple(row.violated for row in rows) == (True, False, True)
+
+
+def test_native_binding_pair_capsule_expands_factorized_groups() -> None:
+    capsule = b"OCPB" + bytes((1, 6)) + _varint(4)
+    capsule += _varint(1) + _signed(7) + _varint(2)
+    capsule += _signed(20) + _signed(1)
+    capsule += _signed(200) + _signed(1)
+
+    info = binding_capsule_info(capsule)
+    assert (info.schema, info.row_count, info.factorized) == (6, 4, True)
+    assert tuple(row.ids for row in decode_binding_capsule(capsule)) == (
+        (7, 20, 20, 200, 200),
+        (7, 20, 21, 200, 201),
+        (7, 21, 20, 201, 200),
+        (7, 21, 21, 201, 201),
+    )

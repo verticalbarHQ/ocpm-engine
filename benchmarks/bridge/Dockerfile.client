@@ -1,0 +1,56 @@
+FROM rust:1.85-bookworm@sha256:e51d0265072d2d9d5d320f6a44dde6b9ef13653b035098febd68cce8fa7c0bc4 AS prior-builder
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3-dev python3-pip python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /source
+COPY --from=prior_engine . .
+RUN python3 -m venv /build-venv \
+    && /build-venv/bin/pip install --no-cache-dir 'maturin==1.9.6' \
+    && /build-venv/bin/maturin build --release --locked --out /wheels
+
+FROM rust:1.85-bookworm@sha256:e51d0265072d2d9d5d320f6a44dde6b9ef13653b035098febd68cce8fa7c0bc4 AS current-builder
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3-dev python3-pip python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /source
+COPY --from=current_engine . .
+RUN python3 -m venv /build-venv \
+    && /build-venv/bin/pip install --no-cache-dir 'maturin==1.9.6' \
+    && /build-venv/bin/maturin build --release --locked --out /wheels
+
+FROM python:3.11-slim-bookworm@sha256:b18992999dbe963a45a8a4da40ac2b1975be1a776d939d098c647482bcad5cba
+
+ARG CONTROLLER_REVISION
+ARG PRIOR_ENGINE_REVISION
+ARG CURRENT_ENGINE_REVISION
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY benchmarks/public/requirements.lock /tmp/requirements.lock
+RUN pip install --no-cache-dir --require-hashes \
+      --requirement /tmp/requirements.lock
+
+COPY --from=prior-builder /wheels /wheels-prior
+COPY --from=current-builder /wheels /wheels-current
+RUN pip install --no-cache-dir --no-deps --target /opt/engine-prior \
+      /wheels-prior/*.whl \
+    && pip install --no-cache-dir --no-deps --target /opt/engine-current \
+      /wheels-current/*.whl \
+    && rm -rf /wheels-prior /wheels-current
+
+COPY --from=prior_engine . /sources/engine-prior
+COPY --from=current_engine . /sources/engine-current
+WORKDIR /workspace
+COPY . .
+
+LABEL org.opencontainers.image.revision="${CONTROLLER_REVISION}" \
+      org.opencontainers.image.bridge.prior-revision="${PRIOR_ENGINE_REVISION}" \
+      org.opencontainers.image.bridge.current-revision="${CURRENT_ENGINE_REVISION}"
+
+CMD ["sleep", "infinity"]

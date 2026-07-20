@@ -12,6 +12,12 @@ from .analytics import (
     next_activity,
     variant_conformance,
 )
+from .bindings import (
+    BindingCapsuleInfo,
+    BindingRow,
+    binding_capsule_info,
+    decode_binding_capsule,
+)
 from .engine import OcpmEngine
 from .models import (
     EdgeFilter,
@@ -23,6 +29,8 @@ from .models import (
 
 __all__ = [
     "EdgeFilter",
+    "BindingCapsuleInfo",
+    "BindingRow",
     "Endpoint",
     "NetworkFilter",
     "OcpmEngine",
@@ -34,6 +42,8 @@ __all__ = [
     "PredictionScore",
     "TransitionCount",
     "bottleneck_order",
+    "binding_capsule_info",
+    "decode_binding_capsule",
     "dfg_conformance",
     "frequency_drift",
     "next_activity",
