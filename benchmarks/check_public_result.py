@@ -643,9 +643,7 @@ def main() -> None:
     rows = validate_contract(result, baseline, allow_dirty=args.preview)
     bridge_checked = False
     if args.release_bridge is not None:
-        bridge_digest = (
-            None if args.preview else args.expected_release_bridge_sha256
-        )
+        bridge_digest = None if args.preview else args.expected_release_bridge_sha256
         if not args.preview and bridge_digest is None:
             fail("an explicitly supplied release bridge requires a pinned digest")
         bridge = release_regression_checker.load_verified(
@@ -655,11 +653,7 @@ def main() -> None:
         validate_regressions(result, bridge, allow_dirty=args.preview)
         bridge_checked = True
     minimum = min(row["speedup"] for row in rows.values())
-    suffix = (
-        "; private same-host non-regression gates passed"
-        if bridge_checked
-        else ""
-    )
+    suffix = "; private same-host non-regression gates passed" if bridge_checked else ""
     print(
         f"public benchmark verified: {len(rows)} exact workloads, "
         f"minimum {minimum:.3f}x versus vanilla PostgreSQL{suffix}"

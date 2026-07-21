@@ -792,9 +792,7 @@ def main() -> None:
     datasets, _ = validate_contract(result, baseline, allow_dirty=args.preview)
     bridge_checked = False
     if args.release_bridge is not None:
-        bridge_digest = (
-            None if args.preview else args.expected_release_bridge_sha256
-        )
+        bridge_digest = None if args.preview else args.expected_release_bridge_sha256
         if not args.preview and bridge_digest is None:
             fail("an explicitly supplied release bridge requires a pinned digest")
         bridge = release_regression_checker.load_verified(
@@ -804,11 +802,7 @@ def main() -> None:
         validate_regressions(result, bridge, allow_dirty=args.preview)
         bridge_checked = True
     latency = [row for dataset in datasets.values() for row in dataset["latency"]]
-    suffix = (
-        "; private same-host non-regression gates passed"
-        if bridge_checked
-        else ""
-    )
+    suffix = "; private same-host non-regression gates passed" if bridge_checked else ""
     print(
         "SAP PM4Py benchmark verified: "
         f"{len(latency)} exact current-versus-vanilla workloads{suffix}"
