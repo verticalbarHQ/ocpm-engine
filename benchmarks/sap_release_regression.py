@@ -109,7 +109,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--worker-python", default=sys.executable)
     parser.add_argument(
         "--output",
-        default=("/results/sap-release-bridge-0.4.0-to-0.6.0.json"),
+        default=("/results/sap-release-bridge-0.6.0-to-0.8.0.json"),
     )
     args = parser.parse_args()
     if args.database:

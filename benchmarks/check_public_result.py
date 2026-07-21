@@ -31,7 +31,7 @@ ROOT = Path(__file__).resolve().parents[1]
 REGRESSION_BASELINE = (
     ROOT / "docs/results/public-common-pm-0.4.0-regression-baseline.json"
 )
-RELEASE_BRIDGE = ROOT / "docs/results/sap-release-bridge-0.4.0-to-0.6.0.json"
+RELEASE_BRIDGE = ROOT / "docs/results/sap-release-bridge-0.6.0-to-0.8.0.json"
 EXPECTED_PAYLOAD_SHA256 = (
     "6fe793b14df606a90fd39408e644aea1e937235eaa5ac047777716b5c7dfee72"
 )
@@ -41,7 +41,7 @@ EXPECTED_BASELINE_PAYLOAD_SHA256 = (
 # Filled only after the independently checked bridge has been reviewed and
 # promoted. Preview validation uses the artifact's self-digest instead.
 EXPECTED_BRIDGE_PAYLOAD_SHA256: str | None = None
-CURRENT_RELEASE = {"ocpm_engine": "0.6.0", "pg_ocpm": "0.7.0"}
+CURRENT_RELEASE = {"ocpm_engine": "0.8.0", "pg_ocpm": "0.8.0"}
 BASELINE_RELEASE = {"ocpm_engine": "0.4.0", "pg_ocpm": "0.5.0"}
 BASELINE_ARTIFACT_TYPE = "public_common_pm_latency_storage_regression_baseline"
 EXPECTED_SOURCE = {
@@ -119,7 +119,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "result",
         nargs="?",
-        default="docs/results/public-common-pm-0.6.0.json",
+        default="docs/results/public-common-pm-0.8.0.json",
     )
     parser.add_argument(
         "--regression-baseline",
@@ -140,7 +140,7 @@ def parse_args() -> argparse.Namespace:
         "--release-bridge",
         type=Path,
         default=RELEASE_BRIDGE,
-        help="matched 0.4/0.5-to-0.6/0.7 SAP release bridge artifact",
+        help="matched 0.6/0.7-to-0.8/0.8 SAP release bridge artifact",
     )
     parser.add_argument(
         "--expected-release-bridge-sha256",

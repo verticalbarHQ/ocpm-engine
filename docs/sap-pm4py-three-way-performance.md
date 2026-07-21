@@ -1,6 +1,6 @@
 # SAP O2C and P2P three-way benchmark status
 
-No `pg_ocpm 0.7.0` plus `ocpm-engine 0.6.0` PM4Py comparison is published in
+No `pg_ocpm 0.8.0` plus `ocpm-engine 0.8.0` PM4Py comparison is published in
 this source revision. Earlier staging values predated the final per-sample
 exactness, source-provenance, hash-locked dependency, concurrency-performance,
 and total peak-RSS gates. The full staging artifact was removed rather than

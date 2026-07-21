@@ -38,14 +38,14 @@ make perf-public-preview-check
 ```
 
 `PG_OCPM_SOURCE` must identify a local `pg_ocpm` repository containing the
-locked `0.7.0` commit. Alternatively, set `PG_OCPM_REPOSITORY` to a public Git
-URL and the runner will clone tag `v0.7.0` into the ignored benchmark workspace.
+locked `0.8.0` commit. Alternatively, set `PG_OCPM_REPOSITORY` to a public Git
+URL and the runner will clone tag `v0.8.0` into the ignored benchmark workspace.
 In either case, the measured database image is built from a clean detached
-worktree at revision `279d81b3db0a0ae7470bf90824f1fbba9d188e70`.
+worktree at revision `0e15ab10f8ec87518b9e822072028fb3eda3879c`.
 
 The runner builds the release-mode stable-ABI Rust wheel from a clean detached
 `ocpm-engine` worktree at revision
-`c44e9341ced643e0b777a18d7b0d26a43127caa0`. The benchmark controller comes
+`f5a95ecd6b8a1f184f8ffed2371980ef419beaab`. The benchmark controller comes
 from the current clean checkout instead of the release worktree. Named Docker
 build contexts keep those sources separate, the runtime image contains only the
 current benchmark harness plus the installed release wheel, and schema-5
@@ -53,8 +53,8 @@ provenance records both revisions and cleanliness states independently. The
 runner then recreates both database volumes, records three serial-latency epochs
 of 30 randomized measured rounds after ten warmups, runs 1/4/8/16 worker
 concurrency sweeps for DFG conformance and drift, writes
-`.benchmarks/public-common-pm-0.6.0.json` and
-`.benchmarks/sap-pm4py-three-way-0.6.0.json`, and stops its containers on exit.
+`.benchmarks/public-common-pm-0.8.0.json` and
+`.benchmarks/sap-pm4py-three-way-0.8.0.json`, and stops its containers on exit.
 The preview check validates both ignored artifacts without changing
 `docs/results/`. `check_public_result.py` validates exact public fixtures and
 settings, correctness flags, workload count, 10x latency gates, and the stable
@@ -75,8 +75,8 @@ release gate.
 
 ### Matched SAP release bridge
 
-`sap_release_regression.py` compares `pg_ocpm 0.5.0` plus `ocpm-engine 0.4.0`
-against `pg_ocpm 0.7.0` plus `ocpm-engine 0.6.0` on the same checksum-pinned
+`sap_release_regression.py` compares `pg_ocpm 0.7.0` plus `ocpm-engine 0.6.0`
+against `pg_ocpm 0.8.0` plus `ocpm-engine 0.8.0` on the same checksum-pinned
 SAP fixture and host. Vanilla PostgreSQL is an untimed correctness oracle. The
 common-PM suite covers its native `pg_ocpm` plus Rust path. The PM4Py suite
 covers both release-sensitive paths: PM4Py over `pg_ocpm` and `ocpm-engine`
@@ -118,7 +118,7 @@ make perf-sap-release-bridge-preview-check
 ```
 
 The ignored preview is written to
-`.benchmarks/sap-release-bridge-0.4.0-to-0.6.0.json`. The bridge is deliberately
+`.benchmarks/sap-release-bridge-0.6.0-to-0.8.0.json`. The bridge is deliberately
 separate from the two current-versus-vanilla public result artifacts. Release
 validation fails closed until its reviewed payload digest is pinned; a
 self-digested preview cannot silently replace matched release evidence.

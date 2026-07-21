@@ -130,11 +130,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--output",
-        default=".benchmarks/sap-pm4py-three-way-0.6.0.json",
+        default=".benchmarks/sap-pm4py-three-way-0.8.0.json",
     )
     parser.add_argument(
         "--report",
-        default=".benchmarks/sap-pm4py-three-way-0.6.0.md",
+        default=".benchmarks/sap-pm4py-three-way-0.8.0.md",
     )
     parser.add_argument("--memory-worker", choices=ENGINES)
     parser.add_argument("--memory-dataset", choices=tuple(DATASETS))

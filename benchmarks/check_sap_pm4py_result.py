@@ -31,7 +31,7 @@ ROOT = Path(__file__).resolve().parents[1]
 REGRESSION_BASELINE = (
     ROOT / "docs/results/sap-pm4py-three-way-0.4.0-regression-baseline.json"
 )
-RELEASE_BRIDGE = ROOT / "docs/results/sap-release-bridge-0.4.0-to-0.6.0.json"
+RELEASE_BRIDGE = ROOT / "docs/results/sap-release-bridge-0.6.0-to-0.8.0.json"
 EXPECTED_PAYLOAD_SHA256 = (
     "c96f53261f7c02c5d563dad51a2c875561e8c47ee114fe1b4016636aae50c9c2"
 )
@@ -39,7 +39,7 @@ EXPECTED_BASELINE_PAYLOAD_SHA256 = (
     "6530be1e72e249d022111f76283a4cb1393df726c0d413948b3689799c4e337b"
 )
 EXPECTED_BRIDGE_PAYLOAD_SHA256: str | None = None
-CURRENT_RELEASE = {"ocpm_engine": "0.6.0", "pg_ocpm": "0.7.0"}
+CURRENT_RELEASE = {"ocpm_engine": "0.8.0", "pg_ocpm": "0.8.0"}
 BASELINE_RELEASE = {"ocpm_engine": "0.4.0", "pg_ocpm": "0.5.0"}
 BASELINE_ARTIFACT_TYPE = "sap_pm4py_latency_memory_storage_regression_baseline"
 EXPECTED_SOURCE = {
@@ -140,7 +140,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "result",
         nargs="?",
-        default="docs/results/sap-pm4py-three-way-0.6.0.json",
+        default="docs/results/sap-pm4py-three-way-0.8.0.json",
     )
     parser.add_argument(
         "--baseline",
@@ -159,7 +159,7 @@ def parse_args() -> argparse.Namespace:
         "--release-bridge",
         type=Path,
         default=RELEASE_BRIDGE,
-        help="matched 0.4/0.5-to-0.6/0.7 unified SAP release bridge artifact",
+        help="matched 0.6/0.7-to-0.8/0.8 unified SAP release bridge artifact",
     )
     parser.add_argument(
         "--expected-release-bridge-sha256",

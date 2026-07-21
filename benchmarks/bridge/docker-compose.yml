@@ -50,7 +50,7 @@ services:
         PG_MAJOR: "16"
         POSTGRES_IMAGE: postgres:16@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20
         SOURCE_REVISION: ${PRIOR_PG_OCPM_REVISION}
-        PG_OCPM_VERSION: "0.5.0"
+        PG_OCPM_VERSION: "0.7.0"
     environment: *postgres-environment
     command: *postgres-command
     shm_size: 1gb
@@ -68,7 +68,7 @@ services:
         PG_MAJOR: "16"
         POSTGRES_IMAGE: postgres:16@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20
         SOURCE_REVISION: ${CURRENT_PG_OCPM_REVISION}
-        PG_OCPM_VERSION: "0.7.0"
+        PG_OCPM_VERSION: "0.8.0"
     environment: *postgres-environment
     command: *postgres-command
     shm_size: 1gb
