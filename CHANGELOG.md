@@ -4,10 +4,9 @@ All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
 
 ## 0.8.0 - 2026-07-20
 
-- Retargeted the checksum-pinned SAP O2C/P2P publication and matched-release
-  regression suites to `pg_ocpm 0.8.0` plus `ocpm-engine 0.8.0`, with the
-  accepted `pg_ocpm 0.7.0` plus `ocpm-engine 0.6.0` pair as the same-host
-  non-inferiority baseline.
+- Published checksum-pinned SAP O2C/P2P current-versus-vanilla and strict OCPQ
+  Q1-Q7 evidence for `pg_ocpm 0.8.0` plus `ocpm-engine 0.8.0`; private
+  same-host release evidence remains ignored.
 - Added the public `DynamicFilter` and `DynamicDfgRequest` contract so status,
   activity existence/nonexistence, case duration, arbitrary event attributes,
   related-object types, and directly-follows duration predicates compose

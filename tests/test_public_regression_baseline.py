@@ -47,7 +47,7 @@ def test_compact_public_baseline_retains_source_and_fixture_contract() -> None:
         "payload_sha256",
     }
     assert CHECKER.RELEASE_BRIDGE == (
-        ROOT / "docs/results/sap-release-bridge-0.6.0-to-0.8.0.json"
+        ROOT / ".benchmarks/sap-release-bridge-0.6.0-to-0.8.0.json"
     )
     assert baseline["source"] == CHECKER.EXPECTED_SOURCE
     assert (

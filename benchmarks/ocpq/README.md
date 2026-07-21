@@ -5,10 +5,9 @@ OCPQ 0.6.7 and `pg_ocpm` plus `ocpm-engine`. The workload is Q1-Q7 from the
 public BPIC 2017-derived OCEL 2.0 evaluation dataset.
 
 The previous root-only comparison is obsolete. The strict protocol measures
-and verifies the complete result tree for each query. No replacement latency
-numbers are published until the strict reference, candidate, memory, storage,
-concurrency, and provenance checks all pass and the resulting preview has been
-reviewed.
+and verifies the complete result tree for each query. The reviewed 0.8.0
+artifacts passed the reference, candidate, memory, storage, concurrency, and
+provenance gates and are published under `docs/results/`.
 
 The timings published by the OCPQ authors are retained as source context only.
 They were collected on a different host, so neither the runner nor the report
@@ -139,6 +138,6 @@ hold:
 - matching source-tree, Docker-host, candidate-image, and database-image
   provenance.
 
-See [`docs/ocpq-performance.md`](../../docs/ocpq-performance.md) for publication
-status. Preview artifacts remain ignored and must be shown for review before
-any result is committed or pushed.
+See [`docs/ocpq-performance.md`](../../docs/ocpq-performance.md) for the
+published results. Preview artifacts remain ignored and must be shown for
+review before any replacement result is committed or pushed.

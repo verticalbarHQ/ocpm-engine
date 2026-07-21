@@ -1,0 +1,724 @@
+{
+  "schema_version": 4,
+  "generated_at": "2026-07-21T14:03:27.884124+00:00",
+  "source": {
+    "ocpq_eval_commit": "846dd4eb9f8600ae42355968453a9412ea4759c2",
+    "ocpq_version": "0.6.7",
+    "ocpq_commit": "80457e561edd7bb9e142d959dd7e0f96e6b03f2f",
+    "docker_image": "ocpq:0.6.7-corrected-harness",
+    "docker_image_id": "sha256:1c79e4767f1d3523c4c2407f1abb806657af8521eb55ab1de6fb7ecd69511849",
+    "dataset_sqlite_sha256": "02ac333a2c194b5a411cb8527dd64b4845e5110752d2ffddb531e48ce97556d7",
+    "query_files_sha256": "387aeb31398d86ef8e7b15393649cbabe75be56185fd67d27021744025873466",
+    "author_published_results_commit": "846dd4eb9f8600ae42355968453a9412ea4759c2"
+  },
+  "method": {
+    "warmups_per_query": 0,
+    "measured_runs_per_query": 10,
+    "fresh_container_per_query": true,
+    "import_and_link_timed_separately": true,
+    "author_published_samples_per_query": 10,
+    "author_published_results_are_cross_host_only": true,
+    "upstream_backend_measure_performance_iterations": 10,
+    "upstream_backend_warmups": 0,
+    "timing_boundary": "OCPQ tree.evaluate plus construction and collection of every node's EvaluationResultWithCount structures",
+    "correctness_boundary": "every node's complete object/event bindings, typed labels, exact violation reason, external-ID canonicalization, sorting, compact-JSON serialization, and SHA-256 outside the timed region",
+    "canonicalization": {
+      "scope": "every query-tree node and every materialized situation",
+      "identifiers": "OCEL external object and event IDs",
+      "variables": "object/event variable indexes retained in every row",
+      "labels": "label names and exact serialized OCPQ label value types retained",
+      "violation": "exact serialized OCPQ ViolationReason retained; null means satisfied",
+      "q6": "root max_dur typed label retained exactly and independently checked against the maximum child duration in integer microseconds",
+      "ordering": "lexicographic compact-JSON row order; duplicates retained",
+      "row_shape": [
+        "[[object_variable_index, external_object_id], ...]",
+        "[[event_variable_index, external_event_id], ...]",
+        "[[label_name, typed_label_value], ...]",
+        "serialized_violation_reason_or_null"
+      ],
+      "expected_node_manifests": {
+        "Q1": [
+          {
+            "rows": 31509,
+            "violations": 11086,
+            "reasons": {
+              "{\"ConstraintNotSatisfied\":0}": 11086
+            },
+            "objects": [
+              0
+            ],
+            "events": [],
+            "labels": []
+          },
+          {
+            "rows": 20423,
+            "violations": 0,
+            "reasons": {},
+            "objects": [
+              0
+            ],
+            "events": [
+              0
+            ],
+            "labels": []
+          }
+        ],
+        "Q2": [
+          {
+            "rows": 42995,
+            "violations": 19690,
+            "reasons": {
+              "{\"ConstraintNotSatisfied\":0}": 19690
+            },
+            "objects": [
+              0
+            ],
+            "events": [
+              0
+            ],
+            "labels": []
+          },
+          {
+            "rows": 23305,
+            "violations": 0,
+            "reasons": {},
+            "objects": [
+              0
+            ],
+            "events": [
+              0,
+              1
+            ],
+            "labels": []
+          }
+        ],
+        "Q3": [
+          {
+            "rows": 23305,
+            "violations": 0,
+            "reasons": {},
+            "objects": [],
+            "events": [
+              0
+            ],
+            "labels": []
+          },
+          {
+            "rows": 23305,
+            "violations": 0,
+            "reasons": {},
+            "objects": [
+              1
+            ],
+            "events": [
+              0
+            ],
+            "labels": []
+          }
+        ],
+        "Q4": [
+          {
+            "rows": 31509,
+            "violations": 14281,
+            "reasons": {
+              "{\"ConstraintNotSatisfied\":0}": 14281
+            },
+            "objects": [
+              0
+            ],
+            "events": [
+              0
+            ],
+            "labels": []
+          },
+          {
+            "rows": 17228,
+            "violations": 0,
+            "reasons": {},
+            "objects": [
+              0,
+              1
+            ],
+            "events": [
+              0,
+              1
+            ],
+            "labels": []
+          }
+        ],
+        "Q5": [
+          {
+            "rows": 31509,
+            "violations": 6429,
+            "reasons": {
+              "{\"ConstraintNotSatisfied\":0}": 6429
+            },
+            "objects": [
+              0,
+              1
+            ],
+            "events": [
+              0
+            ],
+            "labels": []
+          },
+          {
+            "rows": 42995,
+            "violations": 8100,
+            "reasons": {
+              "{\"ConstraintNotSatisfied\":0}": 8100
+            },
+            "objects": [
+              0,
+              1,
+              2
+            ],
+            "events": [
+              0,
+              1
+            ],
+            "labels": []
+          }
+        ],
+        "Q6": [
+          {
+            "rows": 1,
+            "violations": 0,
+            "reasons": {},
+            "objects": [],
+            "events": [],
+            "labels": [
+              "max_dur"
+            ]
+          },
+          {
+            "rows": 17228,
+            "violations": 0,
+            "reasons": {},
+            "objects": [
+              0
+            ],
+            "events": [
+              0,
+              1
+            ],
+            "labels": []
+          }
+        ],
+        "Q7": [
+          {
+            "rows": 74771,
+            "violations": 0,
+            "reasons": {},
+            "objects": [
+              0,
+              1,
+              2
+            ],
+            "events": [
+              1,
+              2
+            ],
+            "labels": []
+          }
+        ]
+      }
+    }
+  },
+  "environment": {
+    "benchmark_host_id": "sha256:3309bb3008e42c20f6fb7b7c99b9035474d57ffdb51cfe1e15954fb48e223bf2",
+    "source_revision": "f0dc8e3f511855cfe1a389164d6b008ec4511055",
+    "source_tree_clean": true,
+    "platform": "macOS-26.5.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "logical_cpus_visible": 18
+  },
+  "queries": {
+    "Q1": {
+      "author_published_runs_ms": [
+        35.203509000000004,
+        34.680627,
+        31.663710999999996,
+        37.800264999999996,
+        38.660466,
+        36.3609,
+        40.699492,
+        41.570359,
+        39.841553000000005,
+        37.787278
+      ],
+      "author_published_mean_ms": 37.426816,
+      "tree_parse_ms": 0.342133,
+      "import_ms": 5130.909699,
+      "link_ms": 3745.786471,
+      "runs_ms": [
+        20.995359,
+        20.590851,
+        17.906127,
+        16.724894,
+        16.732811,
+        17.467575999999998,
+        32.92361,
+        20.657977000000002,
+        19.545911999999998,
+        20.836398
+      ],
+      "mean_ms": 20.4381515,
+      "p50_ms": 20.0683815,
+      "p95_ms": 32.92361,
+      "all_node_situations": 51932,
+      "root_node": 0,
+      "q6_root_label": null,
+      "q6_duration_microseconds": null,
+      "nodes": [
+        {
+          "node_index": 0,
+          "object_variables": [
+            0
+          ],
+          "event_variables": [],
+          "label_names": [],
+          "situation_count": 31509,
+          "situation_violated_count": 11086,
+          "violation_reason_counts": {
+            "{\"ConstraintNotSatisfied\":0}": 11086
+          },
+          "canonical_json_bytes": 1179826,
+          "canonical_sha256": "9eb852a60ab7b2ff4a1d989ea6abed9c516b185bc4b107ee1f61810a7512e4a9"
+        },
+        {
+          "node_index": 1,
+          "object_variables": [
+            0
+          ],
+          "event_variables": [
+            0
+          ],
+          "label_names": [],
+          "situation_count": 20423,
+          "situation_violated_count": 0,
+          "violation_reason_counts": {},
+          "canonical_json_bytes": 838966,
+          "canonical_sha256": "5adba64ba4fd2de7a84679f18727bed084fb2894772428f40924da9bfcbb666d"
+        }
+      ]
+    },
+    "Q2": {
+      "author_published_runs_ms": [
+        51.74926,
+        56.473427,
+        54.737583,
+        60.586897,
+        56.307773999999995,
+        57.108496,
+        58.469437,
+        66.073362,
+        61.118326,
+        56.056349999999995
+      ],
+      "author_published_mean_ms": 57.8680912,
+      "tree_parse_ms": 0.432843,
+      "import_ms": 4197.749577,
+      "link_ms": 3581.667346,
+      "runs_ms": [
+        44.465521,
+        31.237783,
+        32.289055999999995,
+        28.500351,
+        31.176657,
+        30.327555999999998,
+        34.129886,
+        30.317513,
+        35.793344999999995,
+        29.34234
+      ],
+      "mean_ms": 32.7580008,
+      "p50_ms": 31.20722,
+      "p95_ms": 44.465521,
+      "all_node_situations": 66300,
+      "root_node": 0,
+      "q6_root_label": null,
+      "q6_duration_microseconds": null,
+      "nodes": [
+        {
+          "node_index": 0,
+          "object_variables": [
+            0
+          ],
+          "event_variables": [
+            0
+          ],
+          "label_names": [],
+          "situation_count": 42995,
+          "situation_violated_count": 19690,
+          "violation_reason_counts": {
+            "{\"ConstraintNotSatisfied\":0}": 19690
+          },
+          "canonical_json_bytes": 2238618,
+          "canonical_sha256": "3825e5116765ef3ce2df9b46d42d5a52ff87e9644ec89eab3182749123fc080b"
+        },
+        {
+          "node_index": 1,
+          "object_variables": [
+            0
+          ],
+          "event_variables": [
+            0,
+            1
+          ],
+          "label_names": [],
+          "situation_count": 23305,
+          "situation_violated_count": 0,
+          "violation_reason_counts": {},
+          "canonical_json_bytes": 1262010,
+          "canonical_sha256": "cd75b910584db03c8b5f86740ea958e4076c82eb523829ecc57f350533c1aed6"
+        }
+      ]
+    },
+    "Q3": {
+      "author_published_runs_ms": [
+        24.276018,
+        22.902032,
+        23.246654,
+        22.058668,
+        21.426378999999997,
+        23.920258,
+        23.866331000000002,
+        22.628289,
+        22.522565,
+        21.787929000000002
+      ],
+      "author_published_mean_ms": 22.8635123,
+      "tree_parse_ms": 0.346794,
+      "import_ms": 4227.618697,
+      "link_ms": 3568.1384590000002,
+      "runs_ms": [
+        15.403903999999999,
+        11.125123,
+        14.728691,
+        13.357056,
+        15.830907000000002,
+        13.284014,
+        13.308972,
+        11.978045999999999,
+        12.915052999999999,
+        12.078422
+      ],
+      "mean_ms": 13.4010188,
+      "p50_ms": 13.296493000000002,
+      "p95_ms": 15.830907000000002,
+      "all_node_situations": 46610,
+      "root_node": 0,
+      "q6_root_label": null,
+      "q6_duration_microseconds": null,
+      "nodes": [
+        {
+          "node_index": 0,
+          "object_variables": [],
+          "event_variables": [
+            0
+          ],
+          "label_names": [],
+          "situation_count": 23305,
+          "situation_violated_count": 0,
+          "violation_reason_counts": {},
+          "canonical_json_bytes": 654311,
+          "canonical_sha256": "0583f0d3c618765d51f689f8f5d1dc957a5266590d54c5b1c073fe8be0f48929"
+        },
+        {
+          "node_index": 1,
+          "object_variables": [
+            1
+          ],
+          "event_variables": [
+            0
+          ],
+          "label_names": [],
+          "situation_count": 23305,
+          "situation_violated_count": 0,
+          "violation_reason_counts": {},
+          "canonical_json_bytes": 957276,
+          "canonical_sha256": "af08f2b6b3e85bc2ae90e0b0580de98aa2ea4e9355e9f0774faed0d5d80ffb3b"
+        }
+      ]
+    },
+    "Q4": {
+      "author_published_runs_ms": [
+        62.206418,
+        65.713123,
+        62.389904,
+        61.365485,
+        75.569389,
+        71.414191,
+        67.57281900000001,
+        72.593478,
+        65.629224,
+        66.59762900000001
+      ],
+      "author_published_mean_ms": 67.105166,
+      "tree_parse_ms": 0.460628,
+      "import_ms": 4472.043817000001,
+      "link_ms": 3610.039349,
+      "runs_ms": [
+        44.686952000000005,
+        25.357269000000002,
+        34.950672000000004,
+        29.40109,
+        33.289244000000004,
+        33.055991,
+        34.941672,
+        29.546758,
+        31.78319,
+        32.766906
+      ],
+      "mean_ms": 32.9779744,
+      "p50_ms": 32.9114485,
+      "p95_ms": 44.686952000000005,
+      "all_node_situations": 48737,
+      "root_node": 0,
+      "q6_root_label": null,
+      "q6_duration_microseconds": null,
+      "nodes": [
+        {
+          "node_index": 0,
+          "object_variables": [
+            0
+          ],
+          "event_variables": [
+            0
+          ],
+          "label_names": [],
+          "situation_count": 31509,
+          "situation_violated_count": 14281,
+          "violation_reason_counts": {
+            "{\"ConstraintNotSatisfied\":0}": 14281
+          },
+          "canonical_json_bytes": 1636959,
+          "canonical_sha256": "9af254c016bf0be2582045d1678681d95bd6bd13ed233d0a2a1a71d25e3d33a4"
+        },
+        {
+          "node_index": 1,
+          "object_variables": [
+            0,
+            1
+          ],
+          "event_variables": [
+            0,
+            1
+          ],
+          "label_names": [],
+          "situation_count": 17228,
+          "situation_violated_count": 0,
+          "violation_reason_counts": {},
+          "canonical_json_bytes": 1174066,
+          "canonical_sha256": "4339d5f999c37a25f10680cec37ee8cdf4e40c7c7b1f906c491ed5cc860b6483"
+        }
+      ]
+    },
+    "Q5": {
+      "author_published_runs_ms": [
+        72.352029,
+        70.94059299999999,
+        62.733944,
+        66.587799,
+        68.27807299999999,
+        69.04044300000001,
+        64.47631299999999,
+        62.233756,
+        73.379683,
+        75.39122900000001
+      ],
+      "author_published_mean_ms": 68.5413862,
+      "tree_parse_ms": 0.449045,
+      "import_ms": 4246.605336,
+      "link_ms": 3504.9860390000003,
+      "runs_ms": [
+        38.152321,
+        34.786046,
+        39.23137,
+        34.956589,
+        43.471318000000004,
+        38.696991,
+        40.638589,
+        36.024972000000005,
+        42.069016,
+        39.472039
+      ],
+      "mean_ms": 38.7499251,
+      "p50_ms": 38.9641805,
+      "p95_ms": 43.471318000000004,
+      "all_node_situations": 74504,
+      "root_node": 0,
+      "q6_root_label": null,
+      "q6_duration_microseconds": null,
+      "nodes": [
+        {
+          "node_index": 0,
+          "object_variables": [
+            0,
+            1
+          ],
+          "event_variables": [
+            0
+          ],
+          "label_names": [],
+          "situation_count": 31509,
+          "situation_violated_count": 6429,
+          "violation_reason_counts": {
+            "{\"ConstraintNotSatisfied\":0}": 6429
+          },
+          "canonical_json_bytes": 1889637,
+          "canonical_sha256": "16689700f551e2de34c1977329b4c544456268f411a690675da87de6210e607d"
+        },
+        {
+          "node_index": 1,
+          "object_variables": [
+            0,
+            1,
+            2
+          ],
+          "event_variables": [
+            0,
+            1
+          ],
+          "label_names": [],
+          "situation_count": 42995,
+          "situation_violated_count": 8100,
+          "violation_reason_counts": {
+            "{\"ConstraintNotSatisfied\":0}": 8100
+          },
+          "canonical_json_bytes": 3726515,
+          "canonical_sha256": "6087f5fa8c0ea8e88e30abc061da7df6a44d9b1c27c6fa8110a75fde04fb734d"
+        }
+      ]
+    },
+    "Q6": {
+      "author_published_runs_ms": [
+        119.5089,
+        66.745212,
+        90.156047,
+        77.10585,
+        90.136674,
+        98.08911400000001,
+        65.21088999999999,
+        64.798652,
+        79.722797,
+        92.941445
+      ],
+      "author_published_mean_ms": 84.4415581,
+      "tree_parse_ms": 0.358961,
+      "import_ms": 4488.576521,
+      "link_ms": 3688.350088,
+      "runs_ms": [
+        71.12527,
+        46.167837000000006,
+        66.074816,
+        64.239011,
+        64.124135,
+        62.409915000000005,
+        73.474287,
+        46.894884999999995,
+        67.475118,
+        63.706049
+      ],
+      "mean_ms": 62.5691323,
+      "p50_ms": 64.181573,
+      "p95_ms": 73.474287,
+      "all_node_situations": 17229,
+      "root_node": 0,
+      "q6_root_label": {
+        "type": "string",
+        "value": "3140h7m38s"
+      },
+      "q6_duration_microseconds": 11304458000000,
+      "nodes": [
+        {
+          "node_index": 0,
+          "object_variables": [],
+          "event_variables": [],
+          "label_names": [
+            "max_dur"
+          ],
+          "situation_count": 1,
+          "situation_violated_count": 0,
+          "violation_reason_counts": {},
+          "canonical_json_bytes": 67,
+          "canonical_sha256": "4eb17ee6aaa5d37cac8ce9949978ade11d78abd1abd8aef8aa3ebe1506cce0a3"
+        },
+        {
+          "node_index": 1,
+          "object_variables": [
+            0
+          ],
+          "event_variables": [
+            0,
+            1
+          ],
+          "label_names": [],
+          "situation_count": 17228,
+          "situation_violated_count": 0,
+          "violation_reason_counts": {},
+          "canonical_json_bytes": 932874,
+          "canonical_sha256": "b621a19536fce92938375c293be1b6250de483da909d44e8a3ccf37b7af3fb43"
+        }
+      ]
+    },
+    "Q7": {
+      "author_published_runs_ms": [
+        104.035426,
+        75.295818,
+        83.486755,
+        75.069721,
+        80.089326,
+        70.291946,
+        76.338114,
+        66.614761,
+        84.770065,
+        82.535726
+      ],
+      "author_published_mean_ms": 79.8527658,
+      "tree_parse_ms": 0.346086,
+      "import_ms": 4488.850481,
+      "link_ms": 3649.901431,
+      "runs_ms": [
+        61.075989,
+        41.030675,
+        47.144136,
+        43.540152,
+        46.354797000000005,
+        44.571993,
+        48.343852999999996,
+        48.182811,
+        53.584016999999996,
+        44.844286
+      ],
+      "mean_ms": 47.8672709,
+      "p50_ms": 46.749466500000004,
+      "p95_ms": 61.075989,
+      "all_node_situations": 74771,
+      "root_node": 0,
+      "q6_root_label": null,
+      "q6_duration_microseconds": null,
+      "nodes": [
+        {
+          "node_index": 0,
+          "object_variables": [
+            0,
+            1,
+            2
+          ],
+          "event_variables": [
+            1,
+            2
+          ],
+          "label_names": [],
+          "situation_count": 74771,
+          "situation_violated_count": 0,
+          "violation_reason_counts": {},
+          "canonical_json_bytes": 6143143,
+          "canonical_sha256": "b3f5f953f35d7454e31b61f29e79d7f783eba4c7e8b21598da7e4d21060f0370"
+        }
+      ]
+    }
+  }
+}

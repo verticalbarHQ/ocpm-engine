@@ -19,10 +19,14 @@ QUERY_NAME_SET = set(QUERY_NAMES)
 REFERENCE_PATH = Path("docs/results/ocpq-reproduced-strict-all-node-0.6.7.json")
 CANDIDATE_PATH = Path("docs/results/ocpq-bpic2017-pg_ocpm-0.8.0-ocpm-engine-0.8.0.json")
 
-# These remain deliberately unset until reviewed release artifacts are promoted.
-# Preview validation always requires explicit digests on the command line.
-PUBLISHED_REFERENCE_SHA256: str | None = None
-PUBLISHED_CANDIDATE_SHA256: str | None = None
+# Release validation pins the reviewed artifacts below. Preview validation
+# always requires explicit digests calculated from the ignored staging files.
+PUBLISHED_REFERENCE_SHA256: str | None = (
+    "713498443f473655ebf591b72ce525cd0794857838d87d6c9ac413aeadb279e7"
+)
+PUBLISHED_CANDIDATE_SHA256: str | None = (
+    "6a248d833a09f6567ef3302399b5961ea90340725a749ae63ff018d8567534ac"
+)
 
 EXPECTED_RELEASE = {"pg_ocpm": "0.8.0", "ocpm_engine": "0.8.0"}
 EXPECTED_SOURCE = {

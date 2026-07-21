@@ -61,11 +61,10 @@ concurrency, correctness gates, and published context, see
 For the three-way comparison of lightly indexed PostgreSQL with PM4Py,
 `pg_ocpm` with PM4Py, and `pg_ocpm` with ocpm-engine, see
 [SAP PM4Py three-way performance](docs/sap-pm4py-three-way-performance.md).
-The previous seven-query OCPQ result was withdrawn because it compared only
-root output with OCPQ's complete evaluation tree. Its replacement uses zero
-warmups, ten same-host measured runs per query, and exact duplicate-preserving
-parity for every node. No corrected numbers are published until all resource
-and provenance gates pass; see [OCPQ benchmark status](docs/ocpq-performance.md).
+The corrected OCPQ Q1-Q7 comparison uses zero warmups, ten same-host measured
+runs per query, and exact duplicate-preserving parity for every node. The
+published result is 14.02x faster by geometric mean with a 6.51x minimum; see
+[OCPQ benchmark results](docs/ocpq-performance.md).
 For the detailed application read-path design and code references, see
 [Application query performance improvements](docs/technical-performance-improvements.md).
 For the open-source capability survey, license boundary, research review, and
