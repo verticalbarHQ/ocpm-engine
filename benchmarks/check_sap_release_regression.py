@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_RESULT = ROOT / "docs/results/sap-release-bridge-0.4.0-to-0.6.0.json"
+DEFAULT_RESULT = ROOT / "docs/results/sap-release-bridge-0.6.0-to-0.8.0.json"
 
 SCHEMA_VERSION = 2
 ARTIFACT_TYPE = "sap_release_bridge"
@@ -66,30 +66,30 @@ EXPECTED_SOURCE = {
 }
 EXPECTED_RELEASES = {
     "prior": {
-        "ocpm_engine": "0.4.0",
-        "pg_ocpm": "0.5.0",
-        "ocpm_engine_revision": "8427c36aa16da11b04ba642672df096d6f21e156",
-        "pg_ocpm_revision": "e72c5ffc281a1f1019d07aef8ad479217823e4f2",
-    },
-    "current": {
         "ocpm_engine": "0.6.0",
         "pg_ocpm": "0.7.0",
         "ocpm_engine_revision": "c44e9341ced643e0b777a18d7b0d26a43127caa0",
         "pg_ocpm_revision": "279d81b3db0a0ae7470bf90824f1fbba9d188e70",
     },
+    "current": {
+        "ocpm_engine": "0.8.0",
+        "pg_ocpm": "0.8.0",
+        "ocpm_engine_revision": "f5a95ecd6b8a1f184f8ffed2371980ef419beaab",
+        "pg_ocpm_revision": "0e15ab10f8ec87518b9e822072028fb3eda3879c",
+    },
 }
 EXPECTED_HARNESS_SHA256 = {
-    "controller": "874a5fcc081040a0ac9c99c1bbf48d3240ffcfa25b2bfef75fd8b298fd1ace22",
-    "support": "eed18acd3b4b2d2d9511b7783ba9cc5ebe1df8fc5998ed4be22f380c06beecf0",
+    "controller": "e267b33f958448f116f6e56c9b0c1250d931a54eb4a983921da45c120809315a",
+    "support": "62bd9edc72dce3f18fdd2bade8e5b50b41a2418c0e4131e4534de92cd1f68e3b",
     "worker": "bf2772136b1f8f2e0580e4533ce7556c13c57343aed99301657b2fb0f0ac31ce",
-    "common_pm": "5cafc5e15cba2d5ec7e74a177c91b26348f77cb1da5f4b156f2a8838700ac64c",
-    "pm4py": "0dd531b696760ddb14ce9be95c6f47c6e8063e71a740474423f20be5e3489648",
+    "common_pm": "bd61720203fb027339d1f5b1f147be18b5b0525702e51285a4019bcbb7c83180",
+    "pm4py": "f3c6dc87fb40cb9a7b73519f83f558849b919d729ec65f0f16f65e089121c7b1",
     "requirements_lock": (
         "659c44221d2a473777901318dcfd7ac23443beb10d57642e337b2a03132bbb54"
     ),
 }
 EXPECTED_LOADER_SHA256 = {
-    "prior": "85eeaa3ee733f188db1913f16d4f79ee8a6799513c9450f9139ea6ffc4a691b7",
+    "prior": "7221622a43d79e0cc58e8567a852b17c45455323ba3108185ac7824780033c4e",
     "current": "7221622a43d79e0cc58e8567a852b17c45455323ba3108185ac7824780033c4e",
 }
 EXPECTED_POSTGRES_BASE_IMAGE = (

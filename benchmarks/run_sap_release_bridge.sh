@@ -6,13 +6,13 @@ compose="$root/benchmarks/bridge/docker-compose.yml"
 python="${PYTHON:-python3}"
 pg_ocpm_repository="${PG_OCPM_SOURCE:-$(cd "$root/.." && pwd)/pg_ocpm}"
 sources="$root/.benchmarks/sap-release-bridge-sources"
-result="$root/.benchmarks/sap-release-bridge-0.4.0-to-0.6.0.json"
+result="$root/.benchmarks/sap-release-bridge-0.6.0-to-0.8.0.json"
 postgres_base_image="postgres:16@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20"
 
-prior_engine_revision="8427c36aa16da11b04ba642672df096d6f21e156"
-current_engine_revision="c44e9341ced643e0b777a18d7b0d26a43127caa0"
-prior_pg_ocpm_revision="e72c5ffc281a1f1019d07aef8ad479217823e4f2"
-current_pg_ocpm_revision="279d81b3db0a0ae7470bf90824f1fbba9d188e70"
+prior_engine_revision="c44e9341ced643e0b777a18d7b0d26a43127caa0"
+current_engine_revision="f5a95ecd6b8a1f184f8ffed2371980ef419beaab"
+prior_pg_ocpm_revision="279d81b3db0a0ae7470bf90824f1fbba9d188e70"
+current_pg_ocpm_revision="0e15ab10f8ec87518b9e822072028fb3eda3879c"
 
 if [[ "${1:-}" != "--preview" ]] || (( $# != 1 )); then
     echo "usage: $0 --preview" >&2
@@ -64,10 +64,10 @@ ensure_worktree() {
     fi
 }
 
-prior_engine_source="$sources/engine-0.4.0"
-current_engine_source="$sources/engine-0.6.0"
-prior_pg_ocpm_source="$sources/pg_ocpm-0.5.0"
-current_pg_ocpm_source="$sources/pg_ocpm-0.7.0"
+prior_engine_source="$sources/engine-0.6.0"
+current_engine_source="$sources/engine-0.8.0"
+prior_pg_ocpm_source="$sources/pg_ocpm-0.7.0"
+current_pg_ocpm_source="$sources/pg_ocpm-0.8.0"
 
 ensure_worktree \
     "$root" "$prior_engine_revision" "$prior_engine_source" "prior ocpm-engine"
@@ -213,7 +213,7 @@ bridge_exec \
     --prior-host postgres_prior \
     --current-host postgres_current \
     --database ocel_benchmark \
-    --output /results/sap-release-bridge-0.4.0-to-0.6.0.json
+    --output /results/sap-release-bridge-0.6.0-to-0.8.0.json
 
 "$python" "$root/benchmarks/check_sap_release_regression.py" \
     "$result" --preview

@@ -16,21 +16,21 @@ perf-public-concurrency: check-python
 
 perf-public-preview-check: check-python
 	$(PYTHON) benchmarks/check_sap_release_regression.py \
-		.benchmarks/sap-release-bridge-0.4.0-to-0.6.0.json \
+		.benchmarks/sap-release-bridge-0.6.0-to-0.8.0.json \
 		--preview
 	$(PYTHON) benchmarks/check_public_result.py \
-		.benchmarks/public-common-pm-0.6.0.json \
+		.benchmarks/public-common-pm-0.8.0.json \
 		--release-bridge \
-		.benchmarks/sap-release-bridge-0.4.0-to-0.6.0.json \
+		.benchmarks/sap-release-bridge-0.6.0-to-0.8.0.json \
 		--preview
 	$(PYTHON) benchmarks/check_sap_pm4py_result.py \
-		.benchmarks/sap-pm4py-three-way-0.6.0.json \
+		.benchmarks/sap-pm4py-three-way-0.8.0.json \
 		--release-bridge \
-		.benchmarks/sap-release-bridge-0.4.0-to-0.6.0.json \
+		.benchmarks/sap-release-bridge-0.6.0-to-0.8.0.json \
 		--preview
 	$(PYTHON) benchmarks/check_public_provenance_pair.py \
-		--common .benchmarks/public-common-pm-0.6.0.json \
-		--sap .benchmarks/sap-pm4py-three-way-0.6.0.json \
+		--common .benchmarks/public-common-pm-0.8.0.json \
+		--sap .benchmarks/sap-pm4py-three-way-0.8.0.json \
 		--preview
 
 perf-sap-release-bridge-preview: check-python
@@ -38,7 +38,7 @@ perf-sap-release-bridge-preview: check-python
 
 perf-sap-release-bridge-preview-check: check-python
 	$(PYTHON) benchmarks/check_sap_release_regression.py \
-		.benchmarks/sap-release-bridge-0.4.0-to-0.6.0.json \
+		.benchmarks/sap-release-bridge-0.6.0-to-0.8.0.json \
 		--preview
 
 perf-public-release-check: check-python
@@ -48,7 +48,7 @@ perf-public-release-check: check-python
 
 perf-ocpq-preview-check: check-python
 	@reference=.benchmarks/ocpq-reproduced-strict-all-node-preview.json; \
-	candidate=.benchmarks/ocpq-bpic2017-pg_ocpm-0.7.0-ocpm-engine-0.6.0-preview.json; \
+	candidate=.benchmarks/ocpq-bpic2017-pg_ocpm-0.8.0-ocpm-engine-0.8.0-preview.json; \
 	for artifact in "$$reference" "$$candidate"; do \
 		test -f "$$artifact" || { echo "missing preview artifact: $$artifact" >&2; exit 2; }; \
 	done; \

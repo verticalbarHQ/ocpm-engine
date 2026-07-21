@@ -31,15 +31,14 @@ ROOT = Path(__file__).resolve().parents[1]
 REGRESSION_BASELINE = (
     ROOT / "docs/results/sap-pm4py-three-way-0.4.0-regression-baseline.json"
 )
-RELEASE_BRIDGE = ROOT / "docs/results/sap-release-bridge-0.4.0-to-0.6.0.json"
+RELEASE_BRIDGE = ROOT / ".benchmarks/sap-release-bridge-0.6.0-to-0.8.0.json"
 EXPECTED_PAYLOAD_SHA256 = (
-    "c96f53261f7c02c5d563dad51a2c875561e8c47ee114fe1b4016636aae50c9c2"
+    "ca3db89410fd9a7d9b71120504a571e42d684609cbfb352b81bf2b6526ee8166"
 )
 EXPECTED_BASELINE_PAYLOAD_SHA256 = (
     "6530be1e72e249d022111f76283a4cb1393df726c0d413948b3689799c4e337b"
 )
-EXPECTED_BRIDGE_PAYLOAD_SHA256: str | None = None
-CURRENT_RELEASE = {"ocpm_engine": "0.6.0", "pg_ocpm": "0.7.0"}
+CURRENT_RELEASE = {"ocpm_engine": "0.8.0", "pg_ocpm": "0.8.0"}
 BASELINE_RELEASE = {"ocpm_engine": "0.4.0", "pg_ocpm": "0.5.0"}
 BASELINE_ARTIFACT_TYPE = "sap_pm4py_latency_memory_storage_regression_baseline"
 EXPECTED_SOURCE = {
@@ -140,7 +139,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "result",
         nargs="?",
-        default="docs/results/sap-pm4py-three-way-0.6.0.json",
+        default="docs/results/sap-pm4py-three-way-0.8.0.json",
     )
     parser.add_argument(
         "--baseline",
@@ -158,8 +157,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--release-bridge",
         type=Path,
-        default=RELEASE_BRIDGE,
-        help="matched 0.4/0.5-to-0.6/0.7 unified SAP release bridge artifact",
+        help=(
+            "optional ignored same-host non-regression artifact; required by "
+            "the preview workflow and never published"
+        ),
     )
     parser.add_argument(
         "--expected-release-bridge-sha256",
@@ -783,29 +784,28 @@ def main() -> None:
         if args.preview
         else args.expected_payload_sha256 or EXPECTED_PAYLOAD_SHA256
     )
-    bridge_digest = (
-        None
-        if args.preview
-        else args.expected_release_bridge_sha256 or EXPECTED_BRIDGE_PAYLOAD_SHA256
-    )
-    if not args.preview and bridge_digest is None:
-        fail(
-            "release verification requires a reviewed, pinned SAP release bridge digest"
-        )
+    if args.release_bridge is None and args.expected_release_bridge_sha256:
+        fail("--expected-release-bridge-sha256 requires --release-bridge")
     result = load_verified(Path(args.result), expected_digest)
     baseline = load_verified(args.baseline, EXPECTED_BASELINE_PAYLOAD_SHA256)
-    bridge = release_regression_checker.load_verified(
-        args.release_bridge,
-        bridge_digest,
-    )
     validate_regression_baseline(baseline)
     datasets, _ = validate_contract(result, baseline, allow_dirty=args.preview)
-    validate_regressions(result, bridge, allow_dirty=args.preview)
+    bridge_checked = False
+    if args.release_bridge is not None:
+        bridge_digest = None if args.preview else args.expected_release_bridge_sha256
+        if not args.preview and bridge_digest is None:
+            fail("an explicitly supplied release bridge requires a pinned digest")
+        bridge = release_regression_checker.load_verified(
+            args.release_bridge,
+            bridge_digest,
+        )
+        validate_regressions(result, bridge, allow_dirty=args.preview)
+        bridge_checked = True
     latency = [row for dataset in datasets.values() for row in dataset["latency"]]
+    suffix = "; private same-host non-regression gates passed" if bridge_checked else ""
     print(
         "SAP PM4Py benchmark verified: "
-        f"{len(latency)} exact workloads; matched release latency, memory, "
-        "concurrency, and storage gates passed"
+        f"{len(latency)} exact current-versus-vanilla workloads{suffix}"
     )
 
 

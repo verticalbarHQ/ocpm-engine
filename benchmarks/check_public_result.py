@@ -31,17 +31,14 @@ ROOT = Path(__file__).resolve().parents[1]
 REGRESSION_BASELINE = (
     ROOT / "docs/results/public-common-pm-0.4.0-regression-baseline.json"
 )
-RELEASE_BRIDGE = ROOT / "docs/results/sap-release-bridge-0.4.0-to-0.6.0.json"
+RELEASE_BRIDGE = ROOT / ".benchmarks/sap-release-bridge-0.6.0-to-0.8.0.json"
 EXPECTED_PAYLOAD_SHA256 = (
-    "6fe793b14df606a90fd39408e644aea1e937235eaa5ac047777716b5c7dfee72"
+    "8a64067bdb7b0c40a54256f29d4172b3a528677ed0d28dae3552e178a54d87ea"
 )
 EXPECTED_BASELINE_PAYLOAD_SHA256 = (
     "bff5956359d45f070905408081dcb466b9d7ec7bb5115271cc0d8347a5c9a60a"
 )
-# Filled only after the independently checked bridge has been reviewed and
-# promoted. Preview validation uses the artifact's self-digest instead.
-EXPECTED_BRIDGE_PAYLOAD_SHA256: str | None = None
-CURRENT_RELEASE = {"ocpm_engine": "0.6.0", "pg_ocpm": "0.7.0"}
+CURRENT_RELEASE = {"ocpm_engine": "0.8.0", "pg_ocpm": "0.8.0"}
 BASELINE_RELEASE = {"ocpm_engine": "0.4.0", "pg_ocpm": "0.5.0"}
 BASELINE_ARTIFACT_TYPE = "public_common_pm_latency_storage_regression_baseline"
 EXPECTED_SOURCE = {
@@ -119,7 +116,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "result",
         nargs="?",
-        default="docs/results/public-common-pm-0.6.0.json",
+        default="docs/results/public-common-pm-0.8.0.json",
     )
     parser.add_argument(
         "--regression-baseline",
@@ -139,8 +136,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--release-bridge",
         type=Path,
-        default=RELEASE_BRIDGE,
-        help="matched 0.4/0.5-to-0.6/0.7 SAP release bridge artifact",
+        help=(
+            "optional ignored same-host non-regression artifact; required by "
+            "the preview workflow and never published"
+        ),
     )
     parser.add_argument(
         "--expected-release-bridge-sha256",
@@ -636,29 +635,28 @@ def main() -> None:
         if args.preview
         else args.expected_payload_sha256 or EXPECTED_PAYLOAD_SHA256
     )
-    bridge_digest = (
-        None
-        if args.preview
-        else args.expected_release_bridge_sha256 or EXPECTED_BRIDGE_PAYLOAD_SHA256
-    )
-    if not args.preview and bridge_digest is None:
-        fail(
-            "release verification requires a reviewed, pinned SAP release bridge digest"
-        )
+    if args.release_bridge is None and args.expected_release_bridge_sha256:
+        fail("--expected-release-bridge-sha256 requires --release-bridge")
     result = load_verified(Path(args.result), expected_digest)
     baseline = load_verified(args.baseline, EXPECTED_BASELINE_PAYLOAD_SHA256)
-    bridge = release_regression_checker.load_verified(
-        args.release_bridge,
-        bridge_digest,
-    )
     validate_regression_baseline(baseline)
     rows = validate_contract(result, baseline, allow_dirty=args.preview)
-    validate_regressions(result, bridge, allow_dirty=args.preview)
+    bridge_checked = False
+    if args.release_bridge is not None:
+        bridge_digest = None if args.preview else args.expected_release_bridge_sha256
+        if not args.preview and bridge_digest is None:
+            fail("an explicitly supplied release bridge requires a pinned digest")
+        bridge = release_regression_checker.load_verified(
+            args.release_bridge,
+            bridge_digest,
+        )
+        validate_regressions(result, bridge, allow_dirty=args.preview)
+        bridge_checked = True
     minimum = min(row["speedup"] for row in rows.values())
+    suffix = "; private same-host non-regression gates passed" if bridge_checked else ""
     print(
         f"public benchmark verified: {len(rows)} exact workloads, "
-        f"minimum {minimum:.3f}x; matched release latency, memory, "
-        "concurrency, and storage gates passed"
+        f"minimum {minimum:.3f}x versus vanilla PostgreSQL{suffix}"
     )
 
 

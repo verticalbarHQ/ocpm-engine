@@ -441,7 +441,7 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="replace only concurrency sections in the existing --output artifact",
     )
-    parser.add_argument("--output", default="docs/results/public-common-pm-0.6.0.json")
+    parser.add_argument("--output", default="docs/results/public-common-pm-0.8.0.json")
     args = parser.parse_args()
     if args.database:
         args.baseline_db = args.database

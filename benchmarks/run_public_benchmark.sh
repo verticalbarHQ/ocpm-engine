@@ -7,14 +7,14 @@ python="${PYTHON:-python3}"
 pg_ocpm_repository="${PG_OCPM_SOURCE:-}"
 pg_ocpm_remote="${PG_OCPM_REPOSITORY:-}"
 concurrency_only=false
-engine_release="0.6.0"
-pg_ocpm_release="0.7.0"
-engine_revision="c44e9341ced643e0b777a18d7b0d26a43127caa0"
-pg_ocpm_revision="279d81b3db0a0ae7470bf90824f1fbba9d188e70"
+engine_release="0.8.0"
+pg_ocpm_release="0.8.0"
+engine_revision="f5a95ecd6b8a1f184f8ffed2371980ef419beaab"
+pg_ocpm_revision="0e15ab10f8ec87518b9e822072028fb3eda3879c"
 public_result_name="public-common-pm-${engine_release}.json"
 sap_result_name="sap-pm4py-three-way-${engine_release}.json"
 sap_report_name="sap-pm4py-three-way-${engine_release}.md"
-release_bridge="$root/.benchmarks/sap-release-bridge-0.4.0-to-0.6.0.json"
+release_bridge="$root/.benchmarks/sap-release-bridge-0.6.0-to-0.8.0.json"
 sources="$root/.benchmarks/public-sources"
 engine_source="$sources/ocpm-engine-${engine_release}"
 pg_ocpm_source="$sources/pg_ocpm-${pg_ocpm_release}"
@@ -256,7 +256,7 @@ path = Path(ocpm_engine.__file__).resolve()
 version = metadata.version("ocpm-engine")
 if "site-packages" not in path.parts or Path("/workspace") in path.parents:
     raise SystemExit(f"ocpm_engine resolved outside site-packages: {path}")
-if version != "0.6.0":
+if version != "0.8.0":
     raise SystemExit(f"unexpected ocpm-engine version: {version}")
 '
 

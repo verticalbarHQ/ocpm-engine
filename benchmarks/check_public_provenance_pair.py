@@ -24,12 +24,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--common",
         type=Path,
-        default=Path("docs/results/public-common-pm-0.6.0.json"),
+        default=Path("docs/results/public-common-pm-0.8.0.json"),
     )
     parser.add_argument(
         "--sap",
         type=Path,
-        default=Path("docs/results/sap-pm4py-three-way-0.6.0.json"),
+        default=Path("docs/results/sap-pm4py-three-way-0.8.0.json"),
     )
     parser.add_argument("--preview", action="store_true")
     return parser.parse_args()
