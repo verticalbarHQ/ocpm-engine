@@ -48,7 +48,7 @@ perf-public-release-check: check-python
 
 perf-ocpq-preview-check: check-python
 	@reference=.benchmarks/ocpq-reproduced-strict-all-node-preview.json; \
-	candidate=.benchmarks/ocpq-bpic2017-pg_ocpm-0.7.0-ocpm-engine-0.6.0-preview.json; \
+	candidate=.benchmarks/ocpq-bpic2017-pg_ocpm-0.8.0-ocpm-engine-0.8.0-preview.json; \
 	for artifact in "$$reference" "$$candidate"; do \
 		test -f "$$artifact" || { echo "missing preview artifact: $$artifact" >&2; exit 2; }; \
 	done; \

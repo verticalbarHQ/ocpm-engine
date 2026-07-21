@@ -17,14 +17,14 @@ QUERY_NAMES = tuple(f"Q{index}" for index in range(1, 8))
 QUERY_NAME_SET = set(QUERY_NAMES)
 
 REFERENCE_PATH = Path("docs/results/ocpq-reproduced-strict-all-node-0.6.7.json")
-CANDIDATE_PATH = Path("docs/results/ocpq-bpic2017-pg_ocpm-0.7.0-ocpm-engine-0.6.0.json")
+CANDIDATE_PATH = Path("docs/results/ocpq-bpic2017-pg_ocpm-0.8.0-ocpm-engine-0.8.0.json")
 
 # These remain deliberately unset until reviewed release artifacts are promoted.
 # Preview validation always requires explicit digests on the command line.
 PUBLISHED_REFERENCE_SHA256: str | None = None
 PUBLISHED_CANDIDATE_SHA256: str | None = None
 
-EXPECTED_RELEASE = {"pg_ocpm": "0.7.0", "ocpm_engine": "0.6.0"}
+EXPECTED_RELEASE = {"pg_ocpm": "0.8.0", "ocpm_engine": "0.8.0"}
 EXPECTED_SOURCE = {
     "ocpq_eval_commit": "846dd4eb9f8600ae42355968453a9412ea4759c2",
     "ocpq_version": "0.6.7",
@@ -1359,7 +1359,7 @@ def validate_candidate(
         minimum=1,
     )
     if candidate.get("release") != EXPECTED_RELEASE:
-        fail("candidate release must be pg_ocpm 0.7.0 plus ocpm-engine 0.6.0")
+        fail("candidate release must be pg_ocpm 0.8.0 plus ocpm-engine 0.8.0")
     if candidate.get("reference_schema_version") != 4:
         fail("candidate does not reference strict OCPQ schema version 4")
     if candidate.get("reference_artifact_sha256") != reference_digest:
