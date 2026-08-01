@@ -475,7 +475,7 @@ def test_preview_accepts_an_explicit_unpublished_release_pair() -> None:
 def test_release_api_rejects_an_unpublished_release_pair() -> None:
     reference = reference_fixture()
     candidate = candidate_fixture(reference)
-    unpublished = {"pg_ocpm": "0.9.0", "ocpm_engine": "0.9.0"}
+    unpublished = {"pg_ocpm": "1.0.0", "ocpm_engine": "1.0.0"}
     candidate["release"] = unpublished
 
     with pytest.raises(

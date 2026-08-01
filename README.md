@@ -71,16 +71,19 @@ concurrency, correctness gates, and published context, see
 For the three-way comparison of lightly indexed PostgreSQL with PM4Py,
 `pg_ocpm` with PM4Py, and `pg_ocpm` with ocpm-engine, see
 [SAP PM4Py three-way performance](docs/sap-pm4py-three-way-performance.md).
-For the 0.9 factorized-event implementation, SAP O2C/P2P Docker preview, strict
-OCPQ regression, and dynamic-query expectations, see
+For the clean-commit 0.9 Docker comparison across OCPQ, SAP O2C, and SAP P2P,
+including all four requested arms, latency, concurrency, storage, memory, and
+dynamic-query expectations, see the
+[full 0.9 benchmark](docs/ocpm-engine-0.9-full-benchmark.md). The implementation
+details and planner boundaries are summarized in
 [ocpm-engine 0.9 performance evidence](docs/ocpm-engine-0.9-performance.md).
 For the OCPQ data evaluated across OCPQ, vanilla PostgreSQL plus PM4Py,
 `pg_ocpm` plus PM4Py, and `pg_ocpm` plus the engine, see the
 [four-way 0.9 comparison](docs/ocpq-0.9-four-way-comparison.md).
-The corrected OCPQ Q1-Q7 comparison uses zero warmups, ten same-host measured
-runs per query, and exact duplicate-preserving parity for every node. The
-published result is 14.02x faster by geometric mean with a 6.51x minimum; see
-[OCPQ benchmark results](docs/ocpq-performance.md).
+The clean 0.9 strict OCPQ Q1-Q7 result uses zero warmups, ten same-host measured
+runs per query, and exact duplicate-preserving parity for every node. It is
+15.108x faster than OCPQ by geometric mean with a 7.473x minimum query
+speedup.
 For the detailed application read-path design and code references, see
 [Application query performance improvements](docs/technical-performance-improvements.md).
 For the open-source capability survey, license boundary, research review, and

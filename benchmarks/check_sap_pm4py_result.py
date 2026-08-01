@@ -33,12 +33,12 @@ REGRESSION_BASELINE = (
 )
 RELEASE_BRIDGE = ROOT / ".benchmarks/sap-release-bridge-0.6.0-to-0.8.0.json"
 EXPECTED_PAYLOAD_SHA256 = (
-    "ca3db89410fd9a7d9b71120504a571e42d684609cbfb352b81bf2b6526ee8166"
+    "c2c51498b24823935829b63db4c1a1ee093f55ff65acf113c5a926377918c6e6"
 )
 EXPECTED_BASELINE_PAYLOAD_SHA256 = (
     "6530be1e72e249d022111f76283a4cb1393df726c0d413948b3689799c4e337b"
 )
-CURRENT_RELEASE = {"ocpm_engine": "0.8.0", "pg_ocpm": "0.8.0"}
+CURRENT_RELEASE = {"ocpm_engine": "0.9.0", "pg_ocpm": "0.9.0"}
 BASELINE_RELEASE = {"ocpm_engine": "0.4.0", "pg_ocpm": "0.5.0"}
 BASELINE_ARTIFACT_TYPE = "sap_pm4py_latency_memory_storage_regression_baseline"
 EXPECTED_SOURCE = {
@@ -148,7 +148,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "result",
         nargs="?",
-        default="docs/results/sap-pm4py-three-way-0.8.0.json",
+        default="docs/results/sap-pm4py-three-way-0.9.0.json",
     )
     parser.add_argument(
         "--baseline",

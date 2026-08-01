@@ -16,24 +16,26 @@ from typing import Any
 QUERY_NAMES = tuple(f"Q{index}" for index in range(1, 8))
 QUERY_NAME_SET = set(QUERY_NAMES)
 
-REFERENCE_PATH = Path("docs/results/ocpq-reproduced-strict-all-node-0.6.7.json")
-CANDIDATE_PATH = Path("docs/results/ocpq-bpic2017-pg_ocpm-0.8.0-ocpm-engine-0.8.0.json")
+REFERENCE_PATH = Path("docs/results/ocpq-reproduced-strict-all-node-0.9.0.json")
+CANDIDATE_PATH = Path(
+    "docs/results/ocpq-bpic2017-pg_ocpm-0.9.0-ocpm-engine-0.9.0.json"
+)
 
 # Release validation pins the reviewed artifacts below. Preview validation
 # always requires explicit digests calculated from the ignored staging files.
 PUBLISHED_REFERENCE_SHA256: str | None = (
-    "713498443f473655ebf591b72ce525cd0794857838d87d6c9ac413aeadb279e7"
+    "39894339697421834a652620406152c87a92b08831c3a68dc3f30acd6dc77964"
 )
 PUBLISHED_CANDIDATE_SHA256: str | None = (
-    "6a248d833a09f6567ef3302399b5961ea90340725a749ae63ff018d8567534ac"
+    "317af340bff890551c1dfcafe0e0fc8777ade938865173362d56d20073222f1e"
 )
 
-EXPECTED_RELEASE = {"pg_ocpm": "0.8.0", "ocpm_engine": "0.8.0"}
+EXPECTED_RELEASE = {"pg_ocpm": "0.9.0", "ocpm_engine": "0.9.0"}
 EXPECTED_SOURCE = {
     "ocpq_eval_commit": "846dd4eb9f8600ae42355968453a9412ea4759c2",
     "ocpq_version": "0.6.7",
     "ocpq_commit": "80457e561edd7bb9e142d959dd7e0f96e6b03f2f",
-    "docker_image": "ocpq:0.6.7-corrected-harness",
+    "docker_image": "ocpq:0.6.7-corrected-harness-0.9-final",
     "dataset_sqlite_sha256": (
         "02ac333a2c194b5a411cb8527dd64b4845e5110752d2ffddb531e48ce97556d7"
     ),

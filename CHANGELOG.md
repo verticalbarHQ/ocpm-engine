@@ -33,6 +33,12 @@ All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
 - Extended the SAP O2C/P2P three-way harness with a selectable factorized
   engine read path while retaining the aggregate-native path for workloads
   already expressible as sufficient statistics.
+- Published clean-commit Docker evidence across OCPQ Q1-Q7, SAP O2C, and SAP
+  P2P. The factorized engine is 25.181x faster than vanilla PostgreSQL plus
+  PM4Py across eight SAP workloads and 15.108x faster than OCPQ on the strict
+  all-node suite by geometric mean; `pg_ocpm` plus fixed PM4Py is 1.340x faster
+  than vanilla on SAP. The full report keeps the SAP OCPQ cells N/A because the
+  unchanged SAP fixtures have no object-to-object relations.
 
 ## 0.8.0 - 2026-07-20
 
