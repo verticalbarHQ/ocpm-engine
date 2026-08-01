@@ -162,32 +162,34 @@ values are alternatives:
 ```python
 from ocpm_engine import DynamicDfgRequest
 
-request = DynamicDfgRequest.from_mapping({
-    "backbone_type": "Order",
-    "from_date": "2026-01-01T00:00:00Z",
-    "to_date": "2026-02-01T00:00:00Z",
-    "filter": {
-        "statuses": ["complete"],
-        "activities": {
-            "include": ["Order:Approved"],
-            "exclude": ["Order:Rejected"],
+request = DynamicDfgRequest.from_mapping(
+    {
+        "backbone_type": "Order",
+        "from_date": "2026-01-01T00:00:00Z",
+        "to_date": "2026-02-01T00:00:00Z",
+        "filter": {
+            "statuses": ["complete"],
+            "activities": {
+                "include": ["Order:Approved"],
+                "exclude": ["Order:Rejected"],
+            },
+            "event_attributes": {
+                "include": [{"key": "region", "value": "west"}],
+            },
+            "related_object_types": {"include": ["Invoice"]},
+            "edges": {
+                "include": [
+                    {
+                        "source": "Order:Created",
+                        "target": "Order:Approved",
+                        "min_execution_time": 0,
+                        "max_execution_time": 86400,
+                    }
+                ]
+            },
         },
-        "event_attributes": {
-            "include": [{"key": "region", "value": "west"}],
-        },
-        "related_object_types": {"include": ["Invoice"]},
-        "edges": {
-            "include": [
-                {
-                    "source": "Order:Created",
-                    "target": "Order:Approved",
-                    "min_execution_time": 0,
-                    "max_execution_time": 86400,
-                }
-            ]
-        },
-    },
-})
+    }
+)
 plan = engine.build_dynamic_dfg(request)
 answer = engine.execute_dynamic_dfg(cursor, plan)
 ```
