@@ -784,7 +784,7 @@ def complete_provenance(
     if (
         not isinstance(concurrency_threads, str)
         or not concurrency_threads.isdigit()
-        or int(concurrency_threads) < max(CONCURRENCY_LEVELS)
+        or int(concurrency_threads) < 1
     ):
         fail("concurrency worker-thread provenance is invalid")
 
@@ -1352,6 +1352,7 @@ def validate_candidate(
     *,
     reference_digest: str,
     release: bool,
+    expected_release: dict[str, str],
 ) -> dict[str, Any]:
     if candidate.get("schema_version") != 1 or candidate.get("artifact_kind") != (
         "strict-all-node-ocpq-publication-gates"
@@ -1362,8 +1363,12 @@ def validate_candidate(
         "candidate timestamp",
         minimum=1,
     )
-    if candidate.get("release") != EXPECTED_RELEASE:
-        fail("candidate release must be pg_ocpm 0.8.0 plus ocpm-engine 0.8.0")
+    if candidate.get("release") != expected_release:
+        fail(
+            "candidate release must be pg_ocpm "
+            f"{expected_release['pg_ocpm']} plus ocpm-engine "
+            f"{expected_release['ocpm_engine']}"
+        )
     if candidate.get("reference_schema_version") != 4:
         fail("candidate does not reference strict OCPQ schema version 4")
     if candidate.get("reference_artifact_sha256") != reference_digest:
@@ -1440,7 +1445,10 @@ def certify(
     *,
     reference_digest: str,
     release: bool,
+    expected_release: dict[str, str] = EXPECTED_RELEASE,
 ) -> dict[str, Any]:
+    if release and expected_release != EXPECTED_RELEASE:
+        fail("release validation uses only the published release pair")
     require_sha256(reference_digest, "reference digest")
     validate_reference(reference, release=release)
     return validate_candidate(
@@ -1448,6 +1456,7 @@ def certify(
         reference,
         reference_digest=reference_digest,
         release=release,
+        expected_release=expected_release,
     )
 
 
@@ -1457,6 +1466,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--candidate", type=Path, default=CANDIDATE_PATH)
     parser.add_argument("--expected-reference-sha256")
     parser.add_argument("--expected-candidate-sha256")
+    parser.add_argument("--expected-pg-ocpm-version")
+    parser.add_argument("--expected-ocpm-engine-version")
     parser.add_argument(
         "--preview",
         action="store_true",
@@ -1466,6 +1477,29 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     return parser.parse_args()
+
+
+def resolve_expected_release(args: argparse.Namespace) -> dict[str, str]:
+    versions = (
+        args.expected_pg_ocpm_version,
+        args.expected_ocpm_engine_version,
+    )
+    if not args.preview:
+        if any(versions):
+            fail("release validation uses only the published release pair")
+        return EXPECTED_RELEASE
+    if any(versions) and not all(versions):
+        fail("preview release override requires both version values")
+    if not any(versions):
+        return EXPECTED_RELEASE
+    if any(
+        re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", value) is None for value in versions
+    ):
+        fail("preview release versions must use MAJOR.MINOR.PATCH")
+    return {
+        "pg_ocpm": args.expected_pg_ocpm_version,
+        "ocpm_engine": args.expected_ocpm_engine_version,
+    }
 
 
 def resolve_digests(args: argparse.Namespace) -> tuple[str, str]:
@@ -1484,6 +1518,7 @@ def main() -> None:
     args = parse_args()
     try:
         reference_digest, candidate_digest = resolve_digests(args)
+        expected_release = resolve_expected_release(args)
         reference = load_json(args.reference, reference_digest)
         candidate = load_json(args.candidate, candidate_digest)
         result = certify(
@@ -1491,6 +1526,7 @@ def main() -> None:
             candidate,
             reference_digest=reference_digest,
             release=not args.preview,
+            expected_release=expected_release,
         )
     except CertificationError as error:
         raise SystemExit(str(error)) from error

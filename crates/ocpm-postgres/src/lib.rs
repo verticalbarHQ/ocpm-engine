@@ -1,10 +1,13 @@
 //! Thin asynchronous adapter over pg_ocpm aggregate, binding, and event-stream
 //! interfaces.
 
+use futures_util::TryStreamExt;
 use ocpm_core::{
     TransitionKey,
     binding::{BindingCapsule, BindingDecodeError},
+    event_batch::{EventBatch, EventBatchError, EventLogSummary, EventSummaryBuilder},
 };
+use serde::{Deserialize, Serialize};
 use std::time::SystemTime;
 use thiserror::Error;
 use tokio_postgres::{
@@ -56,6 +59,98 @@ SELECT case_id, activity, event_timestamp, event_ordinal
 FROM ocpm.event_log_rows($1, $2, $3, $4, $5)
 "#;
 
+pub const EVENT_LOG_BATCHES_SQL: &str = r#"
+SELECT activity_path, activity_count, case_count,
+       case_id_payloads, event_timestamp_payloads
+FROM ocpm.event_log_batches($1, $2, $3, $4, $5)
+"#;
+
+pub const EVENT_LOG_WINDOW_BATCHES_SQL: &str = r#"
+SELECT chunk.first_window - 1 + batch.window_ordinal AS window_ordinal,
+       batch.activity_path, batch.activity_count, batch.case_count,
+       batch.case_id_payloads, batch.event_timestamp_payloads
+FROM generate_series(
+    1, cardinality($4::timestamptz[]), 256
+) AS chunk(first_window)
+CROSS JOIN LATERAL ocpm.event_log_window_batches(
+    $1, $2, $3,
+    ($4::timestamptz[])[
+        chunk.first_window:
+        LEAST(chunk.first_window + 255, cardinality($4::timestamptz[]))
+    ],
+    ($5::timestamptz[])[
+        chunk.first_window:
+        LEAST(chunk.first_window + 255, cardinality($5::timestamptz[]))
+    ]
+) AS batch
+"#;
+
+pub const PG_OCPM_CAPABILITIES_SQL: &str = r#"
+SELECT ocpm.version(),
+       to_regprocedure(
+           'ocpm.event_log_rows(bigint,bigint,text,timestamptz,timestamptz)'
+       ) IS NOT NULL,
+       to_regprocedure(
+           'ocpm.event_log_batches(bigint,bigint,text,timestamptz,timestamptz)'
+       ) IS NOT NULL,
+       to_regprocedure(
+           'ocpm.event_log_window_batches(bigint,bigint,text,timestamptz[],timestamptz[])'
+       ) IS NOT NULL
+"#;
+
+pub const BINDING_INDEX_COVERAGE_SQL: &str = r#"
+SELECT dataset.refreshed_at,
+       dataset.source_watermark,
+       dataset.event_identity_complete,
+       COALESCE((
+           SELECT jsonb_agg(item ORDER BY item)::text
+           FROM (
+               SELECT jsonb_build_array(object_type) AS item
+               FROM ocpm.binding_object
+               WHERE dataset_id=$1 AND tenant_id=$2
+           ) objects
+       ), '[]'),
+       COALESCE((
+           SELECT jsonb_agg(item ORDER BY item)::text
+           FROM (
+               SELECT jsonb_build_array(object_type,activity) AS item
+               FROM ocpm.binding_activity
+               WHERE dataset_id=$1 AND tenant_id=$2
+           ) activities
+       ), '[]'),
+       COALESCE((
+           SELECT jsonb_agg(item ORDER BY item)::text
+           FROM (
+               SELECT jsonb_build_array(activity) AS item
+               FROM ocpm.binding_event
+               WHERE dataset_id=$1 AND tenant_id=$2
+           ) events
+       ), '[]'),
+       COALESCE((
+           SELECT jsonb_agg(item ORDER BY item)::text
+           FROM (
+               SELECT jsonb_build_array(
+                   source_object_type,target_object_type,activity
+               ) AS item
+               FROM ocpm.binding_neighbor_activity
+               WHERE dataset_id=$1 AND tenant_id=$2
+           ) neighbors
+       ), '[]'),
+       COALESCE((
+           SELECT jsonb_agg(item ORDER BY item)::text
+           FROM (
+               SELECT jsonb_build_array(
+                   source_object_type,source_activity,
+                   target_object_type,target_activity,related_object_type
+               ) AS item
+               FROM ocpm.binding_relation_summary
+               WHERE dataset_id=$1 AND tenant_id=$2
+           ) relations
+       ), '[]')
+FROM ocpm.dataset AS dataset
+WHERE dataset.dataset_id=$1 AND dataset.tenant_id=$2
+"#;
+
 pub const BINDING_OBJECT_ACTIVITY_COUNT_SQL: &str =
     "SELECT ocpm.binding_object_activity_count($1, $2, $3, $4, $5, $6)";
 pub const BINDING_REQUIRES_ACTIVITY_SQL: &str =
@@ -91,6 +186,26 @@ pub enum AdapterError {
     MissingRelationSummary,
     #[error("event-log query must return bigint, text, timestamptz, integer")]
     InvalidEventLogResultShape,
+    #[error("event-batch query returned an unexpected result shape")]
+    InvalidEventBatchResultShape,
+    #[error("event-window-batch query returned an unexpected result shape")]
+    InvalidEventWindowBatchResultShape,
+    #[error(transparent)]
+    EventBatch(#[from] EventBatchError),
+    #[error("event-log row stream is not ordered by case and ordinal")]
+    InvalidEventLogOrder,
+    #[error("event-log timestamp is outside the supported PostgreSQL range")]
+    TimestampOverflow,
+    #[error("event-log database row count overflowed u64")]
+    DatabaseRowCountOverflow,
+    #[error("dataset {dataset_id} for tenant {tenant_id} does not exist")]
+    DatasetNotFound { dataset_id: i64, tenant_id: i64 },
+    #[error("binding-index coverage metadata is invalid: {0}")]
+    InvalidBindingIndexCoverage(String),
+    #[error("event-log window arrays must be nonempty and have equal lengths")]
+    InvalidEventWindows,
+    #[error("event-log batch returned invalid window ordinal {0}")]
+    InvalidWindowOrdinal(i32),
 }
 
 /// A decoded binding capsule plus its encoded wire size.
@@ -147,6 +262,225 @@ pub struct PreparedEventLogQuery {
     statement: Statement,
 }
 
+/// Features detected from the connected extension instead of inferred only
+/// from its version string. This keeps forks and partial upgrades fail-closed.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct PgOcpmCapabilities {
+    pub version: String,
+    pub event_log_rows: bool,
+    pub event_log_batches: bool,
+    pub event_log_window_batches: bool,
+}
+
+impl PgOcpmCapabilities {
+    pub fn factorized_event_export(&self) -> bool {
+        self.event_log_batches
+    }
+
+    pub fn factorized_multi_window_export(&self) -> bool {
+        self.event_log_window_batches
+    }
+}
+
+pub async fn pg_ocpm_capabilities(client: &Client) -> Result<PgOcpmCapabilities, AdapterError> {
+    let row = client.query_one(PG_OCPM_CAPABILITIES_SQL, &[]).await?;
+    Ok(PgOcpmCapabilities {
+        version: row.try_get(0)?,
+        event_log_rows: row.try_get(1)?,
+        event_log_batches: row.try_get(2)?,
+        event_log_window_batches: row.try_get(3)?,
+    })
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub enum EventLogStrategy {
+    FactorizedBatch,
+    NativeRowFallback,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct EventLogExecution {
+    pub strategy: EventLogStrategy,
+    pub database_rows: u64,
+    pub summary: EventLogSummary,
+}
+
+/// A connection-specific pg_ocpm 0.9 factorized event-batch request.
+#[derive(Clone, Debug)]
+pub struct PreparedEventBatchQuery {
+    statement: Statement,
+}
+
+/// One factorized batch assigned to a one-based input window.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct WindowedEventBatch {
+    pub window_ordinal: i32,
+    pub batch: EventBatch,
+}
+
+/// A connection-specific pg_ocpm 0.9 multi-window batch request.
+#[derive(Clone, Debug)]
+pub struct PreparedEventWindowBatchQuery {
+    statement: Statement,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NeighborBindingCoverage {
+    pub source_object_type: String,
+    pub target_object_type: String,
+    pub activity: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RelationBindingCoverage {
+    pub source_object_type: String,
+    pub source_activity: String,
+    pub target_object_type: String,
+    pub target_activity: String,
+    pub related_object_type: String,
+}
+
+/// Observable index coverage plus the dataset refresh markers that invalidate
+/// every binding summary. Absence is explicit; no result cache is consulted.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BindingIndexCoverage {
+    pub refreshed_at: Option<SystemTime>,
+    pub source_watermark: Option<SystemTime>,
+    pub event_identity_complete: bool,
+    pub object_types: Vec<String>,
+    pub activities: Vec<(String, String)>,
+    pub event_activities: Vec<String>,
+    pub neighbors: Vec<NeighborBindingCoverage>,
+    pub relations: Vec<RelationBindingCoverage>,
+}
+
+impl BindingIndexCoverage {
+    pub fn covers_object_type(&self, object_type: &str) -> bool {
+        self.object_types
+            .binary_search_by(|item| item.as_str().cmp(object_type))
+            .is_ok()
+    }
+
+    pub fn covers_activity(&self, object_type: &str, activity: &str) -> bool {
+        self.activities
+            .binary_search_by(|item| {
+                (item.0.as_str(), item.1.as_str()).cmp(&(object_type, activity))
+            })
+            .is_ok()
+    }
+
+    pub fn covers_event_activity(&self, activity: &str) -> bool {
+        self.event_activities
+            .binary_search_by(|item| item.as_str().cmp(activity))
+            .is_ok()
+    }
+
+    pub fn covers_neighbor(
+        &self,
+        source_object_type: &str,
+        target_object_type: &str,
+        activity: &str,
+    ) -> bool {
+        self.neighbors
+            .binary_search_by(|item| {
+                (
+                    item.source_object_type.as_str(),
+                    item.target_object_type.as_str(),
+                    item.activity.as_str(),
+                )
+                    .cmp(&(source_object_type, target_object_type, activity))
+            })
+            .is_ok()
+    }
+
+    pub fn covers_relation(
+        &self,
+        source_object_type: &str,
+        source_activity: &str,
+        target_object_type: &str,
+        target_activity: &str,
+        related_object_type: &str,
+    ) -> bool {
+        self.relations
+            .binary_search_by(|item| {
+                (
+                    item.source_object_type.as_str(),
+                    item.source_activity.as_str(),
+                    item.target_object_type.as_str(),
+                    item.target_activity.as_str(),
+                    item.related_object_type.as_str(),
+                )
+                    .cmp(&(
+                        source_object_type,
+                        source_activity,
+                        target_object_type,
+                        target_activity,
+                        related_object_type,
+                    ))
+            })
+            .is_ok()
+    }
+}
+
+pub async fn binding_index_coverage(
+    client: &Client,
+    dataset_id: i64,
+    tenant_id: i64,
+) -> Result<BindingIndexCoverage, AdapterError> {
+    let row = client
+        .query_opt(BINDING_INDEX_COVERAGE_SQL, &[&dataset_id, &tenant_id])
+        .await?
+        .ok_or(AdapterError::DatasetNotFound {
+            dataset_id,
+            tenant_id,
+        })?;
+    let object_rows = json_string_rows(&row.try_get::<_, String>(3)?, 1)?;
+    let activity_rows = json_string_rows(&row.try_get::<_, String>(4)?, 2)?;
+    let event_rows = json_string_rows(&row.try_get::<_, String>(5)?, 1)?;
+    let neighbor_rows = json_string_rows(&row.try_get::<_, String>(6)?, 3)?;
+    let relation_rows = json_string_rows(&row.try_get::<_, String>(7)?, 5)?;
+    Ok(BindingIndexCoverage {
+        refreshed_at: row.try_get(0)?,
+        source_watermark: row.try_get(1)?,
+        event_identity_complete: row.try_get(2)?,
+        object_types: object_rows.into_iter().map(|row| row[0].clone()).collect(),
+        activities: activity_rows
+            .into_iter()
+            .map(|row| (row[0].clone(), row[1].clone()))
+            .collect(),
+        event_activities: event_rows.into_iter().map(|row| row[0].clone()).collect(),
+        neighbors: neighbor_rows
+            .into_iter()
+            .map(|row| NeighborBindingCoverage {
+                source_object_type: row[0].clone(),
+                target_object_type: row[1].clone(),
+                activity: row[2].clone(),
+            })
+            .collect(),
+        relations: relation_rows
+            .into_iter()
+            .map(|row| RelationBindingCoverage {
+                source_object_type: row[0].clone(),
+                source_activity: row[1].clone(),
+                target_object_type: row[2].clone(),
+                target_activity: row[3].clone(),
+                related_object_type: row[4].clone(),
+            })
+            .collect(),
+    })
+}
+
+fn json_string_rows(source: &str, width: usize) -> Result<Vec<Vec<String>>, AdapterError> {
+    let rows: Vec<Vec<String>> = serde_json::from_str(source)
+        .map_err(|error| AdapterError::InvalidBindingIndexCoverage(error.to_string()))?;
+    if rows.iter().any(|row| row.len() != width) {
+        return Err(AdapterError::InvalidBindingIndexCoverage(format!(
+            "expected width {width}"
+        )));
+    }
+    Ok(rows)
+}
+
 fn validate_event_log_result_shape<'a>(
     column_types: impl IntoIterator<Item = &'a Type>,
 ) -> Result<(), AdapterError> {
@@ -159,6 +493,23 @@ fn validate_event_log_result_shape<'a>(
             .any(|(actual_type, expected_type)| *actual_type != expected_type)
     {
         return Err(AdapterError::InvalidEventLogResultShape);
+    }
+    Ok(())
+}
+
+fn validate_exact_shape<'a>(
+    column_types: impl IntoIterator<Item = &'a Type>,
+    expected: &[Type],
+    error: AdapterError,
+) -> Result<(), AdapterError> {
+    let actual = column_types.into_iter().collect::<Vec<_>>();
+    if actual.len() != expected.len()
+        || actual
+            .into_iter()
+            .zip(expected)
+            .any(|(actual_type, expected_type)| actual_type != expected_type)
+    {
+        return Err(error);
     }
     Ok(())
 }
@@ -207,6 +558,327 @@ impl PreparedEventLogQuery {
     }
 }
 
+impl PreparedEventBatchQuery {
+    pub async fn prepare(client: &Client) -> Result<Self, AdapterError> {
+        let statement = client.prepare(EVENT_LOG_BATCHES_SQL).await?;
+        validate_exact_shape(
+            statement.columns().iter().map(|column| column.type_()),
+            &[
+                Type::TEXT_ARRAY,
+                Type::INT4,
+                Type::INT4,
+                Type::BYTEA,
+                Type::BYTEA,
+            ],
+            AdapterError::InvalidEventBatchResultShape,
+        )?;
+        Ok(Self { statement })
+    }
+
+    pub async fn query(
+        &self,
+        client: &Client,
+        dataset_id: i64,
+        tenant_id: i64,
+        object_type: &str,
+        from_timestamp: SystemTime,
+        to_timestamp: SystemTime,
+    ) -> Result<RowStream, AdapterError> {
+        Ok(client
+            .query_raw(
+                &self.statement,
+                [
+                    &dataset_id as &(dyn ToSql + Sync),
+                    &tenant_id,
+                    &object_type,
+                    &from_timestamp,
+                    &to_timestamp,
+                ],
+            )
+            .await?)
+    }
+
+    pub fn decode(row: &Row) -> Result<EventBatch, AdapterError> {
+        Ok(EventBatch::decode(
+            row.try_get(0)?,
+            row.try_get(1)?,
+            row.try_get(2)?,
+            row.try_get(3)?,
+            row.try_get(4)?,
+        )?)
+    }
+}
+
+impl PreparedEventWindowBatchQuery {
+    pub async fn prepare(client: &Client) -> Result<Self, AdapterError> {
+        let statement = client.prepare(EVENT_LOG_WINDOW_BATCHES_SQL).await?;
+        validate_exact_shape(
+            statement.columns().iter().map(|column| column.type_()),
+            &[
+                Type::INT4,
+                Type::TEXT_ARRAY,
+                Type::INT4,
+                Type::INT4,
+                Type::BYTEA,
+                Type::BYTEA,
+            ],
+            AdapterError::InvalidEventWindowBatchResultShape,
+        )?;
+        Ok(Self { statement })
+    }
+
+    pub async fn query(
+        &self,
+        client: &Client,
+        dataset_id: i64,
+        tenant_id: i64,
+        object_type: &str,
+        from_timestamps: &[SystemTime],
+        to_timestamps: &[SystemTime],
+    ) -> Result<RowStream, AdapterError> {
+        validate_event_windows(from_timestamps, to_timestamps)?;
+        Ok(client
+            .query_raw(
+                &self.statement,
+                [
+                    &dataset_id as &(dyn ToSql + Sync),
+                    &tenant_id,
+                    &object_type,
+                    &from_timestamps,
+                    &to_timestamps,
+                ],
+            )
+            .await?)
+    }
+
+    pub fn decode(row: &Row) -> Result<WindowedEventBatch, AdapterError> {
+        Ok(WindowedEventBatch {
+            window_ordinal: row.try_get(0)?,
+            batch: EventBatch::decode(
+                row.try_get(1)?,
+                row.try_get(2)?,
+                row.try_get(3)?,
+                row.try_get(4)?,
+                row.try_get(5)?,
+            )?,
+        })
+    }
+}
+
+fn validate_event_windows(
+    from_timestamps: &[SystemTime],
+    to_timestamps: &[SystemTime],
+) -> Result<(), AdapterError> {
+    if from_timestamps.is_empty() || from_timestamps.len() != to_timestamps.len() {
+        return Err(AdapterError::InvalidEventWindows);
+    }
+    Ok(())
+}
+
+/// Select pg_ocpm 0.9's factorized path when available and retain the 0.8 row
+/// stream only as a compatibility fallback.
+pub async fn event_log_summary(
+    client: &Client,
+    dataset_id: i64,
+    tenant_id: i64,
+    object_type: &str,
+    from_timestamp: SystemTime,
+    to_timestamp: SystemTime,
+) -> Result<EventLogExecution, AdapterError> {
+    let capabilities = pg_ocpm_capabilities(client).await?;
+    if capabilities.event_log_batches {
+        let query = PreparedEventBatchQuery::prepare(client).await?;
+        let mut stream = std::pin::pin!(
+            query
+                .query(
+                    client,
+                    dataset_id,
+                    tenant_id,
+                    object_type,
+                    from_timestamp,
+                    to_timestamp,
+                )
+                .await?
+        );
+        let mut builder = EventSummaryBuilder::new();
+        let mut database_rows = 0_u64;
+        while let Some(row) = stream.try_next().await? {
+            database_rows = database_rows
+                .checked_add(1)
+                .ok_or(AdapterError::DatabaseRowCountOverflow)?;
+            builder.push_batch(&PreparedEventBatchQuery::decode(&row)?)?;
+        }
+        return Ok(EventLogExecution {
+            strategy: EventLogStrategy::FactorizedBatch,
+            database_rows,
+            summary: builder.finish(),
+        });
+    }
+    if !capabilities.event_log_rows {
+        return Err(AdapterError::InvalidEventLogResultShape);
+    }
+    event_log_row_summary(
+        client,
+        dataset_id,
+        tenant_id,
+        object_type,
+        from_timestamp,
+        to_timestamp,
+    )
+    .await
+}
+
+/// Summarize aligned windows in one PostgreSQL statement containing pg_ocpm
+/// 0.9 bucket scans of at most 256 windows each. The 0.8 compatibility path
+/// remains exact but performs one native row scan per window because the
+/// extension has no multi-window export.
+pub async fn event_log_window_summaries(
+    client: &Client,
+    dataset_id: i64,
+    tenant_id: i64,
+    object_type: &str,
+    from_timestamps: &[SystemTime],
+    to_timestamps: &[SystemTime],
+) -> Result<Vec<EventLogExecution>, AdapterError> {
+    validate_event_windows(from_timestamps, to_timestamps)?;
+    let capabilities = pg_ocpm_capabilities(client).await?;
+    if capabilities.event_log_window_batches {
+        let query = PreparedEventWindowBatchQuery::prepare(client).await?;
+        let mut stream = std::pin::pin!(
+            query
+                .query(
+                    client,
+                    dataset_id,
+                    tenant_id,
+                    object_type,
+                    from_timestamps,
+                    to_timestamps,
+                )
+                .await?
+        );
+        let mut builders = (0..from_timestamps.len())
+            .map(|_| EventSummaryBuilder::new())
+            .collect::<Vec<_>>();
+        let mut database_rows = vec![0_u64; from_timestamps.len()];
+        while let Some(row) = stream.try_next().await? {
+            let batch = PreparedEventWindowBatchQuery::decode(&row)?;
+            let index = batch
+                .window_ordinal
+                .checked_sub(1)
+                .and_then(|ordinal| usize::try_from(ordinal).ok())
+                .filter(|index| *index < builders.len())
+                .ok_or(AdapterError::InvalidWindowOrdinal(batch.window_ordinal))?;
+            database_rows[index] = database_rows[index]
+                .checked_add(1)
+                .ok_or(AdapterError::DatabaseRowCountOverflow)?;
+            builders[index].push_batch(&batch.batch)?;
+        }
+        return Ok(builders
+            .into_iter()
+            .zip(database_rows)
+            .map(|(builder, database_rows)| EventLogExecution {
+                strategy: EventLogStrategy::FactorizedBatch,
+                database_rows,
+                summary: builder.finish(),
+            })
+            .collect());
+    }
+
+    if !capabilities.event_log_rows {
+        return Err(AdapterError::InvalidEventLogResultShape);
+    }
+
+    let mut results = Vec::new();
+    results
+        .try_reserve_exact(from_timestamps.len())
+        .map_err(|_| EventBatchError::DimensionOverflow)?;
+    for (&from_timestamp, &to_timestamp) in from_timestamps.iter().zip(to_timestamps) {
+        results.push(
+            event_log_row_summary(
+                client,
+                dataset_id,
+                tenant_id,
+                object_type,
+                from_timestamp,
+                to_timestamp,
+            )
+            .await?,
+        );
+    }
+    Ok(results)
+}
+
+async fn event_log_row_summary(
+    client: &Client,
+    dataset_id: i64,
+    tenant_id: i64,
+    object_type: &str,
+    from_timestamp: SystemTime,
+    to_timestamp: SystemTime,
+) -> Result<EventLogExecution, AdapterError> {
+    let query = PreparedEventLogQuery::prepare(client).await?;
+    let mut stream = std::pin::pin!(
+        query
+            .query(
+                client,
+                dataset_id,
+                tenant_id,
+                object_type,
+                from_timestamp,
+                to_timestamp,
+            )
+            .await?
+    );
+    let mut builder = EventSummaryBuilder::new();
+    let mut database_rows = 0_u64;
+    let mut current_case = None;
+    let mut expected_ordinal = 1_i32;
+    let mut activities = Vec::new();
+    let mut timestamps = Vec::new();
+    while let Some(row) = stream.try_next().await? {
+        database_rows = database_rows
+            .checked_add(1)
+            .ok_or(AdapterError::DatabaseRowCountOverflow)?;
+        let event = PreparedEventLogQuery::decode(&row)?;
+        if current_case.is_some_and(|case_id| case_id != event.case_id) {
+            builder.push_case(&activities, &timestamps)?;
+            activities.clear();
+            timestamps.clear();
+            expected_ordinal = 1;
+        }
+        if event.event_ordinal != expected_ordinal {
+            return Err(AdapterError::InvalidEventLogOrder);
+        }
+        current_case = Some(event.case_id);
+        expected_ordinal = expected_ordinal
+            .checked_add(1)
+            .ok_or(AdapterError::InvalidEventLogOrder)?;
+        activities.push(event.activity);
+        timestamps.push(system_time_to_pg_micros(event.event_timestamp)?);
+    }
+    if current_case.is_some() {
+        builder.push_case(&activities, &timestamps)?;
+    }
+    Ok(EventLogExecution {
+        strategy: EventLogStrategy::NativeRowFallback,
+        database_rows,
+        summary: builder.finish(),
+    })
+}
+
+fn system_time_to_pg_micros(timestamp: SystemTime) -> Result<i64, AdapterError> {
+    const POSTGRES_EPOCH_UNIX_MICROS: i128 = 946_684_800_000_000;
+    let unix_micros = match timestamp.duration_since(SystemTime::UNIX_EPOCH) {
+        Ok(duration) => {
+            i128::try_from(duration.as_micros()).map_err(|_| AdapterError::TimestampOverflow)?
+        }
+        Err(error) => -i128::try_from(error.duration().as_micros())
+            .map_err(|_| AdapterError::TimestampOverflow)?,
+    };
+    i64::try_from(unix_micros - POSTGRES_EPOCH_UNIX_MICROS)
+        .map_err(|_| AdapterError::TimestampOverflow)
+}
+
 #[cfg(test)]
 mod event_log_tests {
     use super::*;
@@ -235,6 +907,103 @@ mod event_log_tests {
             validate_event_log_result_shape([&Type::INT8, &Type::TEXT]),
             Err(AdapterError::InvalidEventLogResultShape)
         ));
+    }
+
+    #[test]
+    fn event_window_vectors_fail_closed_before_querying() {
+        let timestamp = SystemTime::UNIX_EPOCH;
+
+        assert!(matches!(
+            validate_event_windows(&[], &[]),
+            Err(AdapterError::InvalidEventWindows)
+        ));
+        assert!(matches!(
+            validate_event_windows(&[timestamp], &[timestamp, timestamp]),
+            Err(AdapterError::InvalidEventWindows)
+        ));
+        assert!(validate_event_windows(&[timestamp], &[timestamp]).is_ok());
+    }
+
+    #[test]
+    fn factorized_batch_shapes_are_exact() {
+        assert!(
+            validate_exact_shape(
+                [
+                    &Type::TEXT_ARRAY,
+                    &Type::INT4,
+                    &Type::INT4,
+                    &Type::BYTEA,
+                    &Type::BYTEA,
+                ],
+                &[
+                    Type::TEXT_ARRAY,
+                    Type::INT4,
+                    Type::INT4,
+                    Type::BYTEA,
+                    Type::BYTEA,
+                ],
+                AdapterError::InvalidEventBatchResultShape,
+            )
+            .is_ok()
+        );
+        assert!(matches!(
+            validate_exact_shape(
+                [&Type::TEXT_ARRAY, &Type::INT4],
+                &[
+                    Type::TEXT_ARRAY,
+                    Type::INT4,
+                    Type::INT4,
+                    Type::BYTEA,
+                    Type::BYTEA,
+                ],
+                AdapterError::InvalidEventBatchResultShape,
+            ),
+            Err(AdapterError::InvalidEventBatchResultShape)
+        ));
+    }
+
+    #[test]
+    fn binding_coverage_json_rejects_wrong_width() {
+        assert_eq!(
+            json_string_rows(r#"[["Order","Create"]]"#, 2).unwrap(),
+            vec![vec!["Order", "Create"]]
+        );
+        assert!(matches!(
+            json_string_rows(r#"[["Order"]]"#, 2),
+            Err(AdapterError::InvalidBindingIndexCoverage(_))
+        ));
+    }
+
+    #[test]
+    fn binding_coverage_lookups_are_explicit_and_exact() {
+        let coverage = BindingIndexCoverage {
+            refreshed_at: None,
+            source_watermark: None,
+            event_identity_complete: true,
+            object_types: vec!["Order".into()],
+            activities: vec![("Order".into(), "Create".into())],
+            event_activities: vec!["Create".into()],
+            neighbors: vec![NeighborBindingCoverage {
+                source_object_type: "Order".into(),
+                target_object_type: "Item".into(),
+                activity: "Create".into(),
+            }],
+            relations: vec![RelationBindingCoverage {
+                source_object_type: "Order".into(),
+                source_activity: "Create".into(),
+                target_object_type: "Item".into(),
+                target_activity: "Approve".into(),
+                related_object_type: "User".into(),
+            }],
+        };
+
+        assert!(coverage.covers_object_type("Order"));
+        assert!(coverage.covers_activity("Order", "Create"));
+        assert!(coverage.covers_event_activity("Create"));
+        assert!(coverage.covers_neighbor("Order", "Item", "Create"));
+        assert!(coverage.covers_relation("Order", "Create", "Item", "Approve", "User"));
+        assert!(!coverage.covers_activity("Order", "Approve"));
+        assert!(!coverage.covers_neighbor("Item", "Order", "Create"));
     }
 }
 

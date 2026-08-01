@@ -455,6 +455,61 @@ def test_preview_forces_publication_not_ready_when_evidence_is_missing() -> None
     assert "preview mode" in result["blocking_evidence"]
 
 
+def test_preview_accepts_an_explicit_unpublished_release_pair() -> None:
+    reference = reference_fixture(clean=False)
+    candidate = candidate_fixture(reference, clean=False)
+    candidate["release"] = {"pg_ocpm": "0.9.0", "ocpm_engine": "0.9.0"}
+
+    result = CHECKER.certify(
+        reference,
+        candidate,
+        reference_digest=REFERENCE_DIGEST,
+        release=False,
+        expected_release=candidate["release"],
+    )
+
+    assert result["publication_ready"] is False
+    assert result["every_query_and_node_exact"] is True
+
+
+def test_release_api_rejects_an_unpublished_release_pair() -> None:
+    reference = reference_fixture()
+    candidate = candidate_fixture(reference)
+    unpublished = {"pg_ocpm": "0.9.0", "ocpm_engine": "0.9.0"}
+    candidate["release"] = unpublished
+
+    with pytest.raises(
+        CHECKER.CertificationError,
+        match="only the published release pair",
+    ):
+        CHECKER.certify(
+            reference,
+            candidate,
+            reference_digest=REFERENCE_DIGEST,
+            release=True,
+            expected_release=unpublished,
+        )
+
+
+def test_async_concurrency_does_not_require_one_runtime_thread_per_client() -> None:
+    reference = reference_fixture()
+    candidate = candidate_fixture(reference)
+    candidate["environment"]["concurrency"]["tokio_worker_threads_env"] = "3"
+
+    result = certify(reference, candidate)
+
+    assert result["concurrency_16_to_1_scaling"] == 16.0
+
+
+def test_rejects_zero_concurrency_runtime_threads() -> None:
+    reference = reference_fixture()
+    candidate = candidate_fixture(reference)
+    candidate["environment"]["concurrency"]["tokio_worker_threads_env"] = "0"
+
+    with pytest.raises(CHECKER.CertificationError, match="worker-thread provenance"):
+        certify(reference, candidate)
+
+
 def test_preview_rejects_dirty_artifact_marked_publication_ready() -> None:
     reference = reference_fixture(clean=False)
     candidate = candidate_fixture(reference, clean=False)

@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 pub mod binding;
+pub mod event_batch;
 
 #[derive(Debug, Error, PartialEq)]
 pub enum AnalyticsError {

@@ -9,6 +9,30 @@ source context only; no cross-host ratio is calculated. See
 latency, memory, storage, concurrency, correctness, and provenance gate and are
 published under `docs/results/`.
 
+The descriptive 0.9 four-way preview has a separate fail-closed verifier at
+`check_ocpq_four_way.py`. It requires explicit SHA-256 pins for the corrected
+OCPQ reference, vanilla PostgreSQL plus PM4Py, `pg_ocpm` plus PM4Py, the strict
+engine artifact, and the PM4Py runner. The full invocation and current preview
+digests are recorded in
+[`docs/ocpq-0.9-four-way-comparison.md`](../docs/ocpq-0.9-four-way-comparison.md).
+Passing that verifier does not promote the preview: missing immutable
+`pg_ocpm` provenance and cross-arm PM4Py host identity remain publication
+blockers.
+
+The same 0.9 engine artifact also passes the official strict checker in preview
+mode. Preview release overrides are explicit and do not change the published
+0.8 release pins or any performance threshold:
+
+```sh
+python3 benchmarks/check_ocpq_result.py --preview \
+  --reference .benchmarks/ocpq-reproduced-strict-all-node-0.9-preview.json \
+  --candidate .benchmarks/ocpq-bpic2017-pg_ocpm-0.9.0-ocpm-engine-0.9.0-strict-preview.json \
+  --expected-reference-sha256 ae317e94d0cb8a7cb74786aa71a7f1792eb16c245e577729995640056c4beb9a \
+  --expected-candidate-sha256 ffcaa60383bb52945ea2f0053add72b1ca20264bbcf0dfcc05ed3de5c67c45ba \
+  --expected-pg-ocpm-version 0.9.0 \
+  --expected-ocpm-engine-version 0.9.0
+```
+
 All local checker targets require Python 3.11 or newer. They use
 `.venv/bin/python` when that environment exists, otherwise `python3`. Override
 the interpreter explicitly when needed, for example
@@ -173,6 +197,38 @@ raw nanosecond samples and realized order codes, 1/2/4/8-worker DFG concurrency
 using the same three-epoch duration and per-worker request floors, isolated peak
 RSS, database storage, and client dependency footprints. Exact three-way
 canonical answers are required before samples are accepted.
+
+The 0.9 factorized-event diagnostic uses the same Docker Compose client and
+database images, unchanged datasets, PM4Py evaluator, randomized protocol,
+memory workers, storage snapshot, and concurrency sweep. Inside the prepared
+benchmark client, the workload command is:
+
+```sh
+OCPM_ENGINE_READ_PATH=factorized python benchmarks/sap_pm4py_three_way.py \
+  --output .benchmarks/sap-pm4py-three-way-factorized-0.9.0.json \
+  --report .benchmarks/sap-pm4py-three-way-factorized-0.9.0.md
+```
+
+This is not a standalone host command: the client must be created by the public
+Docker orchestrator so the database hostnames, prepared fixtures, immutable
+image IDs, and required provenance variables are present. The current
+orchestrator remains pinned to the 0.8 published artifacts. Until a clean 0.9
+`pg_ocpm` revision is available to pin, the factorized results are diagnostic
+preview evidence and are validated explicitly with:
+
+```sh
+python benchmarks/check_sap_pm4py_result.py \
+  .benchmarks/sap-pm4py-three-way-factorized-0.9.0.json \
+  --preview \
+  --expected-ocpm-engine-version 0.9.0 \
+  --expected-pg-ocpm-version 0.9.0
+```
+
+The environment switch changes only the ocpm-engine arm. `aggregate` remains
+the default because workloads already expressible as compact sufficient
+statistics should not be routed through an event export merely to improve a
+benchmark narrative. The factorized mode exists to measure general event-log
+consumers against the same vanilla PostgreSQL+PM4Py and pg_ocpm+PM4Py arms.
 
 The relational index reduction is applied only after the main public benchmark
 finishes, so the two suites remain independent. The recorded report is

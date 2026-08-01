@@ -2,6 +2,38 @@
 
 All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
 
+## 0.9.0 - 2026-07-31
+
+- Added strict native decoding for `pg_ocpm 0.9.0` factorized event batches,
+  preserving activity paths and packed case/timestamp vectors instead of
+  expanding one PostgreSQL row and one Python object per event.
+- Added incremental event-log summaries for variants, directly-follows
+  frequency and mean duration, and activity case/occurrence/start/end
+  frequencies. The Rust kernel operates on borrowed per-case views and releases
+  Python's GIL during decoding and aggregation.
+- Added capability-aware single-window and aligned multi-window adapters in
+  Rust and Python. `pg_ocpm 0.9.0` uses one compact batch scan while
+  `pg_ocpm 0.8.0` retains an exact ordered event-row compatibility fallback.
+- Chunked requests larger than 256 windows transparently in both adapters while
+  preserving the original global window order.
+- Added transfer and expansion telemetry so callers can observe database row
+  counts, packed payload bytes, and whether event rows were materialized.
+- Made the Python event adapter consume DB-API cursors incrementally and feed
+  compact rows to a persistent native accumulator in bounded 64-row chunks,
+  avoiding whole-result Python lists and duplicate decoded-batch retention.
+- Exposed borrowed materialized-column and factorized pair-group views for
+  binding capsules, avoiding Cartesian row expansion when an algorithm can
+  consume the encoded grouping directly.
+- Added exact binding-index coverage inspection for object, activity, event,
+  neighbor, and declared relation paths. Missing or malformed metadata fails
+  closed so callers cannot mistake an undeclared path for covered.
+- Pruned event-attribute decoding to base cases and materialized non-edge
+  dynamic filters before lifecycle reconstruction, reducing work for selective
+  dynamic queries without adding dataset- or benchmark-specific plans.
+- Extended the SAP O2C/P2P three-way harness with a selectable factorized
+  engine read path while retaining the aggregate-native path for workloads
+  already expressible as sufficient statistics.
+
 ## 0.8.0 - 2026-07-20
 
 - Published checksum-pinned SAP O2C/P2P current-versus-vanilla and strict OCPQ

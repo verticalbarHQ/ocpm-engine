@@ -22,16 +22,12 @@ image="${OCPM_CANDIDATE_IMAGE:-ocpm-engine:ocpq-strict-publication-preview}"
 network="${OCPM_DOCKER_NETWORK:-bridge}"
 database_container="${OCPM_DATABASE_CONTAINER:-ocpq-strict-nodes}"
 temporary="$(mktemp -d "${TMPDIR:-/tmp}/ocpq-strict-gates.XXXXXX")"
-temporary_index=""
 cleanup() {
   status=$?
   if [[ $status -eq 0 ]]; then
     rm -rf "$temporary"
   else
     echo "strict gate failed; raw diagnostics retained at $temporary" >&2
-  fi
-  if [[ -n "$temporary_index" ]]; then
-    rm -f "$temporary_index"
   fi
   return "$status"
 }
@@ -57,7 +53,7 @@ else
 fi
 reference_revision="$(jq --exit-status --raw-output '.environment.source_revision' "$reference")"
 reference_clean="$(
-  jq --exit-status --raw-output '
+  jq --raw-output '
     if (.environment.source_tree_clean | type) == "boolean" then
       .environment.source_tree_clean
     else
@@ -70,19 +66,13 @@ if [[ "$source_revision" != "$reference_revision" || "$source_tree_clean" != "$r
   exit 1
 fi
 
-# Build a temporary Git index so the fingerprint includes tracked changes,
-# deletions, and untracked source files without mutating the user's index.
-temporary_index="$(mktemp "${TMPDIR:-/tmp}/ocpq-strict-index.XXXXXX")"
-rm -f "$temporary_index"
-GIT_INDEX_FILE="$temporary_index" git -C "$repo" read-tree HEAD
-git -C "$repo" ls-files --modified --deleted --others --exclude-standard -z \
-  | GIT_INDEX_FILE="$temporary_index" git -C "$repo" update-index --add --remove -z --stdin
-source_tree_id="git-tree:$(GIT_INDEX_FILE="$temporary_index" git -C "$repo" write-tree)"
+source_tree_id="$(bash "$repo/benchmarks/ocpq/source_tree_id.sh" "$repo")"
 
 candidate_runner_sha256="$({
   shasum -a 256 \
     "$repo/benchmarks/ocpq/strict_candidate_benchmark.rs" \
     "$repo/benchmarks/ocpq/strict_resource_support.rs" \
+    "$repo/benchmarks/ocpq/source_tree_id.sh" \
     "$repo/benchmarks/ocpq/Dockerfile.candidate"
 } | shasum -a 256 | awk '{print $1}')"
 
@@ -191,9 +181,11 @@ resource_process_run_id="sha256:$(
   printf 'resources:%s:%s:%s' "$RANDOM" "$$" "$SECONDS" \
     | shasum -a 256 | awk '{print $1}'
 )"
+# Three client runtime workers leave CPU headroom for the co-located PostgreSQL
+# server while still scaling the asynchronous request path at 16 clients.
 docker run \
   "${common_docker_arguments[@]}" \
-  --env TOKIO_WORKER_THREADS="${OCPM_CONCURRENCY_WORKER_THREADS:-16}" \
+  --env TOKIO_WORKER_THREADS="${OCPM_CONCURRENCY_WORKER_THREADS:-3}" \
   --env OCPM_PROCESS_RUN_ID="$resource_process_run_id" \
   "$image" \
   --reference /benchmark/reference.json \

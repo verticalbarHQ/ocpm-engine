@@ -25,16 +25,26 @@ The `ocpm-postgres` crate provides an asynchronous adapter for activity profiles
 and single-window and multi-window DFG/variant counts. It also retrieves and
 decodes generic binding-result capsules for cardinality, required-activity,
 eventually-follows, actor, delay, and related-object pair operations. Pair
-results remain factorized and expand through an exact-size lazy iterator.
+results remain factorized, expose borrowed pair groups and materialized columns,
+and expand only through an exact-size lazy iterator when rows are genuinely
+needed.
 Multi-window requests retrieve aligned training, test, comparison-period, or
 drift statistics in one database request.
 
 For algorithms that genuinely require individual events, `ocpm-postgres`
-provides a prepared adapter over `pg_ocpm >= 0.8.0`'s native event table
-function. It exposes PostgreSQL's asynchronous row stream directly, preserving
-backpressure and avoiding SQL array expansion, joins, event-level sorting, and
-whole-log allocation in the engine. Aggregate-native algorithms continue to
-use sufficient statistics because that path transfers far less data.
+detects the installed callable surface. With `pg_ocpm >= 0.9.0`, it decodes
+factorized single- or multi-window activity-path bucket rows, whose packed
+vectors can represent multiple cases, directly into incremental Rust summaries
+through bounded cursor chunks without constructing a whole-result Python list,
+event rows, or Python dataframes. With
+`pg_ocpm 0.8.x`, it preserves the exact asynchronous event-row stream as a
+compatibility fallback. Aggregate-native algorithms continue to use sufficient
+statistics when those are the smaller input.
+
+Event-log window boundaries are inclusive, and a case is selected only when its
+complete lifecycle is contained in the window. Consequently, two adjacent
+nonoverlapping timestamp windows require a one-microsecond gap between the
+first window's inclusive end and the second window's inclusive start.
 
 The existing Python query planner remains available for these request shapes:
 
@@ -61,6 +71,12 @@ concurrency, correctness gates, and published context, see
 For the three-way comparison of lightly indexed PostgreSQL with PM4Py,
 `pg_ocpm` with PM4Py, and `pg_ocpm` with ocpm-engine, see
 [SAP PM4Py three-way performance](docs/sap-pm4py-three-way-performance.md).
+For the 0.9 factorized-event implementation, SAP O2C/P2P Docker preview, strict
+OCPQ regression, and dynamic-query expectations, see
+[ocpm-engine 0.9 performance evidence](docs/ocpm-engine-0.9-performance.md).
+For the OCPQ data evaluated across OCPQ, vanilla PostgreSQL plus PM4Py,
+`pg_ocpm` plus PM4Py, and `pg_ocpm` plus the engine, see the
+[four-way 0.9 comparison](docs/ocpq-0.9-four-way-comparison.md).
 The corrected OCPQ Q1-Q7 comparison uses zero warmups, ten same-host measured
 runs per query, and exact duplicate-preserving parity for every node. The
 published result is 14.02x faster by geometric mean with a 6.51x minimum; see
@@ -183,6 +199,55 @@ At application startup, verify that the dependency is present:
 ```python
 version = engine.verify_pg_ocpm(cursor)
 ```
+
+For native event-log algorithms, inspect capabilities and let the planner
+select the compact 0.9 path or the exact 0.8 fallback:
+
+```python
+from ocpm_engine import EventLogRequest, EventLogWindow
+
+capabilities = engine.inspect_pg_ocpm(cursor)
+request = EventLogRequest(
+    object_type="Order",
+    windows=(
+        EventLogWindow(training_start, training_end),
+        EventLogWindow(test_start, test_end),
+    ),
+)
+execution = engine.execute_event_log_summary(
+    cursor, request, capabilities=capabilities
+)
+
+assert execution.expanded_event_rows == 0  # pg_ocpm 0.9 factorized path
+training, test = execution.summaries
+```
+
+For a large remote result, use a driver-level server-side cursor so the Python
+database driver does not buffer every factorized row during `execute()`. With
+psycopg2 this requires an explicit transaction:
+
+```python
+connection.autocommit = False
+with connection.cursor(name="ocpm_event_batches") as cursor:
+    cursor.itersize = 64
+    execution = engine.execute_event_log_summary(
+        cursor, request, capabilities=capabilities
+    )
+connection.commit()
+```
+
+`pg_ocpm 0.9` bounds PostgreSQL backend memory with a `work_mem`-backed
+tuplestore, while the named cursor bounds client-driver buffering. PostgreSQL's
+materialized set-returning-function contract still completes the compact
+server result before returning its first row, so this path improves peak memory
+and transfer shape but does not claim streaming time-to-first-row. Both engine
+adapters transparently split requests larger than 256 windows into bounded
+extension calls and preserve the original global window order.
+
+Binding-index declarations are observable rather than inferred from a version
+number. `inspect_binding_index(cursor)` returns exact coverage and dataset
+refresh markers; callers should select a binding-index plan only after its
+required object, activity, event, neighbor, or relation declaration is present.
 
 ## Integration boundary
 

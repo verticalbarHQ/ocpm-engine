@@ -2,16 +2,28 @@
 
 from __future__ import annotations
 
+import json
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
 from . import queries
 from .analytics import bottleneck_order
 from .dynamic_queries import Projection, compile_dynamic_dfg
+from .event_batches import (
+    EventLogExecution,
+    summarize_event_row_fallback,
+    summarize_event_window_batch_rows,
+)
 from .models import (
+    BindingIndexCoverage,
+    BindingNeighborCoverage,
+    BindingRelationCoverage,
     DynamicDfgRequest,
     DynamicFilter,
     Endpoint,
+    EventLogRequest,
+    PgOcpmCapabilities,
     ProcessMiningRequest,
     QueryPlan,
 )
@@ -29,6 +41,145 @@ _MIN_TIMESTAMP = datetime(1, 1, 1, tzinfo=UTC)
 _MAX_TIMESTAMP = datetime(9999, 12, 31, 23, 59, 59, 999999, tzinfo=UTC)
 _TIMELINE_PERIODS = frozenset({"hour", "day", "week", "month", "quarter", "year"})
 _MINIMUM_PG_OCPM_VERSION = (0, 8, 0)
+_EVENT_BATCH_MAX_WINDOWS = 256
+
+_PG_OCPM_CAPABILITIES_SQL = """SELECT ocpm.version(),
+       to_regprocedure(
+           'ocpm.event_log_rows(bigint,bigint,text,timestamptz,timestamptz)'
+       ) IS NOT NULL,
+       to_regprocedure(
+           'ocpm.event_log_batches(bigint,bigint,text,timestamptz,timestamptz)'
+       ) IS NOT NULL,
+       to_regprocedure(
+           'ocpm.event_log_window_batches(bigint,bigint,text,timestamptz[],timestamptz[])'
+       ) IS NOT NULL"""
+
+_SINGLE_EVENT_BATCH_SQL = """SELECT 1::integer AS window_ordinal,
+       activity_path,activity_count,case_count,
+       case_id_payloads,event_timestamp_payloads
+FROM ocpm.event_log_batches(
+    %(dataset_id)s,%(tenant_id)s,%(object_type)s,
+    (%(from_dates)s::timestamptz[])[1],(%(to_dates)s::timestamptz[])[1]
+)"""
+
+_WINDOW_EVENT_BATCH_SQL = """SELECT window_ordinal,activity_path,activity_count,
+       case_count,case_id_payloads,event_timestamp_payloads
+FROM ocpm.event_log_window_batches(
+    %(dataset_id)s,%(tenant_id)s,%(object_type)s,
+    %(from_dates)s::timestamptz[],%(to_dates)s::timestamptz[]
+)"""
+
+_CHUNKED_WINDOW_EVENT_BATCH_SQL = """SELECT
+       chunk.first_window - 1 + batch.window_ordinal AS window_ordinal,
+       batch.activity_path,batch.activity_count,batch.case_count,
+       batch.case_id_payloads,batch.event_timestamp_payloads
+FROM generate_series(
+    1,cardinality(%(from_dates)s::timestamptz[]),256
+) AS chunk(first_window)
+CROSS JOIN LATERAL ocpm.event_log_window_batches(
+    %(dataset_id)s,%(tenant_id)s,%(object_type)s,
+    (%(from_dates)s::timestamptz[])[
+        chunk.first_window:
+        LEAST(
+            chunk.first_window + 255,
+            cardinality(%(from_dates)s::timestamptz[])
+        )
+    ],
+    (%(to_dates)s::timestamptz[])[
+        chunk.first_window:
+        LEAST(
+            chunk.first_window + 255,
+            cardinality(%(to_dates)s::timestamptz[])
+        )
+    ]
+) AS batch"""
+
+_EVENT_ROW_FALLBACK_SQL = """SELECT window_ordinal,case_id,activity,
+       event_timestamp,event_ordinal
+FROM unnest(
+    %(from_dates)s::timestamptz[],%(to_dates)s::timestamptz[]
+) WITH ORDINALITY AS window(from_date,to_date,window_ordinal)
+CROSS JOIN LATERAL ocpm.event_log_rows(
+    %(dataset_id)s,%(tenant_id)s,%(object_type)s,
+    window.from_date,window.to_date
+)
+ORDER BY window_ordinal,case_id,event_ordinal"""
+
+_BINDING_INDEX_COVERAGE_SQL = """SELECT dataset.refreshed_at,
+       dataset.source_watermark,
+       dataset.event_identity_complete,
+       COALESCE((
+           SELECT jsonb_agg(item ORDER BY item)::text
+           FROM (
+               SELECT jsonb_build_array(object_type) AS item
+               FROM ocpm.binding_object
+               WHERE dataset_id=%(dataset_id)s AND tenant_id=%(tenant_id)s
+           ) objects
+       ), '[]'),
+       COALESCE((
+           SELECT jsonb_agg(item ORDER BY item)::text
+           FROM (
+               SELECT jsonb_build_array(object_type,activity) AS item
+               FROM ocpm.binding_activity
+               WHERE dataset_id=%(dataset_id)s AND tenant_id=%(tenant_id)s
+           ) activities
+       ), '[]'),
+       COALESCE((
+           SELECT jsonb_agg(item ORDER BY item)::text
+           FROM (
+               SELECT jsonb_build_array(activity) AS item
+               FROM ocpm.binding_event
+               WHERE dataset_id=%(dataset_id)s AND tenant_id=%(tenant_id)s
+           ) events
+       ), '[]'),
+       COALESCE((
+           SELECT jsonb_agg(item ORDER BY item)::text
+           FROM (
+               SELECT jsonb_build_array(
+                   source_object_type,target_object_type,activity
+               ) AS item
+               FROM ocpm.binding_neighbor_activity
+               WHERE dataset_id=%(dataset_id)s AND tenant_id=%(tenant_id)s
+           ) neighbors
+       ), '[]'),
+       COALESCE((
+           SELECT jsonb_agg(item ORDER BY item)::text
+           FROM (
+               SELECT jsonb_build_array(
+                   source_object_type,source_activity,
+                   target_object_type,target_activity,related_object_type
+               ) AS item
+               FROM ocpm.binding_relation_summary
+               WHERE dataset_id=%(dataset_id)s AND tenant_id=%(tenant_id)s
+           ) relations
+       ), '[]')
+FROM ocpm.dataset AS dataset
+WHERE dataset.dataset_id=%(dataset_id)s AND dataset.tenant_id=%(tenant_id)s"""
+
+
+def _coverage_rows(value: Any, width: int) -> tuple[tuple[str, ...], ...]:
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except json.JSONDecodeError as error:
+            raise RuntimeError("invalid binding-index coverage JSON") from error
+    if not isinstance(value, list) or any(
+        not isinstance(row, list)
+        or len(row) != width
+        or any(not isinstance(item, str) for item in row)
+        for row in value
+    ):
+        raise RuntimeError(f"invalid binding-index coverage width {width}")
+    return tuple(tuple(row) for row in value)
+
+
+def _cursor_rows(cursor: Cursor) -> Iterator[Any]:
+    """Prefer incremental DB-API iteration, retaining a compatibility fallback."""
+
+    iterator = getattr(cursor, "__iter__", None)
+    if callable(iterator):
+        return iter(cursor)
+    return iter(cursor.fetchall())
 
 
 def score_dynamic_dfg_rows(rows: list[tuple[Any, ...]]) -> dict[str, Any]:
@@ -91,6 +242,134 @@ class OcpmEngine:
         if parsed < _MINIMUM_PG_OCPM_VERSION:
             raise RuntimeError("ocpm-engine requires pg_ocpm 0.8.0 or later")
         return version
+
+    @staticmethod
+    def inspect_pg_ocpm(cursor: Cursor) -> PgOcpmCapabilities:
+        """Detect callable extension features and retain an exact fallback."""
+
+        cursor.execute(_PG_OCPM_CAPABILITIES_SQL)
+        row = cursor.fetchone()
+        if not row or not row[0]:
+            raise RuntimeError("pg_ocpm is not installed in the current database")
+        version = str(row[0])
+        try:
+            parsed = tuple(int(part) for part in version.split(".")[:3])
+        except ValueError as error:
+            raise RuntimeError(f"invalid pg_ocpm version: {version}") from error
+        if parsed < _MINIMUM_PG_OCPM_VERSION or not bool(row[1]):
+            raise RuntimeError("ocpm-engine requires pg_ocpm 0.8.0 or later")
+        return PgOcpmCapabilities(
+            version=version,
+            event_log_rows=bool(row[1]),
+            event_log_batches=bool(row[2]),
+            event_log_window_batches=bool(row[3]),
+        )
+
+    def inspect_binding_index(self, cursor: Cursor) -> BindingIndexCoverage:
+        """Read exact declared binding coverage without assuming freshness."""
+
+        cursor.execute(
+            _BINDING_INDEX_COVERAGE_SQL,
+            {"dataset_id": self.dataset_id, "tenant_id": self.tenant_id},
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise RuntimeError(
+                f"dataset {self.dataset_id} for tenant {self.tenant_id} does not exist"
+            )
+        object_types = _coverage_rows(row[3], 1)
+        activities = _coverage_rows(row[4], 2)
+        event_activities = _coverage_rows(row[5], 1)
+        neighbors = _coverage_rows(row[6], 3)
+        relations = _coverage_rows(row[7], 5)
+        return BindingIndexCoverage(
+            refreshed_at=row[0],
+            source_watermark=row[1],
+            event_identity_complete=bool(row[2]),
+            object_types=tuple(item[0] for item in object_types),
+            activities=tuple((item[0], item[1]) for item in activities),
+            event_activities=tuple(item[0] for item in event_activities),
+            neighbors=tuple(BindingNeighborCoverage(*item) for item in neighbors),
+            relations=tuple(BindingRelationCoverage(*item) for item in relations),
+        )
+
+    def build_event_log_summary(
+        self,
+        request: EventLogRequest,
+        capabilities: PgOcpmCapabilities,
+    ) -> QueryPlan:
+        """Choose a factorized 0.9 export or an exact 0.8 compatibility path."""
+
+        self._validate_event_log(request)
+        params = {
+            "dataset_id": self.dataset_id,
+            "tenant_id": self.tenant_id,
+            "object_type": request.object_type,
+            "from_dates": [window.from_date for window in request.windows],
+            "to_dates": [window.to_date for window in request.windows],
+        }
+        if len(request.windows) == 1 and capabilities.event_log_batches:
+            sql = _SINGLE_EVENT_BATCH_SQL
+            strategy = "factorized event batch"
+        elif capabilities.event_log_window_batches:
+            if len(request.windows) <= _EVENT_BATCH_MAX_WINDOWS:
+                sql = _WINDOW_EVENT_BATCH_SQL
+                strategy = "factorized multi-window event batch"
+            else:
+                sql = _CHUNKED_WINDOW_EVENT_BATCH_SQL
+                strategy = "factorized chunked multi-window event batch"
+        else:
+            if not capabilities.event_log_rows:
+                raise RuntimeError(
+                    "pg_ocpm exposes neither factorized event batches nor "
+                    "the event-row compatibility export"
+                )
+            sql = _EVENT_ROW_FALLBACK_SQL
+            strategy = "native event-row compatibility fallback"
+        return QueryPlan(Endpoint.EVENT_LOG_SUMMARY, sql, params, strategy)
+
+    def execute_event_log_summary(
+        self,
+        cursor: Cursor,
+        request_or_plan: EventLogRequest | QueryPlan,
+        *,
+        capabilities: PgOcpmCapabilities | None = None,
+    ) -> EventLogExecution:
+        """Execute a native summary while reporting transfer and expansion costs."""
+
+        if isinstance(request_or_plan, QueryPlan):
+            plan = request_or_plan
+            window_count = len(plan.params["from_dates"])
+        else:
+            capabilities = capabilities or self.inspect_pg_ocpm(cursor)
+            plan = self.build_event_log_summary(request_or_plan, capabilities)
+            window_count = len(request_or_plan.windows)
+        if plan.endpoint is not Endpoint.EVENT_LOG_SUMMARY:
+            raise ValueError("execute_event_log_summary requires an event-log plan")
+        cursor.execute(plan.sql, plan.params)
+        database_rows = 0
+
+        def counted_rows() -> Iterator[Any]:
+            nonlocal database_rows
+            for row in _cursor_rows(cursor):
+                database_rows += 1
+                yield row
+
+        rows = counted_rows()
+        if plan.strategy.startswith("factorized"):
+            summaries = summarize_event_window_batch_rows(
+                rows, window_count=window_count
+            )
+            expanded_event_rows = 0
+        else:
+            summaries = summarize_event_row_fallback(rows, window_count=window_count)
+            expanded_event_rows = database_rows
+        return EventLogExecution(
+            strategy=plan.strategy,
+            database_rows=database_rows,
+            expanded_event_rows=expanded_event_rows,
+            summaries=summaries,
+        )
 
     def build_dynamic_case_ids(self, request: DynamicDfgRequest) -> QueryPlan:
         """Build the exact selected-case projection for a dynamic request."""
@@ -342,3 +621,13 @@ class OcpmEngine:
         ):
             if not attribute.key.strip():
                 raise ValueError("event attribute keys must not be empty")
+
+    @staticmethod
+    def _validate_event_log(request: EventLogRequest) -> None:
+        if not request.object_type:
+            raise ValueError("event-log requests require a non-empty object_type")
+        if not request.windows:
+            raise ValueError("event-log requests require at least one window")
+        for window in request.windows:
+            if window.from_date > window.to_date:
+                raise ValueError("event-log window from_date must not exceed to_date")

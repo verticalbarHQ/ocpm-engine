@@ -19,6 +19,7 @@ class Endpoint(StrEnum):
     CASE_LIST = "case_list"
     ENTIRE_PROCESS_MAP = "entire_process_map"
     DYNAMIC_DFG = "dynamic_dfg"
+    EVENT_LOG_SUMMARY = "event_log_summary"
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,6 +143,120 @@ class DynamicDfgRequest:
             from_date=from_date,
             to_date=to_date,
             filter=DynamicFilter.from_mapping(value.get("filter")),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class EventLogWindow:
+    from_date: datetime
+    to_date: datetime
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> EventLogWindow:
+        from_date = _parse_datetime(value.get("from_date"))
+        to_date = _parse_datetime(value.get("to_date"))
+        if from_date is None or to_date is None:
+            raise ValueError("event-log windows require from_date and to_date")
+        return cls(from_date=from_date, to_date=to_date)
+
+
+@dataclass(frozen=True, slots=True)
+class EventLogRequest:
+    """One or more fully-contained case windows for native Rust summaries."""
+
+    object_type: str
+    windows: tuple[EventLogWindow, ...]
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> EventLogRequest:
+        source_windows = value.get("windows")
+        if source_windows is None:
+            source_windows = (value,)
+        return cls(
+            object_type=str(value["object_type"]),
+            windows=tuple(EventLogWindow.from_mapping(item) for item in source_windows),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class PgOcpmCapabilities:
+    version: str
+    event_log_rows: bool
+    event_log_batches: bool
+    event_log_window_batches: bool
+
+    @property
+    def factorized_event_export(self) -> bool:
+        return self.event_log_batches
+
+    @property
+    def factorized_multi_window_export(self) -> bool:
+        return self.event_log_window_batches
+
+
+@dataclass(frozen=True, slots=True)
+class BindingNeighborCoverage:
+    source_object_type: str
+    target_object_type: str
+    activity: str
+
+
+@dataclass(frozen=True, slots=True)
+class BindingRelationCoverage:
+    source_object_type: str
+    source_activity: str
+    target_object_type: str
+    target_activity: str
+    related_object_type: str
+
+
+@dataclass(frozen=True, slots=True)
+class BindingIndexCoverage:
+    """Observable binding-index declarations and dataset refresh markers."""
+
+    refreshed_at: datetime | None
+    source_watermark: datetime | None
+    event_identity_complete: bool
+    object_types: tuple[str, ...]
+    activities: tuple[tuple[str, str], ...]
+    event_activities: tuple[str, ...]
+    neighbors: tuple[BindingNeighborCoverage, ...]
+    relations: tuple[BindingRelationCoverage, ...]
+
+    def covers_object_type(self, object_type: str) -> bool:
+        return object_type in self.object_types
+
+    def covers_activity(self, object_type: str, activity: str) -> bool:
+        return (object_type, activity) in self.activities
+
+    def covers_event_activity(self, activity: str) -> bool:
+        return activity in self.event_activities
+
+    def covers_neighbor(
+        self, source_object_type: str, target_object_type: str, activity: str
+    ) -> bool:
+        return (
+            BindingNeighborCoverage(source_object_type, target_object_type, activity)
+            in self.neighbors
+        )
+
+    def covers_relation(
+        self,
+        source_object_type: str,
+        source_activity: str,
+        target_object_type: str,
+        target_activity: str,
+        related_object_type: str,
+    ) -> bool:
+        return (
+            BindingRelationCoverage(
+                source_object_type,
+                source_activity,
+                target_object_type,
+                target_activity,
+                related_object_type,
+            )
+            in self.relations
         )
 
 

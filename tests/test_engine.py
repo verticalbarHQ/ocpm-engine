@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import struct
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -10,8 +11,11 @@ from ocpm_engine import (
     DynamicFilter,
     EdgeFilter,
     EventAttributeFilter,
+    EventLogRequest,
+    EventLogWindow,
     NetworkFilter,
     OcpmEngine,
+    PgOcpmCapabilities,
     ProcessMiningRequest,
     score_dynamic_dfg_rows,
 )
@@ -121,6 +125,9 @@ def test_dynamic_filter_is_parameterized_across_every_predicate_family() -> None
         assert "ocpm.event_chunk" in plan.sql
         assert "ocpm.connected_objects_one_hop" in plan.sql
         assert "ocpm.event_log_rows" in plan.sql
+        assert "preselected AS MATERIALIZED" in plan.sql
+        assert "JOIN preselected USING (case_id)" in plan.sql
+        assert "event.case_id IN (SELECT case_id FROM base)" in plan.sql
         assert "event_locator" not in plan.sql
     assert "array_agg(case_id ORDER BY case_id)" in ids.sql
     assert "lifecycle_edges" in dfg.sql
@@ -283,6 +290,7 @@ class FakeCursor:
     def __init__(self, row: tuple[object, ...]) -> None:
         self.row = row
         self.executed: tuple[str, dict[str, object] | None] | None = None
+        self.fetchall_called = False
 
     def execute(self, query: str, params: dict[str, object] | None = None) -> None:
         self.executed = (query, params)
@@ -291,7 +299,11 @@ class FakeCursor:
         return self.row
 
     def fetchall(self) -> list[tuple[object, ...]]:
+        self.fetchall_called = True
         return [self.row]
+
+    def __iter__(self):
+        return iter([self.row])
 
 
 def test_execute_and_version_check_use_cursor_protocol() -> None:
@@ -307,6 +319,162 @@ def test_execute_and_version_check_use_cursor_protocol() -> None:
         "tenant_id": 12,
         "timeline_period": "week",
     }
+
+
+def event_log_request(*windows: tuple[datetime, datetime]) -> EventLogRequest:
+    return EventLogRequest(
+        object_type="Order",
+        windows=tuple(EventLogWindow(start, end) for start, end in windows),
+    )
+
+
+def test_pg_ocpm_capabilities_are_detected_by_callable_surface() -> None:
+    cursor = FakeCursor(("0.9.0", True, True, True))
+
+    capabilities = OcpmEngine.inspect_pg_ocpm(cursor)
+
+    assert capabilities.factorized_event_export
+    assert capabilities.factorized_multi_window_export
+    assert cursor.executed and "to_regprocedure" in cursor.executed[0]
+
+
+def test_binding_index_coverage_is_observable_and_exact() -> None:
+    refreshed = NOW - timedelta(minutes=1)
+    cursor = FakeCursor(
+        (
+            refreshed,
+            NOW,
+            True,
+            '[["Order"]]',
+            '[["Order","Create"]]',
+            '[["Create"]]',
+            '[["Order","Item","Create"]]',
+            '[["Order","Create","Item","Approve","User"]]',
+        )
+    )
+
+    coverage = OcpmEngine(9, 12).inspect_binding_index(cursor)
+
+    assert coverage.refreshed_at == refreshed
+    assert coverage.source_watermark == NOW
+    assert coverage.event_identity_complete
+    assert coverage.covers_object_type("Order")
+    assert coverage.covers_activity("Order", "Create")
+    assert coverage.covers_event_activity("Create")
+    assert coverage.covers_neighbor("Order", "Item", "Create")
+    assert coverage.covers_relation("Order", "Create", "Item", "Approve", "User")
+    assert not coverage.covers_activity("Order", "Approve")
+    assert cursor.executed and "ocpm.binding_relation_summary" in cursor.executed[0]
+
+
+def test_binding_index_coverage_fails_closed_on_invalid_metadata() -> None:
+    cursor = FakeCursor((NOW, NOW, True, "[]", '[["Order"]]', "[]", "[]", "[]"))
+
+    with pytest.raises(RuntimeError, match="coverage width 2"):
+        OcpmEngine(9, 12).inspect_binding_index(cursor)
+
+
+def test_event_log_planner_uses_batches_with_row_fallback() -> None:
+    engine = OcpmEngine(9, 12)
+    request = event_log_request((NOW - timedelta(days=3), NOW))
+    batch = engine.build_event_log_summary(
+        request, PgOcpmCapabilities("0.9.0", True, True, True)
+    )
+    fallback = engine.build_event_log_summary(
+        request, PgOcpmCapabilities("0.8.0", True, False, False)
+    )
+
+    assert "ocpm.event_log_batches" in batch.sql
+    assert batch.strategy == "factorized event batch"
+    assert "ocpm.event_log_rows" in fallback.sql
+    assert fallback.strategy == "native event-row compatibility fallback"
+
+
+def test_event_log_planner_uses_one_multi_window_scan() -> None:
+    engine = OcpmEngine(9, 12)
+    request = event_log_request(
+        (NOW - timedelta(days=4), NOW - timedelta(days=2)),
+        (NOW - timedelta(days=2), NOW),
+    )
+    plan = engine.build_event_log_summary(
+        request, PgOcpmCapabilities("0.9.0", True, True, True)
+    )
+
+    assert "ocpm.event_log_window_batches" in plan.sql
+    assert "ORDER BY" not in plan.sql
+    assert plan.strategy == "factorized multi-window event batch"
+    assert len(plan.params["from_dates"]) == 2
+
+
+def test_event_log_planner_chunks_more_than_256_windows() -> None:
+    windows = tuple((NOW - timedelta(days=1), NOW) for _ in range(257))
+    plan = OcpmEngine(9, 12).build_event_log_summary(
+        event_log_request(*windows),
+        PgOcpmCapabilities("0.9.0", True, True, True),
+    )
+
+    assert "generate_series" in plan.sql
+    assert "chunk.first_window + 255" in plan.sql
+    assert "ORDER BY" not in plan.sql
+    assert plan.strategy == "factorized chunked multi-window event batch"
+    assert len(plan.params["from_dates"]) == 257
+
+
+@pytest.mark.parametrize(
+    "windows,capabilities",
+    [
+        (1, PgOcpmCapabilities("0.9.0", False, False, False)),
+        (2, PgOcpmCapabilities("0.9.0", False, True, False)),
+    ],
+)
+def test_event_log_planner_rejects_capabilities_without_a_usable_export(
+    windows: int, capabilities: PgOcpmCapabilities
+) -> None:
+    request_windows = tuple(
+        (NOW - timedelta(days=index + 1), NOW - timedelta(days=index))
+        for index in reversed(range(windows))
+    )
+
+    with pytest.raises(RuntimeError, match="neither factorized event batches"):
+        OcpmEngine(9, 12).build_event_log_summary(
+            event_log_request(*request_windows), capabilities
+        )
+
+
+def test_event_log_execution_reports_zero_row_expansion() -> None:
+    path = ["A", "B"]
+    case_ids = struct.pack("=q", 7)
+    timestamps = struct.pack("=iqq", 2, 0, 2_000_000)
+    cursor = FakeCursor((1, path, 2, 1, case_ids, timestamps))
+    engine = OcpmEngine(9, 12)
+    plan = engine.build_event_log_summary(
+        event_log_request((NOW - timedelta(days=1), NOW)),
+        PgOcpmCapabilities("0.9.0", True, True, True),
+    )
+
+    execution = engine.execute_event_log_summary(cursor, plan)
+
+    assert execution.database_rows == 1
+    assert execution.expanded_event_rows == 0
+    assert execution.summaries[0].case_count == 1
+    assert execution.summaries[0].dfg[0].mean_duration_seconds == 2.0
+    assert not cursor.fetchall_called
+
+
+def test_event_log_fallback_streams_rows_and_reports_expansion() -> None:
+    cursor = FakeCursor((1, 7, "A", NOW, 1))
+    engine = OcpmEngine(9, 12)
+    plan = engine.build_event_log_summary(
+        event_log_request((NOW - timedelta(days=1), NOW)),
+        PgOcpmCapabilities("0.8.0", True, False, False),
+    )
+
+    execution = engine.execute_event_log_summary(cursor, plan)
+
+    assert execution.database_rows == 1
+    assert execution.expanded_event_rows == 1
+    assert execution.summaries[0].case_count == 1
+    assert not cursor.fetchall_called
 
 
 def test_version_check_rejects_older_pg_ocpm() -> None:

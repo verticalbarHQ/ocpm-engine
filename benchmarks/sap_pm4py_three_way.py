@@ -57,6 +57,12 @@ ENGINES = (
     "pg_ocpm_ocpm_engine",
 )
 
+ENGINE_READ_PATH = os.environ.get("OCPM_ENGINE_READ_PATH", "aggregate")
+if ENGINE_READ_PATH not in {"aggregate", "factorized"}:
+    raise RuntimeError(
+        "OCPM_ENGINE_READ_PATH must be either 'aggregate' or 'factorized'"
+    )
+
 _PM4PY = None
 
 
@@ -633,7 +639,9 @@ def run_pm4py(
     raise ValueError(workload)
 
 
-def run_ocpm_engine(connection, fixture: Fixture, workload: str) -> dict[str, Any]:
+def run_ocpm_engine_aggregate(
+    connection, fixture: Fixture, workload: str
+) -> dict[str, Any]:
     from ocpm_engine import (
         TransitionCount,
         bottleneck_order,
@@ -706,6 +714,115 @@ def run_ocpm_engine(connection, fixture: Fixture, workload: str) -> dict[str, An
         return {"answer": answer, "input": {"aggregate_rows": len(rows)}}
 
     raise ValueError(workload)
+
+
+def run_ocpm_engine_factorized(
+    connection, fixture: Fixture, workload: str
+) -> dict[str, Any]:
+    """Score pg_ocpm 0.9 batches without materializing event rows or frames."""
+
+    from ocpm_engine import EventLogRequest, EventLogWindow, OcpmEngine
+
+    engine = OcpmEngine(fixture.ocpm_dataset_id, fixture.tenant_id)
+    with connection.cursor() as capability_cursor:
+        capabilities = engine.inspect_pg_ocpm(capability_cursor)
+    if workload == "edge_bottleneck_ranking":
+        windows = ((fixture.from_time, fixture.to_time),)
+    else:
+        windows = (
+            (fixture.from_time, fixture.train_to),
+            (fixture.test_from, fixture.to_time),
+        )
+    request = EventLogRequest(
+        object_type=fixture.object_type,
+        windows=tuple(EventLogWindow(*window) for window in windows),
+    )
+    restore_autocommit = connection.autocommit
+    if restore_autocommit:
+        connection.autocommit = False
+    try:
+        cursor_name = f"ocpm_engine_batches_{os.getpid()}_{time.perf_counter_ns()}"
+        with connection.cursor(name=cursor_name) as event_cursor:
+            event_cursor.itersize = 64
+            execution = engine.execute_event_log_summary(
+                event_cursor, request, capabilities=capabilities
+            )
+        if restore_autocommit:
+            connection.commit()
+    except BaseException:
+        if restore_autocommit:
+            connection.rollback()
+        raise
+    finally:
+        if restore_autocommit:
+            connection.autocommit = True
+
+    if workload in ("dfg_conformance_95pct", "next_activity_prediction"):
+        train = {
+            (edge.source, edge.target): edge.frequency
+            for edge in execution.summaries[0].dfg
+        }
+        test = {
+            (edge.source, edge.target): edge.frequency
+            for edge in execution.summaries[1].dfg
+        }
+        answer = (
+            dfg_score_from_counts(train, test)
+            if workload == "dfg_conformance_95pct"
+            else next_score_from_counts(train, test)
+        )
+        aggregate_rows = len(set(train) | set(test))
+    elif workload == "variant_conformance_95pct":
+        train = {
+            canonical_variant(list(variant.activity_path)): variant.frequency
+            for variant in execution.summaries[0].variants
+        }
+        test = {
+            canonical_variant(list(variant.activity_path)): variant.frequency
+            for variant in execution.summaries[1].variants
+        }
+        answer = variant_score_from_counts(train, test)
+        aggregate_rows = len(set(train) | set(test))
+    elif workload == "edge_bottleneck_ranking":
+        answer = [
+            [
+                edge.source,
+                edge.target,
+                edge.frequency,
+                round(edge.mean_duration_seconds, 6),
+            ]
+            for edge in execution.summaries[0].dfg
+        ]
+        answer.sort(key=lambda row: (-row[3], -row[2], row[0], row[1]))
+        aggregate_rows = len(answer)
+    else:
+        raise ValueError(workload)
+
+    return {
+        "answer": answer,
+        "input": {
+            "source": "pg_ocpm_event_batches",
+            "strategy": execution.strategy,
+            "batch_rows": execution.database_rows,
+            "event_rows": sum(summary.event_count for summary in execution.summaries),
+            "expanded_event_rows": execution.expanded_event_rows,
+            "payload_bytes": sum(
+                summary.payload_bytes for summary in execution.summaries
+            ),
+            "aggregate_rows": aggregate_rows,
+        },
+    }
+
+
+def run_ocpm_engine(connection, fixture: Fixture, workload: str) -> dict[str, Any]:
+    """Dispatch the benchmark engine arm to its declared general read path."""
+
+    runner = (
+        run_ocpm_engine_factorized
+        if ENGINE_READ_PATH == "factorized"
+        else run_ocpm_engine_aggregate
+    )
+    return runner(connection, fixture, workload)
 
 
 def canonical(value: Any) -> str:
@@ -1453,13 +1570,21 @@ def render_latency(metrics: dict[str, Any]) -> str:
 
 
 def render(result: dict[str, Any]) -> str:
+    engine_read_path = result.get("method", {}).get(
+        "ocpm_engine_read_path", "aggregate"
+    )
+    engine_input = (
+        "factorized event batches"
+        if engine_read_path == "factorized"
+        else "sufficient statistics"
+    )
     lines = [
         "# SAP O2C and P2P three-way process-mining benchmark",
         "",
         (
             "The official SAP IDES OCEL 2.0 logs are compared through three paths: "
             "PM4Py over lightly indexed relational PostgreSQL, PM4Py over `pg_ocpm` "
-            "event chunks, and ocpm-engine over `pg_ocpm` sufficient statistics. "
+            f"event chunks, and ocpm-engine over `pg_ocpm` {engine_input}. "
             "Every accepted sample passed exact three-way semantic comparison."
         ),
         "",
@@ -1714,6 +1839,7 @@ def update_concurrency_only(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def benchmark(args: argparse.Namespace) -> dict[str, Any]:
+    provenance = public_benchmark_provenance()
     rng = random.Random(args.seed)
     baseline = connect(args.baseline_host, args.database, args.timeout_seconds)
     extension = connect(args.extension_host, args.database, args.timeout_seconds)
@@ -1853,7 +1979,7 @@ def benchmark(args: argparse.Namespace) -> dict[str, Any]:
             "datasets": list(args.datasets),
         },
         "environment": environment,
-        "provenance": public_benchmark_provenance(),
+        "provenance": provenance,
         "method": {
             "warmups": args.warmups,
             "measured_runs": args.runs * args.latency_epochs,
@@ -1883,6 +2009,7 @@ def benchmark(args: argparse.Namespace) -> dict[str, Any]:
                 "ocel_e2o_object"
             ),
             "result_cache_used": False,
+            "ocpm_engine_read_path": ENGINE_READ_PATH,
         },
         "summary": {
             "correct_workloads": sum(

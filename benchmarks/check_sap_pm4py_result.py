@@ -89,6 +89,15 @@ EXPECTED_INPUT_FIELDS = {
     },
     "pg_ocpm_ocpm_engine": {"aggregate_rows"},
 }
+FACTORIZED_ENGINE_INPUT_FIELDS = {
+    "source",
+    "strategy",
+    "batch_rows",
+    "event_rows",
+    "expanded_event_rows",
+    "payload_bytes",
+    "aggregate_rows",
+}
 EXPECTED_CONCURRENCY_EPOCHS = 3
 MINIMUM_CONCURRENCY_SECONDS = 5.0
 MINIMUM_REQUESTS_PER_WORKER = 32
@@ -173,6 +182,16 @@ def parse_args() -> argparse.Namespace:
             "validate a staged, self-digested artifact without requiring the "
             "published digest pin"
         ),
+    )
+    parser.add_argument(
+        "--expected-ocpm-engine-version",
+        default=CURRENT_RELEASE["ocpm_engine"],
+        help="expected installed ocpm-engine package version",
+    )
+    parser.add_argument(
+        "--expected-pg-ocpm-version",
+        default=CURRENT_RELEASE["pg_ocpm"],
+        help="expected installed pg_ocpm extension version",
     )
     return parser.parse_args()
 
@@ -582,11 +601,17 @@ def validate_concurrency(
 
 
 def validate_contract(
-    result: dict[str, Any], baseline: dict[str, Any], *, allow_dirty: bool
+    result: dict[str, Any],
+    baseline: dict[str, Any],
+    *,
+    allow_dirty: bool,
+    current_release: dict[str, str] = CURRENT_RELEASE,
 ) -> tuple[
     dict[str, dict[str, Any]],
     dict[str, dict[str, Any]],
 ]:
+    if not allow_dirty and current_release != CURRENT_RELEASE:
+        fail("release validation uses only the published release pair")
     validate_artifact_shape(result)
     if result.get("schema_version") != PUBLIC_BENCHMARK_SCHEMA_VERSION:
         fail("unexpected SAP benchmark schema version")
@@ -605,14 +630,14 @@ def validate_contract(
     validate_concurrency_protocol(result)
     if (
         result["environment"]["client"].get("ocpm_engine_version")
-        != CURRENT_RELEASE["ocpm_engine"]
+        != current_release["ocpm_engine"]
     ):
-        fail(f"expected ocpm-engine {CURRENT_RELEASE['ocpm_engine']}")
+        fail(f"expected ocpm-engine {current_release['ocpm_engine']}")
     if (
         result["environment"]["database"]["pg_ocpm"].get("pg_ocpm_version")
-        != CURRENT_RELEASE["pg_ocpm"]
+        != current_release["pg_ocpm"]
     ):
-        fail(f"expected pg_ocpm {CURRENT_RELEASE['pg_ocpm']}")
+        fail(f"expected pg_ocpm {current_release['pg_ocpm']}")
     try:
         validate_recorded_public_provenance(
             result.get("provenance"), allow_dirty=allow_dirty
@@ -659,7 +684,32 @@ def validate_contract(
                 p95 = metrics.get("p95_ms", 0)
                 if not (0 < minimum <= p50 <= p95):
                     fail(f"{name}/{workload}/{engine}: invalid latency metrics")
-                if metrics.get("input") != prior_row["input"].get(engine):
+                input_value = metrics.get("input")
+                if (
+                    engine == "pg_ocpm_ocpm_engine"
+                    and result["method"].get("ocpm_engine_read_path") == "factorized"
+                ):
+                    if (
+                        not isinstance(input_value, dict)
+                        or set(input_value) != FACTORIZED_ENGINE_INPUT_FIELDS
+                        or input_value.get("source") != "pg_ocpm_event_batches"
+                        or input_value.get("strategy")
+                        not in {
+                            "factorized event batch",
+                            "factorized multi-window event batch",
+                        }
+                        or type(input_value.get("batch_rows")) is not int
+                        or input_value["batch_rows"] <= 0
+                        or input_value.get("event_rows")
+                        != prior_row["input"]["vanilla_pg_pm4py"]["event_rows"]
+                        or input_value.get("expanded_event_rows") != 0
+                        or type(input_value.get("payload_bytes")) is not int
+                        or input_value["payload_bytes"] <= 0
+                        or input_value.get("aggregate_rows")
+                        != prior_row["input"][engine]["aggregate_rows"]
+                    ):
+                        fail(f"{name}/{workload}/{engine}: invalid factorized input")
+                elif input_value != prior_row["input"].get(engine):
                     fail(f"{name}/{workload}/{engine}: timed input shape changed")
             speedups = row["speedups"]
             expected = {
@@ -750,7 +800,7 @@ def validate_contract(
     packages = result["storage"]["client_packages"]
     if packages["pm4py"].get("version") != "2.7.23.3":
         fail("PM4Py version changed")
-    if packages["ocpm_engine"].get("version") != CURRENT_RELEASE["ocpm_engine"]:
+    if packages["ocpm_engine"].get("version") != current_release["ocpm_engine"]:
         fail("ocpm-engine package version changed")
     if (
         packages["pm4py"].get("additional_database_bytes") != 0
@@ -773,6 +823,15 @@ def validate_regressions(
     )
 
 
+def resolve_expected_release(
+    *, preview: bool, ocpm_engine: str, pg_ocpm: str
+) -> dict[str, str]:
+    requested = {"ocpm_engine": ocpm_engine, "pg_ocpm": pg_ocpm}
+    if not preview and requested != CURRENT_RELEASE:
+        fail("release validation uses only the published release pair")
+    return requested
+
+
 def main() -> None:
     args = parse_args()
     if args.preview and (
@@ -789,7 +848,17 @@ def main() -> None:
     result = load_verified(Path(args.result), expected_digest)
     baseline = load_verified(args.baseline, EXPECTED_BASELINE_PAYLOAD_SHA256)
     validate_regression_baseline(baseline)
-    datasets, _ = validate_contract(result, baseline, allow_dirty=args.preview)
+    current_release = resolve_expected_release(
+        preview=args.preview,
+        ocpm_engine=args.expected_ocpm_engine_version,
+        pg_ocpm=args.expected_pg_ocpm_version,
+    )
+    datasets, _ = validate_contract(
+        result,
+        baseline,
+        allow_dirty=args.preview,
+        current_release=current_release,
+    )
     bridge_checked = False
     if args.release_bridge is not None:
         bridge_digest = None if args.preview else args.expected_release_bridge_sha256

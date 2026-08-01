@@ -7,6 +7,14 @@ if [[ $# -ne 2 ]]; then
 fi
 : "${OCPM_DATABASE_URL:?OCPM_DATABASE_URL is required}"
 
+for command in docker git jq shasum; do
+  command -v "$command" >/dev/null || {
+    echo "$command is required" >&2
+    exit 2
+  }
+done
+
+repo="$(git rev-parse --show-toplevel)"
 reference="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
 output_dir="$(cd "$(dirname "$2")" && pwd)"
 output_name="$(basename "$2")"
@@ -40,6 +48,22 @@ elif git diff --quiet --ignore-submodules -- \
 else
   source_tree_clean=false
 fi
+
+# Distinguish dirty previews built from the same HEAD revision without changing
+# the user's real index.
+source_tree_id="$(bash "$repo/benchmarks/ocpq/source_tree_id.sh" "$repo")"
+
+candidate_runner_sha256="$({
+  shasum -a 256 \
+    "$repo/benchmarks/ocpq/strict_candidate_benchmark.rs" \
+    "$repo/benchmarks/ocpq/strict_resource_support.rs" \
+    "$repo/benchmarks/ocpq/source_tree_id.sh" \
+    "$repo/benchmarks/ocpq/Dockerfile.candidate"
+} | shasum -a 256 | awk '{print $1}')"
+process_run_id="sha256:$(
+  printf 'candidate:%s:%s:%s' "$RANDOM" "$$" "$SECONDS" \
+    | shasum -a 256 | awk '{print $1}'
+)"
 
 docker build \
   --file benchmarks/ocpq/Dockerfile.candidate \
@@ -93,6 +117,9 @@ docker run --rm \
   --env OCPM_DATABASE_URL \
   --env OCPM_SOURCE_REVISION="$source_revision" \
   --env OCPM_SOURCE_TREE_CLEAN="$source_tree_clean" \
+  --env OCPM_SOURCE_TREE_ID="$source_tree_id" \
+  --env OCPM_CANDIDATE_RUNNER_SHA256="$candidate_runner_sha256" \
+  --env OCPM_PROCESS_RUN_ID="$process_run_id" \
   --env OCPM_CANDIDATE_IMAGE="$image" \
   --env OCPM_CANDIDATE_IMAGE_ID="$candidate_image_id" \
   --env OCPM_DATABASE_IMAGE="$database_image" \
@@ -100,6 +127,7 @@ docker run --rm \
   --env OCPM_BENCHMARK_HOST_ID="$benchmark_host_id" \
   --env OCPM_PG_OCPM_SOURCE_REVISION="$pg_ocpm_source_revision" \
   --env OCPM_PG_OCPM_SOURCE_TREE_CLEAN="$pg_ocpm_source_tree_clean" \
+  --env OCPM_PROVENANCE_COMPLETE=false \
   "${mounts[@]}" \
   "$image" \
   "${arguments[@]}"
