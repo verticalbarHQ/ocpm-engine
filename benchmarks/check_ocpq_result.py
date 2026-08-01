@@ -17,9 +17,7 @@ QUERY_NAMES = tuple(f"Q{index}" for index in range(1, 8))
 QUERY_NAME_SET = set(QUERY_NAMES)
 
 REFERENCE_PATH = Path("docs/results/ocpq-reproduced-strict-all-node-0.9.0.json")
-CANDIDATE_PATH = Path(
-    "docs/results/ocpq-bpic2017-pg_ocpm-0.9.0-ocpm-engine-0.9.0.json"
-)
+CANDIDATE_PATH = Path("docs/results/ocpq-bpic2017-pg_ocpm-0.9.0-ocpm-engine-0.9.0.json")
 
 # Release validation pins the reviewed artifacts below. Preview validation
 # always requires explicit digests calculated from the ignored staging files.
