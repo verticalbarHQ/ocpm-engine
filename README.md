@@ -10,6 +10,7 @@ selective scans and sufficient-statistic aggregation into PostgreSQL while the
 same source-neutral Rust kernels construct and score models. The legacy
 PostgreSQL planner remains available for `pg_ocpm >= 0.8.0` during the 1.x
 compatibility window.
+Legacy PostgreSQL planner compatibility: Required extension version: `pg_ocpm >= 0.8.0`.
 
 Current engine version: **1.0.0**. See the [release notes](CHANGELOG.md) and
 [academic implementation provenance](docs/academic-implementation-provenance.md).
