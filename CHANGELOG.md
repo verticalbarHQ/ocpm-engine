@@ -48,6 +48,8 @@ All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
   same-time 0.9/1.0 Docker A/B confirmed that 1.0 matched or exceeded 0.9
   throughput and had lower p95 at every tested client level.
 - Locked every workspace package and the Python distribution to version 1.0.0.
+- Upgraded `quick-xml` to 0.41.0 to bound namespace processing and remediate
+  `RUSTSEC-2026-0194` and `RUSTSEC-2026-0195` before release.
 
 ## 0.10.0 - 2026-08-03
 

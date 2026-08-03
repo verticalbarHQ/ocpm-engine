@@ -11,8 +11,8 @@ use ocpm_core::{
     AttributeValue, CanonicalLog, Event, EventObjectRelation, Object, ObjectAttributeChange,
     ObjectObjectRelation, OcpmError, OcpmErrorCode, OcpmResult, Timestamp,
 };
-use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event as XmlEvent};
+use quick_xml::{Reader, XmlVersion};
 use rusqlite::Connection;
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
@@ -673,7 +673,7 @@ fn xes_attribute<R: BufRead>(
         let attribute = attribute
             .map_err(|error| OcpmError::invalid_data(format!("invalid XES attribute: {error}")))?;
         let decoded = attribute
-            .decode_and_unescape_value(xml.decoder())
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, xml.decoder())
             .map_err(|error| OcpmError::invalid_data(format!("invalid XES text: {error}")))?
             .into_owned();
         match attribute.key.as_ref() {
@@ -1046,5 +1046,23 @@ mod tests {
             log.events[0].attributes["note"],
             AttributeValue::String("a,b".to_owned())
         );
+    }
+
+    #[test]
+    fn imports_xes_attributes_with_xml_entities() {
+        let input = br#"<?xml version="1.0" encoding="UTF-8"?>
+        <log>
+          <trace>
+            <string key="concept:name" value="case-1"/>
+            <event>
+              <string key="concept:name" value="Create &amp; approve"/>
+              <string key="identity:id" value="event-1"/>
+              <date key="time:timestamp" value="2024-01-01T00:00:00Z"/>
+            </event>
+          </trace>
+        </log>"#;
+        let log = read_xes(&input[..]).unwrap();
+        assert_eq!(log.events[0].activity, "Create & approve");
+        assert_eq!(log.events[0].external_id, "event-1");
     }
 }
