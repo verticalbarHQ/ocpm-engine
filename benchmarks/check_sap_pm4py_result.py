@@ -98,6 +98,31 @@ FACTORIZED_ENGINE_INPUT_FIELDS = {
     "payload_bytes",
     "aggregate_rows",
 }
+PROVIDER_AGGREGATE_INPUT_FIELDS = {
+    "source",
+    "strategy",
+    "database_rows",
+    "expanded_event_rows",
+    "aggregate_rows",
+}
+PROVIDER_AGGREGATE_CONTRACTS = {
+    "dfg_conformance_95pct": (
+        "pg_ocpm_lifecycle_dfg_window_counts",
+        "native lifecycle DFG window aggregate",
+    ),
+    "variant_conformance_95pct": (
+        "pg_ocpm_lifecycle_variant_window_counts",
+        "native lifecycle variant window aggregate",
+    ),
+    "next_activity_prediction": (
+        "pg_ocpm_lifecycle_dfg_window_counts",
+        "native lifecycle DFG window aggregate",
+    ),
+    "edge_bottleneck_ranking": (
+        "pg_ocpm_edge_feature_aggregates",
+        "native filtered edge feature aggregate",
+    ),
+}
 EXPECTED_CONCURRENCY_EPOCHS = 3
 MINIMUM_CONCURRENCY_SECONDS = 5.0
 MINIMUM_REQUESTS_PER_WORKER = 32
@@ -198,6 +223,29 @@ def parse_args() -> argparse.Namespace:
 
 def fail(message: str) -> None:
     raise SystemExit(message)
+
+
+def validate_provider_aggregate_input(
+    name: str,
+    workload: str,
+    input_value: Any,
+    prior_input: dict[str, Any],
+) -> None:
+    """Validate the public provider API without binding 1.0 to legacy SQL input."""
+
+    expected_source, expected_strategy = PROVIDER_AGGREGATE_CONTRACTS[workload]
+    if (
+        not isinstance(input_value, dict)
+        or set(input_value) != PROVIDER_AGGREGATE_INPUT_FIELDS
+        or input_value.get("source") != expected_source
+        or input_value.get("strategy") != expected_strategy
+        or type(input_value.get("database_rows")) is not int
+        or input_value["database_rows"] <= 0
+        or input_value.get("database_rows") != input_value.get("aggregate_rows")
+        or input_value.get("expanded_event_rows") != 0
+        or input_value.get("aggregate_rows") != prior_input.get("aggregate_rows")
+    ):
+        fail(f"{name}/{workload}/pg_ocpm_ocpm_engine: invalid provider aggregate input")
 
 
 def load_verified(path: Path, expected_digest: str | None = None) -> dict[str, Any]:
@@ -709,6 +757,16 @@ def validate_contract(
                         != prior_row["input"][engine]["aggregate_rows"]
                     ):
                         fail(f"{name}/{workload}/{engine}: invalid factorized input")
+                elif (
+                    engine == "pg_ocpm_ocpm_engine"
+                    and result["method"].get("ocpm_engine_read_path") == "auto"
+                ):
+                    validate_provider_aggregate_input(
+                        name,
+                        workload,
+                        input_value,
+                        prior_row["input"][engine],
+                    )
                 elif input_value != prior_row["input"].get(engine):
                     fail(f"{name}/{workload}/{engine}: timed input shape changed")
             speedups = row["speedups"]
