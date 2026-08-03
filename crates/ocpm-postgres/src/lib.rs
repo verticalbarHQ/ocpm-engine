@@ -8,12 +8,15 @@ use ocpm_core::{
     event_batch::{EventBatch, EventBatchError, EventLogSummary, EventSummaryBuilder},
 };
 use serde::{Deserialize, Serialize};
-use std::time::SystemTime;
+use std::collections::{BTreeMap, BTreeSet};
+use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 use tokio_postgres::{
     Client, Row, RowStream, Statement,
     types::{ToSql, Type},
 };
+
+pub type PgClient = Client;
 
 pub const DFG_COUNTS_SQL: &str = r#"
 SELECT source_activity, target_activity, edge_type, frequency
@@ -37,6 +40,29 @@ SELECT source_activity, target_activity, source_object_type,
 FROM ocpm.dfg_window_counts($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 ORDER BY source_activity, target_activity, source_object_type,
          target_object_type, edge_type
+"#;
+
+pub const LIFECYCLE_DFG_WINDOW_COUNTS_SQL: &str = r#"
+SELECT chunk.first_window,
+       dfg.object_type, dfg.source_activity, dfg.target_activity,
+       dfg.frequencies
+FROM generate_series(
+    1, cardinality($3::timestamptz[]), 256
+) AS chunk(first_window)
+CROSS JOIN LATERAL ocpm.lifecycle_dfg_window_counts(
+    $1, $2,
+    ($3::timestamptz[])[
+        chunk.first_window:
+        LEAST(chunk.first_window + 255, cardinality($3::timestamptz[]))
+    ],
+    ($4::timestamptz[])[
+        chunk.first_window:
+        LEAST(chunk.first_window + 255, cardinality($4::timestamptz[]))
+    ],
+    $5, $6, $7, 1::bigint
+) AS dfg
+ORDER BY chunk.first_window, dfg.object_type,
+         dfg.source_activity, dfg.target_activity
 "#;
 
 pub const VARIANT_WINDOW_COUNTS_SQL: &str = r#"
@@ -95,6 +121,12 @@ SELECT ocpm.version(),
        ) IS NOT NULL,
        to_regprocedure(
            'ocpm.event_log_window_batches(bigint,bigint,text,timestamptz[],timestamptz[])'
+       ) IS NOT NULL,
+       to_regprocedure(
+           'ocpm.lifecycle_dfg_window_counts(bigint,bigint,timestamptz[],timestamptz[],text[],text[],text[],bigint)'
+       ) IS NOT NULL,
+       to_regprocedure(
+           'ocpm.lifecycle_variant_window_counts(bigint,bigint,timestamptz[],timestamptz[],text[],text[],text[],text[],text[],bigint)'
        ) IS NOT NULL
 "#;
 
@@ -206,6 +238,8 @@ pub enum AdapterError {
     InvalidEventWindows,
     #[error("event-log batch returned invalid window ordinal {0}")]
     InvalidWindowOrdinal(i32),
+    #[error("lifecycle DFG query returned an invalid chunk")]
+    InvalidLifecycleDfgChunk,
 }
 
 /// A decoded binding capsule plus its encoded wire size.
@@ -270,6 +304,8 @@ pub struct PgOcpmCapabilities {
     pub event_log_rows: bool,
     pub event_log_batches: bool,
     pub event_log_window_batches: bool,
+    pub lifecycle_dfg_window_counts: bool,
+    pub lifecycle_variant_window_counts: bool,
 }
 
 impl PgOcpmCapabilities {
@@ -280,6 +316,14 @@ impl PgOcpmCapabilities {
     pub fn factorized_multi_window_export(&self) -> bool {
         self.event_log_window_batches
     }
+
+    pub fn lifecycle_dfg_pushdown(&self) -> bool {
+        self.lifecycle_dfg_window_counts
+    }
+
+    pub fn lifecycle_variant_pushdown(&self) -> bool {
+        self.lifecycle_variant_window_counts
+    }
 }
 
 pub async fn pg_ocpm_capabilities(client: &Client) -> Result<PgOcpmCapabilities, AdapterError> {
@@ -289,6 +333,8 @@ pub async fn pg_ocpm_capabilities(client: &Client) -> Result<PgOcpmCapabilities,
         event_log_rows: row.try_get(1)?,
         event_log_batches: row.try_get(2)?,
         event_log_window_batches: row.try_get(3)?,
+        lifecycle_dfg_window_counts: row.try_get(4)?,
+        lifecycle_variant_window_counts: row.try_get(5)?,
     })
 }
 
@@ -1413,6 +1459,34 @@ pub struct WindowedDfgCount {
     pub frequencies: Vec<i64>,
 }
 
+/// Filters applied before lifecycle DFG counts leave PostgreSQL.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LifecycleDfgFilter {
+    pub object_types: Option<Vec<String>>,
+    pub source_activities: Option<Vec<String>>,
+    pub target_activities: Option<Vec<String>>,
+    pub minimum_total_frequency: i64,
+}
+
+impl Default for LifecycleDfgFilter {
+    fn default() -> Self {
+        Self {
+            object_types: None,
+            source_activities: None,
+            target_activities: None,
+            minimum_total_frequency: 1,
+        }
+    }
+}
+
+/// Exact directly-follows frequencies for one object type across aligned windows.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct WindowedLifecycleDfgCount {
+    pub object_type: String,
+    pub transition: TransitionKey,
+    pub frequencies: Vec<i64>,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct WindowedVariantCount {
     pub object_type: String,
@@ -1573,6 +1647,97 @@ pub async fn dfg_window_counts(
         .collect())
 }
 
+/// Fetch exact lifecycle-contained DFG counts for arbitrary aligned windows.
+///
+/// PostgreSQL receives at most 256 windows per aggregate invocation. Larger
+/// requests are chunked inside one statement and stitched into zero-filled,
+/// aligned vectors without reconstructing events or case identifiers.
+pub async fn lifecycle_dfg_window_counts(
+    client: &Client,
+    dataset_id: i64,
+    tenant_id: i64,
+    window_starts: &[SystemTime],
+    window_ends: &[SystemTime],
+    filter: &LifecycleDfgFilter,
+) -> Result<Vec<WindowedLifecycleDfgCount>, AdapterError> {
+    validate_event_windows(window_starts, window_ends)?;
+    if filter.minimum_total_frequency < 1 {
+        return Err(AdapterError::InvalidLifecycleDfgChunk);
+    }
+    let statement = client.prepare(LIFECYCLE_DFG_WINDOW_COUNTS_SQL).await?;
+    let mut stream = std::pin::pin!(
+        client
+            .query_raw(
+                &statement,
+                [
+                    &dataset_id as &(dyn ToSql + Sync),
+                    &tenant_id,
+                    &window_starts,
+                    &window_ends,
+                    &filter.object_types,
+                    &filter.source_activities,
+                    &filter.target_activities,
+                ],
+            )
+            .await?
+    );
+    let mut counts = BTreeMap::<(String, String, String), Vec<i64>>::new();
+    let mut seen_chunks = BTreeSet::<(i32, String, String, String)>::new();
+    while let Some(row) = stream.try_next().await? {
+        let first_window: i32 = row.try_get(0)?;
+        let object_type: String = row.try_get(1)?;
+        let source: String = row.try_get(2)?;
+        let target: String = row.try_get(3)?;
+        let frequencies: Vec<i64> = row.try_get(4)?;
+        let offset = first_window
+            .checked_sub(1)
+            .and_then(|value| usize::try_from(value).ok())
+            .ok_or(AdapterError::InvalidLifecycleDfgChunk)?;
+        let expected = window_starts.len().saturating_sub(offset).min(256);
+        if expected == 0
+            || frequencies.len() != expected
+            || frequencies.iter().any(|frequency| *frequency < 0)
+        {
+            return Err(AdapterError::InvalidLifecycleDfgChunk);
+        }
+        if !seen_chunks.insert((
+            first_window,
+            object_type.clone(),
+            source.clone(),
+            target.clone(),
+        )) {
+            return Err(AdapterError::InvalidLifecycleDfgChunk);
+        }
+        let aligned = counts
+            .entry((object_type, source, target))
+            .or_insert_with(|| vec![0; window_starts.len()]);
+        aligned[offset..offset + expected].copy_from_slice(&frequencies);
+    }
+    counts
+        .into_iter()
+        .filter_map(|((object_type, source, target), frequencies)| {
+            let total = frequencies
+                .iter()
+                .try_fold(0_i64, |total, frequency| total.checked_add(*frequency));
+            match total {
+                Some(total) if total >= filter.minimum_total_frequency => {
+                    Some(Ok(WindowedLifecycleDfgCount {
+                        object_type,
+                        transition: TransitionKey {
+                            source,
+                            target,
+                            edge_type: "directly_follows".to_owned(),
+                        },
+                        frequencies,
+                    }))
+                }
+                Some(_) => None,
+                None => Some(Err(AdapterError::InvalidLifecycleDfgChunk)),
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()
+}
+
 /// Fetch aligned variant frequencies for multiple time windows without
 /// transferring paths or case rows.
 pub async fn variant_window_counts(
@@ -1650,4 +1815,236 @@ pub async fn activity_profile(
             end_frequency: row.get(5),
         })
         .collect())
+}
+
+/// Load one canonical pg_ocpm 1.0 snapshot for provider-neutral execution.
+///
+/// The caller supplies an already-authorized connection. This function sets the
+/// session tenant scope before any canonical table read, verifies that the
+/// dataset has a published generation, and validates the resulting OCEL before
+/// returning it. High-volume aggregate APIs above remain preferable when an
+/// algorithm can consume sufficient statistics directly.
+pub async fn load_canonical_snapshot(
+    client: &Client,
+    tenant_id: i64,
+    dataset_id: i64,
+) -> Result<ocpm_core::CanonicalLog, AdapterError> {
+    client
+        .execute(
+            "SELECT set_config('ocpm.tenant_id', $1, false)",
+            &[&tenant_id.to_string()],
+        )
+        .await?;
+    let dataset = client
+        .query_opt(
+            "SELECT dataset_name, source_watermark, active_generation
+             FROM ocpm.dataset
+             WHERE tenant_id=$1 AND dataset_id=$2
+               AND active_generation IS NOT NULL",
+            &[&tenant_id, &dataset_id],
+        )
+        .await?
+        .ok_or(AdapterError::DatasetNotFound {
+            dataset_id,
+            tenant_id,
+        })?;
+    let source_watermark = dataset
+        .get::<_, Option<SystemTime>>(1)
+        .map(system_timestamp);
+
+    let object_rows = client
+        .query(
+            "SELECT object_id, external_object_id, object_type
+             FROM ocpm.object_entity
+             WHERE tenant_id=$1 AND dataset_id=$2
+             ORDER BY object_type, external_object_id",
+            &[&tenant_id, &dataset_id],
+        )
+        .await?;
+    let objects = object_rows
+        .into_iter()
+        .map(|row| {
+            Ok(ocpm_core::Object {
+                id: positive_id(row.get::<_, i64>(0))?,
+                external_id: row.get(1),
+                object_type: row.get(2),
+            })
+        })
+        .collect::<Result<Vec<_>, AdapterError>>()?;
+
+    let event_rows = client
+        .query(
+            "SELECT event_id, external_event_id, activity,
+                    event_timestamp, event_submicro_nanos,
+                    source_timestamp, event_sequence, lifecycle, attributes
+             FROM ocpm.event_entity
+             WHERE tenant_id=$1 AND dataset_id=$2
+             ORDER BY event_timestamp, event_submicro_nanos,
+                      event_sequence, external_event_id",
+            &[&tenant_id, &dataset_id],
+        )
+        .await?;
+    let events = event_rows
+        .into_iter()
+        .map(|row| {
+            let base = system_timestamp(row.get(3));
+            let submicro = row.get::<_, i16>(4) as i128;
+            let source = row.get::<_, Option<String>>(5);
+            let attributes = json_object_attributes(row.get(8))?;
+            Ok(ocpm_core::Event {
+                id: positive_id(row.get::<_, i64>(0))?,
+                external_id: row.get(1),
+                activity: row.get(2),
+                timestamp: ocpm_core::Timestamp {
+                    epoch_nanos_utc: base.epoch_nanos_utc + submicro,
+                    source,
+                },
+                sequence: positive_or_zero(row.get::<_, i64>(6))?,
+                lifecycle: row.get(7),
+                attributes,
+            })
+        })
+        .collect::<Result<Vec<_>, AdapterError>>()?;
+
+    let e2o_rows = client
+        .query(
+            "SELECT relation_id, event_id, object_id, qualifier
+             FROM ocpm.event_object_relation
+             WHERE tenant_id=$1 AND dataset_id=$2
+             ORDER BY relation_id",
+            &[&tenant_id, &dataset_id],
+        )
+        .await?;
+    let event_object_relations = e2o_rows
+        .into_iter()
+        .map(|row| {
+            Ok(ocpm_core::EventObjectRelation {
+                relation_id: positive_id(row.get::<_, i64>(0))?,
+                event_id: positive_id(row.get::<_, i64>(1))?,
+                object_id: positive_id(row.get::<_, i64>(2))?,
+                qualifier: row.get(3),
+            })
+        })
+        .collect::<Result<Vec<_>, AdapterError>>()?;
+
+    let o2o_rows = client
+        .query(
+            "SELECT relation_id, source_object_id, target_object_id,
+                    qualifier, valid_from, valid_to
+             FROM ocpm.object_object_relation
+             WHERE tenant_id=$1 AND dataset_id=$2
+             ORDER BY relation_id",
+            &[&tenant_id, &dataset_id],
+        )
+        .await?;
+    let object_object_relations = o2o_rows
+        .into_iter()
+        .map(|row| {
+            Ok(ocpm_core::ObjectObjectRelation {
+                relation_id: positive_id(row.get::<_, i64>(0))?,
+                source_object_id: positive_id(row.get::<_, i64>(1))?,
+                target_object_id: positive_id(row.get::<_, i64>(2))?,
+                qualifier: row.get(3),
+                valid_from: row.get::<_, Option<SystemTime>>(4).map(system_timestamp),
+                valid_to: row.get::<_, Option<SystemTime>>(5).map(system_timestamp),
+            })
+        })
+        .collect::<Result<Vec<_>, AdapterError>>()?;
+
+    let attribute_rows = client
+        .query(
+            "SELECT object_id, attribute_name, valid_from, value
+             FROM ocpm.object_attribute_history
+             WHERE tenant_id=$1 AND dataset_id=$2
+             ORDER BY object_id, attribute_name, valid_from",
+            &[&tenant_id, &dataset_id],
+        )
+        .await?;
+    let object_attribute_history = attribute_rows
+        .into_iter()
+        .map(|row| {
+            Ok(ocpm_core::ObjectAttributeChange {
+                object_id: positive_id(row.get::<_, i64>(0))?,
+                name: row.get(1),
+                valid_from: system_timestamp(row.get(2)),
+                value: json_attribute(row.get(3))?,
+            })
+        })
+        .collect::<Result<Vec<_>, AdapterError>>()?;
+
+    let mut log = ocpm_core::CanonicalLog {
+        dataset_id: dataset.get(0),
+        tenant_id: tenant_id.to_string(),
+        source_watermark,
+        events,
+        objects,
+        event_object_relations,
+        object_object_relations,
+        object_attribute_history,
+        metadata: BTreeMap::from([(
+            "pg_ocpm_generation".to_owned(),
+            serde_json::json!(dataset.get::<_, i64>(2)),
+        )]),
+    };
+    log.validate().map_err(|error| {
+        AdapterError::InvalidBindingIndexCoverage(format!(
+            "canonical provider contract violation: {error}"
+        ))
+    })?;
+    log.sort_canonical();
+    Ok(log)
+}
+
+fn positive_id(value: i64) -> Result<u64, AdapterError> {
+    u64::try_from(value).map_err(|_| {
+        AdapterError::InvalidBindingIndexCoverage("canonical ID must be nonnegative".to_owned())
+    })
+}
+
+fn positive_or_zero(value: i64) -> Result<u64, AdapterError> {
+    positive_id(value)
+}
+
+fn system_timestamp(value: SystemTime) -> ocpm_core::Timestamp {
+    let nanos = match value.duration_since(UNIX_EPOCH) {
+        Ok(duration) => duration.as_nanos() as i128,
+        Err(error) => -(error.duration().as_nanos() as i128),
+    };
+    ocpm_core::Timestamp::from_epoch_nanos(nanos)
+}
+
+fn json_object_attributes(
+    value: serde_json::Value,
+) -> Result<BTreeMap<String, ocpm_core::AttributeValue>, AdapterError> {
+    let serde_json::Value::Object(values) = value else {
+        return Err(AdapterError::InvalidBindingIndexCoverage(
+            "canonical event attributes must be a JSON object".to_owned(),
+        ));
+    };
+    values
+        .into_iter()
+        .map(|(name, value)| Ok((name, json_attribute(value)?)))
+        .collect()
+}
+
+fn json_attribute(
+    value: serde_json::Value,
+) -> Result<ocpm_core::AttributeValue, AdapterError> {
+    match value {
+        serde_json::Value::Null => Ok(ocpm_core::AttributeValue::Null),
+        serde_json::Value::String(value) => Ok(ocpm_core::AttributeValue::String(value)),
+        serde_json::Value::Bool(value) => Ok(ocpm_core::AttributeValue::Boolean(value)),
+        serde_json::Value::Number(value) => value
+            .as_i64()
+            .map(ocpm_core::AttributeValue::Integer)
+            .or_else(|| value.as_f64().map(ocpm_core::AttributeValue::Float))
+            .ok_or_else(|| {
+                AdapterError::InvalidBindingIndexCoverage(
+                    "canonical numeric attribute is outside supported range".to_owned(),
+                )
+            }),
+        _ => Err(AdapterError::InvalidBindingIndexCoverage(
+            "canonical attributes must be scalar JSON values".to_owned(),
+        )),
+    }
 }

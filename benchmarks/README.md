@@ -238,3 +238,25 @@ The compact
 retains only source counts, fixture identity, exact answer hashes, and input
 shapes. It contains no historical latency, memory, storage, concurrency,
 environment, method, generated-summary, or dependency-footprint values.
+
+## Rust4PM and OCPA ecosystem pairs
+
+The ecosystem suite is separate from both SAP and strict OCPQ. It runs four
+fixed object-centric workloads against each competitor and pg_ocpm +
+ocpm-engine using that competitor project's own upstream OCEL 2.0 dataset:
+
+```sh
+make perf-ecosystem
+make perf-ecosystem-rust4pm
+make perf-ecosystem-ocpa
+```
+
+The full run uses checksum-pinned inputs, isolated Docker images, exact answer
+gates, 10 warmups, three 30-request serial epochs, and three 1/2/4/8-worker
+concurrency epochs. Import time, storage, and memory are reported outside
+steady-state latency. Rust4PM uses its native importer. OCPA 1.3.4's documented
+importer fails on its unchanged upstream example, so its steady-state arm uses
+a disclosed setup adapter and cannot pass the publication gate. See the
+[ecosystem benchmark contract](ecosystem/README.md), the
+[Rust4PM pair report](../docs/rust4pm-vs-pg-ocpm-engine.md), and the
+[OCPA pair report](../docs/ocpa-vs-pg-ocpm-engine.md).

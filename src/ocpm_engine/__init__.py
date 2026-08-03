@@ -1,4 +1,4 @@
-"""Rust-first process-mining companion library for pg_ocpm."""
+"""Standalone Rust-first object-centric process-mining engine."""
 
 from .analytics import (
     ConformanceScore,
@@ -21,6 +21,7 @@ from .bindings import (
     decode_binding_pair_groups,
 )
 from .engine import OcpmEngine, score_dynamic_dfg_rows
+from .standalone import StandaloneEngine, serialize_model
 from .event_batches import (
     EventActivityCount,
     EventDfgEdge,
@@ -36,15 +37,24 @@ from .models import (
     BindingRelationCoverage,
     DynamicDfgRequest,
     DynamicFilter,
+    EdgeFeature,
+    EdgeFeatureExecution,
+    EdgeFeatureRequest,
     EdgeFilter,
     Endpoint,
     EventAttributeFilter,
     EventLogRequest,
     EventLogWindow,
+    LifecycleDfgExecution,
+    LifecycleDfgRequest,
+    LifecycleVariantExecution,
+    LifecycleVariantRequest,
     NetworkFilter,
     PgOcpmCapabilities,
     ProcessMiningRequest,
     QueryPlan,
+    WindowedDfgCount,
+    WindowedVariantCount,
 )
 
 __all__ = [
@@ -54,6 +64,9 @@ __all__ = [
     "EdgeFilter",
     "DynamicDfgRequest",
     "DynamicFilter",
+    "EdgeFeature",
+    "EdgeFeatureExecution",
+    "EdgeFeatureRequest",
     "BindingCapsuleInfo",
     "BindingPairGroup",
     "BindingRow",
@@ -65,12 +78,20 @@ __all__ = [
     "EventLogRequest",
     "EventLogSummary",
     "EventLogWindow",
+    "LifecycleDfgExecution",
+    "LifecycleDfgRequest",
+    "LifecycleVariantExecution",
+    "LifecycleVariantRequest",
     "EventVariantCount",
     "NetworkFilter",
     "OcpmEngine",
+    "StandaloneEngine",
+    "serialize_model",
     "ProcessMiningRequest",
     "PgOcpmCapabilities",
     "QueryPlan",
+    "WindowedDfgCount",
+    "WindowedVariantCount",
     "ConformanceScore",
     "DriftContributor",
     "DriftScore",

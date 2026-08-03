@@ -44,7 +44,7 @@ def artifacts() -> tuple[dict, dict, dict, dict]:
             "backend": backend,
             "dataset": "bpic2017-ocpq",
             "pm4py_version": "2.7.23.3",
-            "pg_ocpm_version": "0.9.0" if backend == "pg_ocpm" else None,
+            "pg_ocpm_version": "1.0.0" if backend == "pg_ocpm" else None,
             "reference_source": copy.deepcopy(CHECKER.STABLE_SOURCE),
             "reference_artifact_sha256": "b" * 64,
         }
@@ -76,7 +76,7 @@ def artifacts() -> tuple[dict, dict, dict, dict]:
         "reference_artifact_sha256": "b" * 64,
         "reference_source": copy.deepcopy(CHECKER.STABLE_SOURCE),
         "fresh_container_per_query": True,
-        "release": {"pg_ocpm": "0.9.0", "ocpm_engine": "0.9.0"},
+        "release": {"pg_ocpm": "1.0.0", "ocpm_engine": "1.0.0"},
         "queries": {
             query: {
                 "runs_ms": [2.0] * 10,
@@ -156,8 +156,8 @@ def test_verified_runner_digest_still_keeps_four_way_result_descriptive() -> Non
 @pytest.mark.parametrize(
     ("artifact_index", "version", "message"),
     [
-        (1, "0.9.0", "vanilla: pg_ocpm provenance must be absent"),
-        (2, "0.8.0", "pg_pm4py: pg_ocpm version mismatch"),
+        (1, "1.0.0", "vanilla: pg_ocpm provenance must be absent"),
+        (2, "0.9.0", "pg_pm4py: pg_ocpm version mismatch"),
     ],
 )
 def test_certify_rejects_backend_version_drift(

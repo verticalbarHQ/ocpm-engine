@@ -11,7 +11,22 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 pub mod binding;
+pub mod canonical;
+pub mod data;
+pub mod error;
 pub mod event_batch;
+pub mod model;
+pub mod request;
+pub mod result;
+pub mod serialization;
+
+pub use canonical::{canonical_json, content_hash};
+pub use data::*;
+pub use error::{OcpmError, OcpmErrorCode, OcpmResult};
+pub use model::*;
+pub use request::*;
+pub use result::*;
+pub use serialization::*;
 
 #[derive(Debug, Error, PartialEq)]
 pub enum AnalyticsError {

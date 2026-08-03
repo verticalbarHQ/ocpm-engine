@@ -1,4 +1,6 @@
 use ocpm_core::{
+    ConformanceRequest, DatasetView, DiscoveryRequest, EnhancementRequest,
+    AppendBatch, FitPredictionRequest, ModelArtifact, PredictionRequest, PredictionTarget, QueryRequest,
     TransitionKey,
     binding::BindingCapsule,
     dfg_frequency_conformance,
@@ -6,6 +8,8 @@ use ocpm_core::{
     frequency_drift as score_frequency_drift, next_activity_prediction, rank_bottlenecks,
     variant_frequency_conformance,
 };
+use ocpm_engine::Engine;
+use ocpm_provider::ProviderCapability;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
@@ -29,6 +33,178 @@ type EventSummaryOutput = (
     Vec<EventDfgOutput>,
     Vec<EventActivityOutput>,
 );
+
+fn json_error(error: impl std::fmt::Display) -> PyErr {
+    PyValueError::new_err(error.to_string())
+}
+
+fn parse_json<T: serde::de::DeserializeOwned>(value: &str) -> PyResult<T> {
+    serde_json::from_str(value).map_err(json_error)
+}
+
+fn encode_json<T: serde::Serialize>(value: &T) -> PyResult<String> {
+    serde_json::to_string(value).map_err(json_error)
+}
+
+/// Source-neutral Python entry point backed by the same Rust facade as native
+/// applications. The JSON boundary keeps the Python API deterministic and
+/// versionable without duplicating any process-mining algorithm in Python.
+#[pyclass(name = "StandaloneEngine")]
+struct PyStandaloneEngine {
+    engine: Engine,
+}
+
+#[pymethods]
+impl PyStandaloneEngine {
+    #[new]
+    fn new(canonical_json: &str) -> PyResult<Self> {
+        Ok(Self {
+            engine: Engine::from_canonical_json(canonical_json.as_bytes()).map_err(json_error)?,
+        })
+    }
+
+    #[staticmethod]
+    fn from_ocel2_json(ocel2_json: &str) -> PyResult<Self> {
+        Ok(Self {
+            engine: Engine::from_ocel2_json(ocel2_json.as_bytes()).map_err(json_error)?,
+        })
+    }
+
+    #[staticmethod]
+    fn from_xes(xes: &str) -> PyResult<Self> {
+        Ok(Self {
+            engine: Engine::from_xes(std::io::Cursor::new(xes.as_bytes())).map_err(json_error)?,
+        })
+    }
+
+    #[staticmethod]
+    fn from_sqlite(path: &str) -> PyResult<Self> {
+        Ok(Self {
+            engine: Engine::from_sqlite(path).map_err(json_error)?,
+        })
+    }
+
+    fn provider_name(&self) -> &'static str {
+        self.engine.provider_name()
+    }
+
+    fn append_json(&mut self, batch_json: &str) -> PyResult<()> {
+        let batch: AppendBatch = parse_json(batch_json)?;
+        self.engine = self.engine.append(batch).map_err(json_error)?;
+        Ok(())
+    }
+
+    fn capabilities_json(&self) -> PyResult<String> {
+        encode_json(&self.engine.capabilities())
+    }
+
+    fn profile_json(&self, view_json: &str) -> PyResult<String> {
+        let view: DatasetView = parse_json(view_json)?;
+        encode_json(&self.engine.profile(&view).map_err(json_error)?)
+    }
+
+    fn query_json(&self, request_json: &str) -> PyResult<String> {
+        let request: QueryRequest = parse_json(request_json)?;
+        encode_json(&self.engine.query(&request).map_err(json_error)?)
+    }
+
+    fn canonical_json(&self, view_json: &str) -> PyResult<String> {
+        let view: DatasetView = parse_json(view_json)?;
+        let mut output = Vec::new();
+        self.engine
+            .write_canonical_json(&mut output, &view)
+            .map_err(json_error)?;
+        String::from_utf8(output).map_err(json_error)
+    }
+
+    fn ocel2_json(&self, view_json: &str) -> PyResult<String> {
+        let view: DatasetView = parse_json(view_json)?;
+        let mut output = Vec::new();
+        self.engine
+            .write_ocel2_json(&mut output, &view)
+            .map_err(json_error)?;
+        String::from_utf8(output).map_err(json_error)
+    }
+
+    fn xes(&self, view_json: &str, object_type: &str) -> PyResult<String> {
+        let view: DatasetView = parse_json(view_json)?;
+        let mut output = Vec::new();
+        self.engine
+            .write_xes(&mut output, &view, object_type)
+            .map_err(json_error)?;
+        String::from_utf8(output).map_err(json_error)
+    }
+
+    fn write_sqlite(&self, view_json: &str, path: &str) -> PyResult<()> {
+        let view: DatasetView = parse_json(view_json)?;
+        self.engine.write_sqlite(path, &view).map_err(json_error)
+    }
+
+    fn discover_json(&self, request_json: &str) -> PyResult<String> {
+        let request: DiscoveryRequest = parse_json(request_json)?;
+        encode_json(&self.engine.discover(&request).map_err(json_error)?)
+    }
+
+    fn conformance_json(&self, request_json: &str) -> PyResult<String> {
+        let request: ConformanceRequest = parse_json(request_json)?;
+        encode_json(&self.engine.conformance(&request).map_err(json_error)?)
+    }
+
+    fn enhance_json(&self, request_json: &str) -> PyResult<String> {
+        let request: EnhancementRequest = parse_json(request_json)?;
+        encode_json(&self.engine.enhance(&request).map_err(json_error)?)
+    }
+
+    fn fit_prediction_json(&self, request_json: &str) -> PyResult<String> {
+        let request: FitPredictionRequest = parse_json(request_json)?;
+        encode_json(&self.engine.fit_prediction(&request).map_err(json_error)?)
+    }
+
+    fn predict_json(&self, request_json: &str) -> PyResult<String> {
+        let request: PredictionRequest = parse_json(request_json)?;
+        encode_json(&self.engine.predict(&request).map_err(json_error)?)
+    }
+
+    fn evaluate_prediction_json(
+        &self,
+        view_json: &str,
+        target_json: &str,
+        holdout_fraction: f64,
+        parameters_json: &str,
+    ) -> PyResult<String> {
+        let view: DatasetView = parse_json(view_json)?;
+        let target: PredictionTarget = parse_json(target_json)?;
+        let parameters: std::collections::BTreeMap<String, serde_json::Value> =
+            parse_json(parameters_json)?;
+        encode_json(
+            &self
+                .engine
+                .evaluate_prediction(&view, target, holdout_fraction, parameters)
+                .map_err(json_error)?,
+        )
+    }
+
+    fn explain_json(&self, view_json: &str, capability_json: &str) -> PyResult<String> {
+        let view: DatasetView = parse_json(view_json)?;
+        let capability: ProviderCapability = parse_json(capability_json)?;
+        encode_json(&self.engine.explain(&view, capability))
+    }
+}
+
+#[pyfunction]
+fn serialize_model(artifact_json: &str, format: &str) -> PyResult<String> {
+    let artifact: ModelArtifact = parse_json(artifact_json)?;
+    match format {
+        "json" => String::from_utf8(ocpm_core::model_json(&artifact).map_err(json_error)?)
+            .map_err(json_error),
+        "dot" => Ok(ocpm_core::model_dot(&artifact)),
+        "pnml" => ocpm_core::model_pnml(&artifact).map_err(json_error),
+        "svg" => Ok(ocpm_core::model_svg(&artifact)),
+        _ => Err(PyValueError::new_err(
+            "format must be one of json, dot, pnml, or svg",
+        )),
+    }
+}
 
 fn transitions(
     sources: Vec<String>,
@@ -445,7 +621,7 @@ fn decode_binding_pair_groups(
 
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add("__version__", "0.9.0")?;
+    module.add("__version__", "1.0.0")?;
     module.add_function(wrap_pyfunction!(dfg_conformance, module)?)?;
     module.add_function(wrap_pyfunction!(next_activity, module)?)?;
     module.add_function(wrap_pyfunction!(variant_conformance, module)?)?;
@@ -456,6 +632,8 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(decode_binding_pair_groups, module)?)?;
     module.add_function(wrap_pyfunction!(event_batch_summary, module)?)?;
     module.add_function(wrap_pyfunction!(event_window_batch_summaries, module)?)?;
+    module.add_function(wrap_pyfunction!(serialize_model, module)?)?;
     module.add_class::<PyEventWindowSummaryBuilder>()?;
+    module.add_class::<PyStandaloneEngine>()?;
     Ok(())
 }

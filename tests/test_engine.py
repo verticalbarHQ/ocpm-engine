@@ -9,10 +9,13 @@ import pytest
 from ocpm_engine import (
     DynamicDfgRequest,
     DynamicFilter,
+    EdgeFeatureRequest,
     EdgeFilter,
     EventAttributeFilter,
     EventLogRequest,
     EventLogWindow,
+    LifecycleDfgRequest,
+    LifecycleVariantRequest,
     NetworkFilter,
     OcpmEngine,
     PgOcpmCapabilities,
@@ -329,12 +332,14 @@ def event_log_request(*windows: tuple[datetime, datetime]) -> EventLogRequest:
 
 
 def test_pg_ocpm_capabilities_are_detected_by_callable_surface() -> None:
-    cursor = FakeCursor(("0.9.0", True, True, True))
+    cursor = FakeCursor(("0.10.0", True, True, True, True, True))
 
     capabilities = OcpmEngine.inspect_pg_ocpm(cursor)
 
     assert capabilities.factorized_event_export
     assert capabilities.factorized_multi_window_export
+    assert capabilities.lifecycle_dfg_pushdown
+    assert capabilities.lifecycle_variant_pushdown
     assert cursor.executed and "to_regprocedure" in cursor.executed[0]
 
 
@@ -474,6 +479,238 @@ def test_event_log_fallback_streams_rows_and_reports_expansion() -> None:
     assert execution.database_rows == 1
     assert execution.expanded_event_rows == 1
     assert execution.summaries[0].case_count == 1
+    assert not cursor.fetchall_called
+
+
+class FakeRowsCursor(FakeCursor):
+    def __init__(self, rows: list[tuple[object, ...]]) -> None:
+        super().__init__(rows[0] if rows else ())
+        self.rows = rows
+
+    def fetchall(self) -> list[tuple[object, ...]]:
+        self.fetchall_called = True
+        return self.rows
+
+    def __iter__(self):
+        return iter(self.rows)
+
+
+def lifecycle_dfg_request(window_count: int = 2) -> LifecycleDfgRequest:
+    return LifecycleDfgRequest(
+        object_types=("Order",),
+        windows=tuple(
+            EventLogWindow(
+                NOW - timedelta(days=window_count - index),
+                NOW - timedelta(days=window_count - index - 1),
+            )
+            for index in range(window_count)
+        ),
+    )
+
+
+def test_lifecycle_dfg_planner_uses_bounded_native_chunks() -> None:
+    engine = OcpmEngine(9, 12)
+    direct = engine.build_lifecycle_dfg(lifecycle_dfg_request())
+    chunked = engine.build_lifecycle_dfg(lifecycle_dfg_request(257))
+
+    assert "ocpm.lifecycle_dfg_window_counts" in direct.sql
+    assert "generate_series" not in direct.sql
+    assert direct.params["object_types"] == ["Order"]
+    assert direct.strategy == "native lifecycle DFG window aggregate"
+    assert "generate_series" in chunked.sql
+    assert "chunk.first_window + 255" in chunked.sql
+    assert "%(target_activities)s::text[],1::bigint" in chunked.sql
+    assert chunked.strategy == "native chunked lifecycle DFG window aggregate"
+
+
+def test_lifecycle_dfg_execution_returns_exact_aligned_counts() -> None:
+    cursor = FakeRowsCursor(
+        [
+            (1, "Order", "A", "B", [10, 4]),
+            (1, "Order", "B", "C", [2, 1]),
+        ]
+    )
+    execution = OcpmEngine(9, 12).execute_lifecycle_dfg(
+        cursor,
+        lifecycle_dfg_request(),
+        capabilities=PgOcpmCapabilities("0.10.0", True, True, True, True),
+    )
+
+    assert execution.strategy == "native lifecycle DFG window aggregate"
+    assert execution.database_rows == 2
+    assert execution.expanded_event_rows == 0
+    assert [
+        (count.object_type, count.source, count.target, count.frequencies)
+        for count in execution.counts
+    ] == [
+        ("Order", "A", "B", (10, 4)),
+        ("Order", "B", "C", (2, 1)),
+    ]
+    assert not cursor.fetchall_called
+
+
+def test_lifecycle_dfg_applies_frequency_threshold_after_chunk_alignment() -> None:
+    base = lifecycle_dfg_request(257)
+    request = LifecycleDfgRequest(
+        object_types=base.object_types,
+        windows=base.windows,
+        minimum_total_frequency=10,
+    )
+    cursor = FakeRowsCursor(
+        [
+            (1, "Order", "A", "B", [0] * 255 + [6]),
+            (257, "Order", "A", "B", [5]),
+        ]
+    )
+
+    execution = OcpmEngine(9, 12).execute_lifecycle_dfg(
+        cursor,
+        request,
+        capabilities=PgOcpmCapabilities("0.10.0", True, True, True, True),
+    )
+
+    assert len(execution.counts) == 1
+    assert sum(execution.counts[0].frequencies) == 11
+
+
+def test_lifecycle_dfg_falls_back_without_changing_semantics() -> None:
+    path = ["A", "B"]
+    case_ids = struct.pack("=q", 7)
+    timestamps = struct.pack("=iqq", 2, 0, 2_000_000)
+    cursor = FakeCursor((1, path, 2, 1, case_ids, timestamps))
+    execution = OcpmEngine(9, 12).execute_lifecycle_dfg(
+        cursor,
+        LifecycleDfgRequest(
+            object_types=("Order",),
+            windows=(EventLogWindow(NOW - timedelta(days=1), NOW),),
+        ),
+        capabilities=PgOcpmCapabilities("0.9.0", True, True, True, False),
+    )
+
+    assert execution.strategy == "factorized event-summary lifecycle DFG fallback"
+    assert execution.database_rows == 1
+    assert execution.expanded_event_rows == 0
+    assert execution.counts[0].source == "A"
+    assert execution.counts[0].target == "B"
+    assert execution.counts[0].frequencies == (1,)
+
+
+def lifecycle_variant_request(window_count: int = 2) -> LifecycleVariantRequest:
+    dfg = lifecycle_dfg_request(window_count)
+    return LifecycleVariantRequest(dfg.object_types, dfg.windows)
+
+
+def test_lifecycle_variant_planner_uses_bounded_native_chunks() -> None:
+    capabilities = PgOcpmCapabilities("0.10.0", True, True, True, True, True)
+    engine = OcpmEngine(9, 12)
+    direct = engine.build_lifecycle_variants(lifecycle_variant_request(), capabilities)
+    chunked = engine.build_lifecycle_variants(
+        lifecycle_variant_request(257), capabilities
+    )
+
+    assert "ocpm.lifecycle_variant_window_counts" in direct.sql
+    assert "generate_series" not in direct.sql
+    assert direct.strategy == "native lifecycle variant window aggregate"
+    assert "generate_series" in chunked.sql
+    assert "chunk.first_window + 255" in chunked.sql
+    assert "%(exclude_activities)s::text[],1::bigint" in chunked.sql
+
+
+def test_lifecycle_variant_execution_returns_paths_and_aligned_counts() -> None:
+    cursor = FakeRowsCursor(
+        [
+            (1, "Order", "hash-a", ["A", "B"], [10, 4]),
+            (1, "Order", "hash-b", [["A"], ["C"]], [2, 1]),
+        ]
+    )
+    execution = OcpmEngine(9, 12).execute_lifecycle_variants(
+        cursor,
+        lifecycle_variant_request(),
+        capabilities=PgOcpmCapabilities("0.10.0", True, True, True, True, True),
+    )
+
+    assert execution.database_rows == 2
+    assert [
+        (count.path_hash, count.activity_path, count.frequencies)
+        for count in execution.counts
+    ] == [
+        ("hash-a", ("A", "B"), (10, 4)),
+        ("hash-b", ("A", "C"), (2, 1)),
+    ]
+    assert not cursor.fetchall_called
+
+
+def test_lifecycle_variant_applies_frequency_threshold_after_chunk_alignment() -> None:
+    base = lifecycle_variant_request(257)
+    request = LifecycleVariantRequest(
+        object_types=base.object_types,
+        windows=base.windows,
+        minimum_total_frequency=10,
+    )
+    cursor = FakeRowsCursor(
+        [
+            (1, "Order", "hash-a", ["A", "B"], [0] * 255 + [6]),
+            (257, "Order", "hash-a", ["A", "B"], [5]),
+        ]
+    )
+
+    execution = OcpmEngine(9, 12).execute_lifecycle_variants(
+        cursor,
+        request,
+        capabilities=PgOcpmCapabilities("0.10.0", True, True, True, True, True),
+    )
+
+    assert len(execution.counts) == 1
+    assert sum(execution.counts[0].frequencies) == 11
+
+
+def test_lifecycle_variant_old_version_uses_exact_per_window_fallback() -> None:
+    cursor = FakeRowsCursor([(1, "Order", "hash-a", ["A", "B"], [3])])
+    execution = OcpmEngine(9, 12).execute_lifecycle_variants(
+        cursor,
+        LifecycleVariantRequest(
+            object_types=("Order",),
+            windows=(EventLogWindow(NOW - timedelta(days=1), NOW),),
+        ),
+        capabilities=PgOcpmCapabilities("0.9.0", True, True, True, True, False),
+    )
+
+    assert execution.strategy == "exact per-window lifecycle variant fallback"
+    assert execution.counts[0].frequencies == (3,)
+
+
+def test_edge_feature_execution_streams_compact_general_statistics() -> None:
+    cursor = FakeRowsCursor(
+        [
+            (
+                "A",
+                "B",
+                "Order",
+                "Order",
+                "directly_follows",
+                7,
+                2.5,
+                1.0,
+                4.0,
+                1.2,
+                2,
+                2 / 7,
+            )
+        ]
+    )
+    execution = OcpmEngine(9, 12).execute_edge_features(
+        cursor,
+        EdgeFeatureRequest(
+            NOW - timedelta(days=1),
+            NOW,
+            source_object_types=("Order",),
+            target_object_types=("Order",),
+        ),
+    )
+
+    assert execution.database_rows == 1
+    assert execution.features[0].frequency == 7
+    assert execution.features[0].mean_duration == 2.5
     assert not cursor.fetchall_called
 
 

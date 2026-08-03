@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import Any
 
 QUERIES = tuple(f"Q{index}" for index in range(1, 8))
+DEFAULT_PG_OCPM_VERSION = "1.0.0"
+DEFAULT_OCPM_ENGINE_VERSION = "1.0.0"
 STABLE_SOURCE = {
     "ocpq_eval_commit": "846dd4eb9f8600ae42355968453a9412ea4759c2",
     "ocpq_version": "0.6.7",
@@ -127,7 +129,7 @@ def _publication_blockers(
         or not isinstance(pg_revision, str)
         or re.fullmatch(r"[0-9a-f]{40}", pg_revision) is None
     ):
-        blockers.append("pg_ocpm 0.9 evidence lacks a clean immutable source revision")
+        blockers.append("pg_ocpm evidence lacks a clean immutable source revision")
     if engine.get("publication_status", {}).get("ready") is not True:
         blockers.append("the strict engine artifact is not publication-ready")
     if not pm4py_runner_sha256 or any(
@@ -150,6 +152,8 @@ def certify(
     *,
     reference_sha256: str,
     pm4py_runner_sha256: str | None = None,
+    pg_ocpm_version: str = DEFAULT_PG_OCPM_VERSION,
+    ocpm_engine_version: str = DEFAULT_OCPM_ENGINE_VERSION,
 ) -> dict[str, Any]:
     """Return recomputed evidence after validating the four artifact contracts."""
 
@@ -181,7 +185,8 @@ def certify(
         "engine requires one fresh container per query",
     )
     _require(
-        engine.get("release") == {"pg_ocpm": "0.9.0", "ocpm_engine": "0.9.0"},
+        engine.get("release")
+        == {"pg_ocpm": pg_ocpm_version, "ocpm_engine": ocpm_engine_version},
         "engine release mismatch",
     )
 
@@ -209,7 +214,7 @@ def certify(
             )
         else:
             _require(
-                source.get("pg_ocpm_version") == "0.9.0",
+                source.get("pg_ocpm_version") == pg_ocpm_version,
                 "pg_pm4py: pg_ocpm version mismatch",
             )
             _require(
@@ -296,6 +301,10 @@ def certify(
         "status": "verified_descriptive_preview",
         "publication_ready": not publication_blockers,
         "publication_blockers": publication_blockers,
+        "release": {
+            "pg_ocpm": pg_ocpm_version,
+            "ocpm_engine": ocpm_engine_version,
+        },
         "every_query_and_node_exact": True,
         "queries": rows,
         "geometric_means_ms": geometric_means,
@@ -319,6 +328,12 @@ def main() -> None:
     parser.add_argument("--engine-sha256", required=True)
     parser.add_argument("--pm4py-runner", type=Path, required=True)
     parser.add_argument("--pm4py-runner-sha256", required=True)
+    parser.add_argument(
+        "--pg-ocpm-version", default=DEFAULT_PG_OCPM_VERSION
+    )
+    parser.add_argument(
+        "--ocpm-engine-version", default=DEFAULT_OCPM_ENGINE_VERSION
+    )
     args = parser.parse_args()
 
     reference = _load_pinned(args.reference, args.reference_sha256)
@@ -336,6 +351,8 @@ def main() -> None:
         engine,
         reference_sha256=args.reference_sha256,
         pm4py_runner_sha256=args.pm4py_runner_sha256,
+        pg_ocpm_version=args.pg_ocpm_version,
+        ocpm_engine_version=args.ocpm_engine_version,
     )
     print(json.dumps(result, indent=2, sort_keys=True))
 

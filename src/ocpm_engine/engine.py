@@ -21,11 +21,20 @@ from .models import (
     BindingRelationCoverage,
     DynamicDfgRequest,
     DynamicFilter,
+    EdgeFeature,
+    EdgeFeatureExecution,
+    EdgeFeatureRequest,
     Endpoint,
     EventLogRequest,
+    LifecycleDfgExecution,
+    LifecycleDfgRequest,
+    LifecycleVariantExecution,
+    LifecycleVariantRequest,
     PgOcpmCapabilities,
     ProcessMiningRequest,
     QueryPlan,
+    WindowedDfgCount,
+    WindowedVariantCount,
 )
 
 
@@ -52,6 +61,12 @@ _PG_OCPM_CAPABILITIES_SQL = """SELECT ocpm.version(),
        ) IS NOT NULL,
        to_regprocedure(
            'ocpm.event_log_window_batches(bigint,bigint,text,timestamptz[],timestamptz[])'
+       ) IS NOT NULL,
+       to_regprocedure(
+           'ocpm.lifecycle_dfg_window_counts(bigint,bigint,timestamptz[],timestamptz[],text[],text[],text[],bigint)'
+       ) IS NOT NULL,
+       to_regprocedure(
+           'ocpm.lifecycle_variant_window_counts(bigint,bigint,timestamptz[],timestamptz[],text[],text[],text[],text[],text[],bigint)'
        ) IS NOT NULL"""
 
 _SINGLE_EVENT_BATCH_SQL = """SELECT 1::integer AS window_ordinal,
@@ -104,6 +119,106 @@ CROSS JOIN LATERAL ocpm.event_log_rows(
     window.from_date,window.to_date
 )
 ORDER BY window_ordinal,case_id,event_ordinal"""
+
+_LIFECYCLE_DFG_WINDOW_SQL = """SELECT 1::integer AS first_window,
+       result.object_type,result.source_activity,result.target_activity,
+       result.frequencies
+FROM ocpm.lifecycle_dfg_window_counts(
+    %(dataset_id)s,%(tenant_id)s,
+    %(from_dates)s::timestamptz[],%(to_dates)s::timestamptz[],
+    %(object_types)s::text[],%(source_activities)s::text[],
+    %(target_activities)s::text[],%(minimum_total_frequency)s
+) AS result
+ORDER BY result.object_type,result.source_activity,result.target_activity"""
+
+_CHUNKED_LIFECYCLE_DFG_WINDOW_SQL = """SELECT chunk.first_window,
+       result.object_type,result.source_activity,result.target_activity,
+       result.frequencies
+FROM generate_series(
+    1,cardinality(%(from_dates)s::timestamptz[]),256
+) AS chunk(first_window)
+CROSS JOIN LATERAL ocpm.lifecycle_dfg_window_counts(
+    %(dataset_id)s,%(tenant_id)s,
+    (%(from_dates)s::timestamptz[])[
+        chunk.first_window:
+        LEAST(
+            chunk.first_window + 255,
+            cardinality(%(from_dates)s::timestamptz[])
+        )
+    ],
+    (%(to_dates)s::timestamptz[])[
+        chunk.first_window:
+        LEAST(
+            chunk.first_window + 255,
+            cardinality(%(to_dates)s::timestamptz[])
+        )
+    ],
+    %(object_types)s::text[],%(source_activities)s::text[],
+    %(target_activities)s::text[],1::bigint
+) AS result
+ORDER BY chunk.first_window,result.object_type,
+         result.source_activity,result.target_activity"""
+
+_LIFECYCLE_VARIANT_WINDOW_SQL = """SELECT 1::integer AS first_window,
+       result.object_type,result.path_hash,result.activity_path,
+       result.frequencies
+FROM ocpm.lifecycle_variant_window_counts(
+    %(dataset_id)s,%(tenant_id)s,
+    %(from_dates)s::timestamptz[],%(to_dates)s::timestamptz[],
+    %(object_types)s::text[],%(statuses)s::text[],
+    %(variant_hashes)s::text[],%(include_activities)s::text[],
+    %(exclude_activities)s::text[],%(minimum_total_frequency)s
+) AS result
+ORDER BY result.object_type,result.path_hash"""
+
+_CHUNKED_LIFECYCLE_VARIANT_WINDOW_SQL = """SELECT chunk.first_window,
+       result.object_type,result.path_hash,result.activity_path,
+       result.frequencies
+FROM generate_series(
+    1,cardinality(%(from_dates)s::timestamptz[]),256
+) AS chunk(first_window)
+CROSS JOIN LATERAL ocpm.lifecycle_variant_window_counts(
+    %(dataset_id)s,%(tenant_id)s,
+    (%(from_dates)s::timestamptz[])[
+        chunk.first_window:
+        LEAST(chunk.first_window + 255,cardinality(%(from_dates)s::timestamptz[]))
+    ],
+    (%(to_dates)s::timestamptz[])[
+        chunk.first_window:
+        LEAST(chunk.first_window + 255,cardinality(%(to_dates)s::timestamptz[]))
+    ],
+    %(object_types)s::text[],%(statuses)s::text[],
+    %(variant_hashes)s::text[],%(include_activities)s::text[],
+    %(exclude_activities)s::text[],1::bigint
+) AS result
+ORDER BY chunk.first_window,result.object_type,result.path_hash"""
+
+_LIFECYCLE_VARIANT_FALLBACK_SQL = """SELECT window.ordinality::integer,
+       result.object_type,result.path_hash,result.activity_path,
+       ARRAY[result.frequency]::bigint[]
+FROM unnest(
+    %(from_dates)s::timestamptz[],%(to_dates)s::timestamptz[]
+) WITH ORDINALITY AS window(from_date,to_date,ordinality)
+CROSS JOIN LATERAL ocpm.variant_counts(
+    %(dataset_id)s,%(tenant_id)s,window.from_date,window.to_date,
+    %(object_types)s::text[],%(statuses)s::text[],
+    %(variant_hashes)s::text[],%(include_activities)s::text[],
+    %(exclude_activities)s::text[],1
+) AS result
+ORDER BY window.ordinality,result.object_type,result.path_hash"""
+
+_EDGE_FEATURE_SQL = """SELECT source_activity,target_activity,
+       source_object_type,target_object_type,edge_type,frequency,
+       mean_duration,minimum_duration,maximum_duration,standard_deviation,
+       slow_count,slow_rate
+FROM ocpm.edge_feature_aggregates(
+    %(dataset_id)s,%(tenant_id)s,%(from_date)s,%(to_date)s,%(slow_threshold)s,
+    %(source_object_types)s::text[],%(target_object_types)s::text[],
+    %(source_activities)s::text[],%(target_activities)s::text[],
+    %(edge_types)s::text[],%(contexts)s::text[],%(minimum_frequency)s
+)
+ORDER BY source_activity,target_activity,source_object_type,
+         target_object_type,edge_type"""
 
 _BINDING_INDEX_COVERAGE_SQL = """SELECT dataset.refreshed_at,
        dataset.source_watermark,
@@ -180,6 +295,24 @@ def _cursor_rows(cursor: Cursor) -> Iterator[Any]:
     if callable(iterator):
         return iter(cursor)
     return iter(cursor.fetchall())
+
+
+def _activity_path(value: Any) -> tuple[str, ...]:
+    """Normalize both supported finalized activity-path JSON shapes."""
+
+    if isinstance(value, str):
+        value = json.loads(value)
+    if not isinstance(value, list):
+        raise RuntimeError("pg_ocpm returned an invalid activity path")
+    path: list[str] = []
+    for item in value:
+        if isinstance(item, str):
+            path.append(item)
+        elif isinstance(item, list) and len(item) == 1 and isinstance(item[0], str):
+            path.append(item[0])
+        else:
+            raise RuntimeError("pg_ocpm returned an invalid activity path entry")
+    return tuple(path)
 
 
 def score_dynamic_dfg_rows(rows: list[tuple[Any, ...]]) -> dict[str, Any]:
@@ -263,6 +396,8 @@ class OcpmEngine:
             event_log_rows=bool(row[1]),
             event_log_batches=bool(row[2]),
             event_log_window_batches=bool(row[3]),
+            lifecycle_dfg_window_counts=bool(row[4]),
+            lifecycle_variant_window_counts=bool(row[5]),
         )
 
     def inspect_binding_index(self, cursor: Cursor) -> BindingIndexCoverage:
@@ -370,6 +505,269 @@ class OcpmEngine:
             expanded_event_rows=expanded_event_rows,
             summaries=summaries,
         )
+
+    def build_lifecycle_dfg(self, request: LifecycleDfgRequest) -> QueryPlan:
+        """Build a bounded exact DFG pushdown over finalized lifecycle paths."""
+
+        self._validate_lifecycle_dfg(request)
+        params = {
+            "dataset_id": self.dataset_id,
+            "tenant_id": self.tenant_id,
+            "from_dates": [window.from_date for window in request.windows],
+            "to_dates": [window.to_date for window in request.windows],
+            "object_types": list(request.object_types),
+            "source_activities": list(request.source_activities) or None,
+            "target_activities": list(request.target_activities) or None,
+            "minimum_total_frequency": request.minimum_total_frequency,
+        }
+        if len(request.windows) <= _EVENT_BATCH_MAX_WINDOWS:
+            sql = _LIFECYCLE_DFG_WINDOW_SQL
+            strategy = "native lifecycle DFG window aggregate"
+        else:
+            sql = _CHUNKED_LIFECYCLE_DFG_WINDOW_SQL
+            strategy = "native chunked lifecycle DFG window aggregate"
+        return QueryPlan(Endpoint.LIFECYCLE_DFG, sql, params, strategy)
+
+    def execute_lifecycle_dfg(
+        self,
+        cursor: Cursor,
+        request: LifecycleDfgRequest,
+        *,
+        capabilities: PgOcpmCapabilities | None = None,
+    ) -> LifecycleDfgExecution:
+        """Return exact aligned DFG counts with a lossless old-version fallback."""
+
+        self._validate_lifecycle_dfg(request)
+        capabilities = capabilities or self.inspect_pg_ocpm(cursor)
+        if not capabilities.lifecycle_dfg_window_counts:
+            return self._execute_lifecycle_dfg_fallback(cursor, request, capabilities)
+
+        plan = self.build_lifecycle_dfg(request)
+        cursor.execute(plan.sql, plan.params)
+        window_count = len(request.windows)
+        counts: dict[tuple[str, str, str], list[int]] = {}
+        seen_chunks: set[tuple[int, str, str, str]] = set()
+        database_rows = 0
+        for row in _cursor_rows(cursor):
+            database_rows += 1
+            first_window = int(row[0])
+            object_type = str(row[1])
+            source = str(row[2])
+            target = str(row[3])
+            frequencies = tuple(int(value) for value in row[4])
+            expected_count = min(
+                _EVENT_BATCH_MAX_WINDOWS,
+                window_count - first_window + 1,
+            )
+            if (
+                first_window < 1
+                or expected_count < 1
+                or len(frequencies) != expected_count
+            ):
+                raise RuntimeError("pg_ocpm returned an invalid lifecycle DFG chunk")
+            if any(value < 0 for value in frequencies):
+                raise RuntimeError("pg_ocpm returned a negative lifecycle DFG count")
+            chunk_key = (first_window, object_type, source, target)
+            if chunk_key in seen_chunks:
+                raise RuntimeError("pg_ocpm returned a duplicate lifecycle DFG edge")
+            seen_chunks.add(chunk_key)
+            key = (object_type, source, target)
+            aligned = counts.setdefault(key, [0] * window_count)
+            offset = first_window - 1
+            aligned[offset : offset + len(frequencies)] = frequencies
+
+        result = tuple(
+            WindowedDfgCount(object_type, source, target, tuple(frequencies))
+            for (object_type, source, target), frequencies in sorted(counts.items())
+            if sum(frequencies) >= request.minimum_total_frequency
+        )
+        return LifecycleDfgExecution(
+            strategy=plan.strategy,
+            database_rows=database_rows,
+            expanded_event_rows=0,
+            counts=result,
+        )
+
+    def _execute_lifecycle_dfg_fallback(
+        self,
+        cursor: Cursor,
+        request: LifecycleDfgRequest,
+        capabilities: PgOcpmCapabilities,
+    ) -> LifecycleDfgExecution:
+        counts: dict[tuple[str, str, str], list[int]] = {}
+        database_rows = 0
+        expanded_event_rows = 0
+        for object_type in request.object_types:
+            execution = self.execute_event_log_summary(
+                cursor,
+                EventLogRequest(object_type=object_type, windows=request.windows),
+                capabilities=capabilities,
+            )
+            database_rows += execution.database_rows
+            expanded_event_rows += execution.expanded_event_rows
+            for window_index, summary in enumerate(execution.summaries):
+                for edge in summary.dfg:
+                    if (
+                        request.source_activities
+                        and edge.source not in request.source_activities
+                    ):
+                        continue
+                    if (
+                        request.target_activities
+                        and edge.target not in request.target_activities
+                    ):
+                        continue
+                    key = (object_type, edge.source, edge.target)
+                    aligned = counts.setdefault(key, [0] * len(request.windows))
+                    aligned[window_index] = edge.frequency
+        result = tuple(
+            WindowedDfgCount(object_type, source, target, tuple(frequencies))
+            for (object_type, source, target), frequencies in sorted(counts.items())
+            if sum(frequencies) >= request.minimum_total_frequency
+        )
+        return LifecycleDfgExecution(
+            strategy="factorized event-summary lifecycle DFG fallback",
+            database_rows=database_rows,
+            expanded_event_rows=expanded_event_rows,
+            counts=result,
+        )
+
+    def build_lifecycle_variants(
+        self,
+        request: LifecycleVariantRequest,
+        capabilities: PgOcpmCapabilities,
+    ) -> QueryPlan:
+        """Build an exact complete-variant query over aligned lifecycle windows."""
+
+        self._validate_lifecycle_variants(request)
+        params = {
+            "dataset_id": self.dataset_id,
+            "tenant_id": self.tenant_id,
+            "from_dates": [window.from_date for window in request.windows],
+            "to_dates": [window.to_date for window in request.windows],
+            "object_types": list(request.object_types),
+            "statuses": list(request.statuses) or None,
+            "variant_hashes": list(request.variant_hashes) or None,
+            "include_activities": list(request.include_activities) or None,
+            "exclude_activities": list(request.exclude_activities) or None,
+            "minimum_total_frequency": request.minimum_total_frequency,
+        }
+        if not capabilities.lifecycle_variant_window_counts:
+            sql = _LIFECYCLE_VARIANT_FALLBACK_SQL
+            strategy = "exact per-window lifecycle variant fallback"
+        elif len(request.windows) <= _EVENT_BATCH_MAX_WINDOWS:
+            sql = _LIFECYCLE_VARIANT_WINDOW_SQL
+            strategy = "native lifecycle variant window aggregate"
+        else:
+            sql = _CHUNKED_LIFECYCLE_VARIANT_WINDOW_SQL
+            strategy = "native chunked lifecycle variant window aggregate"
+        return QueryPlan(Endpoint.LIFECYCLE_VARIANTS, sql, params, strategy)
+
+    def execute_lifecycle_variants(
+        self,
+        cursor: Cursor,
+        request: LifecycleVariantRequest,
+        *,
+        capabilities: PgOcpmCapabilities | None = None,
+    ) -> LifecycleVariantExecution:
+        """Return exact complete paths and zero-filled aligned frequencies."""
+
+        capabilities = capabilities or self.inspect_pg_ocpm(cursor)
+        plan = self.build_lifecycle_variants(request, capabilities)
+        cursor.execute(plan.sql, plan.params)
+        window_count = len(request.windows)
+        counts: dict[tuple[str, str, tuple[str, ...]], list[int]] = {}
+        seen_chunks: set[tuple[int, str, str]] = set()
+        database_rows = 0
+        fallback = plan.strategy.endswith("fallback")
+        for row in _cursor_rows(cursor):
+            database_rows += 1
+            first_window = int(row[0])
+            object_type = str(row[1])
+            path_hash = str(row[2])
+            path = _activity_path(row[3])
+            frequencies = tuple(int(value) for value in row[4])
+            expected_count = (
+                1
+                if fallback
+                else min(_EVENT_BATCH_MAX_WINDOWS, window_count - first_window + 1)
+            )
+            if (
+                first_window < 1
+                or first_window > window_count
+                or len(frequencies) != expected_count
+                or any(value < 0 for value in frequencies)
+            ):
+                raise RuntimeError(
+                    "pg_ocpm returned an invalid lifecycle variant chunk"
+                )
+            chunk_key = (first_window, object_type, path_hash)
+            if chunk_key in seen_chunks:
+                raise RuntimeError("pg_ocpm returned a duplicate lifecycle variant")
+            seen_chunks.add(chunk_key)
+            key = (object_type, path_hash, path)
+            aligned = counts.setdefault(key, [0] * window_count)
+            offset = first_window - 1
+            aligned[offset : offset + len(frequencies)] = frequencies
+        result = tuple(
+            WindowedVariantCount(object_type, path_hash, path, tuple(frequencies))
+            for (object_type, path_hash, path), frequencies in sorted(counts.items())
+            if sum(frequencies) >= request.minimum_total_frequency
+        )
+        return LifecycleVariantExecution(plan.strategy, database_rows, result)
+
+    def build_edge_features(self, request: EdgeFeatureRequest) -> QueryPlan:
+        """Build a selective exact edge-feature aggregate."""
+
+        self._validate_edge_features(request)
+        params = {
+            "dataset_id": self.dataset_id,
+            "tenant_id": self.tenant_id,
+            "from_date": request.from_date,
+            "to_date": request.to_date,
+            "slow_threshold": request.slow_threshold,
+            "source_object_types": list(request.source_object_types) or None,
+            "target_object_types": list(request.target_object_types) or None,
+            "source_activities": list(request.source_activities) or None,
+            "target_activities": list(request.target_activities) or None,
+            "edge_types": list(request.edge_types) or None,
+            "contexts": list(request.contexts) or None,
+            "minimum_frequency": request.minimum_frequency,
+        }
+        return QueryPlan(
+            Endpoint.EDGE_FEATURES,
+            _EDGE_FEATURE_SQL,
+            params,
+            "native filtered edge feature aggregate",
+        )
+
+    def execute_edge_features(
+        self, cursor: Cursor, request: EdgeFeatureRequest
+    ) -> EdgeFeatureExecution:
+        """Stream compact edge statistics without reconstructing event logs."""
+
+        plan = self.build_edge_features(request)
+        cursor.execute(plan.sql, plan.params)
+        features: list[EdgeFeature] = []
+        for row in _cursor_rows(cursor):
+            feature = EdgeFeature(
+                source=str(row[0]),
+                target=str(row[1]),
+                source_object_type=str(row[2]),
+                target_object_type=str(row[3]),
+                edge_type=str(row[4]),
+                frequency=int(row[5]),
+                mean_duration=float(row[6]),
+                minimum_duration=float(row[7]),
+                maximum_duration=float(row[8]),
+                standard_deviation=None if row[9] is None else float(row[9]),
+                slow_count=int(row[10]),
+                slow_rate=float(row[11]),
+            )
+            if feature.frequency < 1 or feature.slow_count < 0:
+                raise RuntimeError("pg_ocpm returned an invalid edge feature")
+            features.append(feature)
+        return EdgeFeatureExecution(plan.strategy, len(features), tuple(features))
 
     def build_dynamic_case_ids(self, request: DynamicDfgRequest) -> QueryPlan:
         """Build the exact selected-case projection for a dynamic request."""
@@ -631,3 +1029,62 @@ class OcpmEngine:
         for window in request.windows:
             if window.from_date > window.to_date:
                 raise ValueError("event-log window from_date must not exceed to_date")
+
+    @staticmethod
+    def _validate_lifecycle_dfg(request: LifecycleDfgRequest) -> None:
+        if not request.object_types or any(
+            not object_type for object_type in request.object_types
+        ):
+            raise ValueError("lifecycle DFG requests require object types")
+        if len(set(request.object_types)) != len(request.object_types):
+            raise ValueError("lifecycle DFG object types must be unique")
+        if not request.windows:
+            raise ValueError("lifecycle DFG requests require at least one window")
+        if any(window.from_date > window.to_date for window in request.windows):
+            raise ValueError("lifecycle DFG window from_date must not exceed to_date")
+        if any(not activity for activity in request.source_activities):
+            raise ValueError("lifecycle DFG source activities must not be empty")
+        if any(not activity for activity in request.target_activities):
+            raise ValueError("lifecycle DFG target activities must not be empty")
+        if request.minimum_total_frequency < 1:
+            raise ValueError("lifecycle DFG minimum frequency must be positive")
+
+    @staticmethod
+    def _validate_lifecycle_variants(request: LifecycleVariantRequest) -> None:
+        if not request.object_types or any(not item for item in request.object_types):
+            raise ValueError("lifecycle variant requests require object types")
+        if len(set(request.object_types)) != len(request.object_types):
+            raise ValueError("lifecycle variant object types must be unique")
+        if not request.windows:
+            raise ValueError("lifecycle variant requests require windows")
+        if any(window.from_date > window.to_date for window in request.windows):
+            raise ValueError(
+                "lifecycle variant window from_date must not exceed to_date"
+            )
+        filters = (
+            request.statuses,
+            request.variant_hashes,
+            request.include_activities,
+            request.exclude_activities,
+        )
+        if any(not value for values in filters for value in values):
+            raise ValueError("lifecycle variant filters must not be empty")
+        if request.minimum_total_frequency < 1:
+            raise ValueError("lifecycle variant minimum frequency must be positive")
+
+    @staticmethod
+    def _validate_edge_features(request: EdgeFeatureRequest) -> None:
+        if request.from_date > request.to_date:
+            raise ValueError("edge feature from_date must not exceed to_date")
+        filters = (
+            request.source_object_types,
+            request.target_object_types,
+            request.source_activities,
+            request.target_activities,
+            request.edge_types,
+            request.contexts,
+        )
+        if any(not value for values in filters for value in values):
+            raise ValueError("edge feature filters must not be empty")
+        if request.minimum_frequency < 1:
+            raise ValueError("edge feature minimum frequency must be positive")

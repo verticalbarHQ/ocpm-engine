@@ -1,25 +1,36 @@
 # ocpm-engine
 
-`ocpm-engine` is a Rust-first process-mining companion library for `pg_ocpm`.
-PostgreSQL performs selective capsule scans and sufficient-statistic
-aggregation; deterministic Rust kernels construct and score models without
-transferring event tables into Python.
+`ocpm-engine` 1.0 is a standalone, Rust-first object-centric process-mining
+engine. It can load canonical or OCEL JSON, XES, CSV, and SQLite data directly,
+then query, discover, check, enhance, predict, and serialize models without a
+database or Python dataframe runtime.
 
-This package does not install another PostgreSQL extension or create database
-objects. PostgreSQL must already have `pg_ocpm` installed and the target dataset
-must already be finalized with `ocpm.finish_load(...)`.
+`pg_ocpm >= 1.0.0` is an optional provider. When present, the engine pushes
+selective scans and sufficient-statistic aggregation into PostgreSQL while the
+same source-neutral Rust kernels construct and score models. The legacy
+PostgreSQL planner remains available for `pg_ocpm >= 0.8.0` during the 1.x
+compatibility window.
 
-Required extension version: `pg_ocpm >= 0.8.0`. See the
-[release notes](CHANGELOG.md) for every library version.
+Current engine version: **1.0.0**. See the [release notes](CHANGELOG.md) and
+[academic implementation provenance](docs/academic-implementation-provenance.md).
 
-## Native analytics
+## Native capabilities
 
-- frequency-covered DFG and complete-variant conformance;
-- deterministic next-activity models;
-- stable bottleneck ranking;
-- explainable DFG, variant, or activity-frequency drift using bounded
-  Jensen-Shannon divergence; and
+- typed object-centric filtering and binding queries;
+- DFG, OC-DFG, Alpha, process-tree, Petri-net, OCPN, and declarative discovery;
+- frequency coverage, token replay, bounded alignment, OCPN, and declarative
+  conformance;
+- process maps, timelines, histograms, performance, rework, organizational,
+  bottleneck, window-comparison, and drift enhancement;
+- next-activity, remaining-time, and outcome prediction with temporal holdout
+  evaluation;
+- canonical JSON, DOT, PNML, SVG, OCEL JSON, XES, CSV, and SQLite I/O; and
 - Python 3.11+ stable-ABI bindings that release the GIL during native work.
+
+OCEL 2.0 XML is intentionally not claimed in 1.0. The detailed XML interchange
+syntax is not defined by the peer-reviewed sources currently admitted by this
+project's clean-room policy. It will remain deferred until an eligible source
+or an explicit interoperability-policy change exists.
 
 The `ocpm-postgres` crate provides an asynchronous adapter for activity profiles
 and single-window and multi-window DFG/variant counts. It also retrieves and
@@ -30,6 +41,15 @@ and expand only through an exact-size lazy iterator when rows are genuinely
 needed.
 Multi-window requests retrieve aligned training, test, comparison-period, or
 drift statistics in one database request.
+
+With `pg_ocpm >= 0.10.0`, exact lifecycle DFG requests use a compact native
+multi-window aggregate over finalized case variants. The engine requests only
+the sufficient statistics needed for DFG conformance and prediction, while
+complete-variant and edge-duration analyses use their own compact aggregates.
+Only analyses that genuinely require event-level detail retain the factorized
+event path.
+Requests can span multiple object types and arbitrary aligned windows; the
+engine chunks more than 256 windows to bound database working memory.
 
 For algorithms that genuinely require individual events, `ocpm-postgres`
 detects the installed callable surface. With `pg_ocpm >= 0.9.0`, it decodes
@@ -65,6 +85,13 @@ It selects bounded one-hop traversal for narrow windows, transitive closure for
 wide or unbounded windows, and exact boundary reconstruction for wide variant
 queries.
 
+The legacy 0.10 APIs also expose lifecycle DFG counts, complete lifecycle variants,
+and filtered edge-duration features as general sufficient-statistic requests.
+They accept caller-selected datasets, tenants, object/activity filters, and
+arbitrary aligned windows; requests larger than 256 windows are transparently
+chunked and zero-filled back into the original order. Rich event-level analyses
+continue to use the factorized event stream.
+
 For the public SAP O2C/P2P release benchmark, including latency, storage,
 concurrency, correctness gates, and published context, see
 [Public common-process-mining performance](docs/public-common-pm-performance.md).
@@ -80,15 +107,25 @@ details and planner boundaries are summarized in
 For the OCPQ data evaluated across OCPQ, vanilla PostgreSQL plus PM4Py,
 `pg_ocpm` plus PM4Py, and `pg_ocpm` plus the engine, see the
 [four-way 0.9 comparison](docs/ocpq-0.9-four-way-comparison.md).
+For pairwise comparisons on each upstream project's own OCEL 2.0 input, see
+[Rust4PM versus pg_ocpm + ocpm-engine](docs/rust4pm-vs-pg-ocpm-engine.md) and
+[OCPA versus pg_ocpm + ocpm-engine](docs/ocpa-vs-pg-ocpm-engine.md). These use a
+separate common-workload suite and do not alter the strict OCPQ Q1-Q7 result.
+The 0.10 root cause, general API boundaries, resource model, and peer-reviewed
+database/process-mining basis are documented in
+[pg_ocpm 0.10 general aggregation design](docs/pg-ocpm-0.10-general-aggregation.md).
 The clean 0.9 strict OCPQ Q1-Q7 result uses zero warmups, ten same-host measured
 runs per query, and exact duplicate-preserving parity for every node. It is
 15.108x faster than OCPQ by geometric mean with a 7.473x minimum query
-speedup.
+speedup. Version 1.0 results are published only after the new exact-answer
+Docker suite completes; older 0.10 preview numbers are not relabeled as 1.0.
 For the detailed application read-path design and code references, see
 [Application query performance improvements](docs/technical-performance-improvements.md).
 For the open-source capability survey, license boundary, research review, and
 database-versus-engine placement decisions, see
 [Process-mining capability map](docs/process-mining-capability-map.md).
+The preliminary release, patent, and ICPM evidence assessment is in
+[Open-source, patent, and ICPM assessment](docs/open-source-patent-icpm-assessment.md).
 
 ## Install
 
@@ -113,6 +150,28 @@ explicit promotion, validate committed artifacts with
 [the benchmark guide](benchmarks/README.md) for the exact methodology.
 
 ## Use
+
+The standalone facade accepts versioned JSON requests and returns ordinary
+Python dictionaries while algorithms run in Rust:
+
+```python
+from ocpm_engine import StandaloneEngine
+
+engine = StandaloneEngine.from_ocel2_json("events.json")
+profile = engine.profile({"object_types": ["Order"]})
+model = engine.discover(
+    {
+        "view": {"object_types": ["Order"]},
+        "algorithm": "object_centric_dfg",
+    }
+)
+```
+
+`append()` validates a bounded columnar batch and advances the source watermark
+only after the complete batch succeeds. `explain()` reports the selected
+provider boundary without exposing provider-specific expressions.
+
+### Compatibility API
 
 Compact aggregate rows can be scored directly:
 
