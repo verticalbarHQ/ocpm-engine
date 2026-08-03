@@ -11,7 +11,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from benchmarks import public_fixture as public
 from benchmarks.ecosystem.common import DATASETS, OBJECT_TYPE_SELECTION
 
 
@@ -28,6 +27,8 @@ def parse_args() -> argparse.Namespace:
 
 
 def obtain_dataset(data_dir: Path, specification: dict[str, Any]) -> Path:
+    from benchmarks import public_fixture as public
+
     data_dir.mkdir(parents=True, exist_ok=True)
     target = data_dir / specification["filename"]
     if not target.exists():
@@ -77,6 +78,8 @@ def select_object_type(dataset: dict[str, Any]) -> tuple[str, list[dict[str, Any
 
 
 def prepare(args: argparse.Namespace) -> dict[str, Any]:
+    from benchmarks import public_fixture as public
+
     specification = DATASETS[args.dataset]
     path = obtain_dataset(Path(args.data_dir), specification)
     read_specification = {
