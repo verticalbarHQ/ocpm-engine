@@ -328,12 +328,8 @@ def main() -> None:
     parser.add_argument("--engine-sha256", required=True)
     parser.add_argument("--pm4py-runner", type=Path, required=True)
     parser.add_argument("--pm4py-runner-sha256", required=True)
-    parser.add_argument(
-        "--pg-ocpm-version", default=DEFAULT_PG_OCPM_VERSION
-    )
-    parser.add_argument(
-        "--ocpm-engine-version", default=DEFAULT_OCPM_ENGINE_VERSION
-    )
+    parser.add_argument("--pg-ocpm-version", default=DEFAULT_PG_OCPM_VERSION)
+    parser.add_argument("--ocpm-engine-version", default=DEFAULT_OCPM_ENGINE_VERSION)
     args = parser.parse_args()
 
     reference = _load_pinned(args.reference, args.reference_sha256)

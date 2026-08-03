@@ -21,7 +21,6 @@ from .bindings import (
     decode_binding_pair_groups,
 )
 from .engine import OcpmEngine, score_dynamic_dfg_rows
-from .standalone import StandaloneEngine, serialize_model
 from .event_batches import (
     EventActivityCount,
     EventDfgEdge,
@@ -56,6 +55,7 @@ from .models import (
     WindowedDfgCount,
     WindowedVariantCount,
 )
+from .standalone import StandaloneEngine, serialize_model
 
 __all__ = [
     "BindingIndexCoverage",

@@ -25,9 +25,7 @@ def canonical_fixture() -> dict:
                 "attributes": {},
             },
         ],
-        "objects": [
-            {"id": 1, "external_id": "o1", "object_type": "order"}
-        ],
+        "objects": [{"id": 1, "external_id": "o1", "object_type": "order"}],
         "event_object_relations": [
             {"relation_id": 1, "event_id": 1, "object_id": 1, "qualifier": ""},
             {"relation_id": 2, "event_id": 2, "object_id": 1, "qualifier": ""},
