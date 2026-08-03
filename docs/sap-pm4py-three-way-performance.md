@@ -8,30 +8,30 @@ Source: **98,350 events**, **107,767 objects**, and **236,265 event-object links
 
 | Workload | Vanilla PG + PM4Py p50/p95 (epoch range) | pg_ocpm + PM4Py p50/p95 (epoch range) | pg_ocpm + ocpm-engine p50/p95 (epoch range) | pg_ocpm PM4Py vs vanilla | Engine vs vanilla |
 |---|---:|---:|---:|---:|---:|
-| dfg_conformance_95pct | 136.46 / 141.76 ms (138.31-143.90) | 99.80 / 102.09 ms (101.54-102.30) | 12.45 / 12.70 ms (12.64-12.73) | 1.37x | 10.96x |
-| variant_conformance_95pct | 125.91 / 133.44 ms (129.79-133.93) | 89.01 / 92.90 ms (91.07-93.62) | 15.96 / 16.28 ms (16.26-16.29) | 1.42x | 7.89x |
-| next_activity_prediction | 136.29 / 141.61 ms (139.92-142.44) | 99.43 / 105.27 ms (102.22-107.43) | 12.39 / 12.65 ms (12.56-13.07) | 1.37x | 11.00x |
-| edge_bottleneck_ranking | 191.32 / 195.99 ms (195.71-196.42) | 144.03 / 150.87 ms (148.02-151.97) | 3.21 / 3.32 ms (3.31-3.33) | 1.33x | 59.64x |
+| dfg_conformance_95pct | 280.32 / 326.63 ms (324.85-328.84) | 193.57 / 220.21 ms (215.57-233.11) | 28.58 / 32.35 ms (32.19-33.55) | 1.45x | 9.81x |
+| variant_conformance_95pct | 233.71 / 271.84 ms (245.98-277.25) | 156.20 / 176.71 ms (168.81-178.22) | 23.91 / 27.06 ms (25.08-27.78) | 1.50x | 9.78x |
+| next_activity_prediction | 245.18 / 283.48 ms (265.13-286.13) | 172.78 / 196.77 ms (191.56-197.82) | 26.52 / 29.11 ms (28.18-29.48) | 1.42x | 9.24x |
+| edge_bottleneck_ranking | 378.06 / 486.29 ms (433.42-497.88) | 283.25 / 362.62 ms (306.90-405.08) | 3.32 / 4.03 ms (3.60-4.28) | 1.33x | 113.73x |
 
-Geometric-mean speedup versus vanilla: **1.37x** for pg_ocpm + PM4Py and **15.43x** for pg_ocpm + ocpm-engine. Correctness: **4/4**.
+Geometric-mean speedup versus vanilla: **1.42x** for pg_ocpm + PM4Py and **17.82x** for pg_ocpm + ocpm-engine. Correctness: **4/4**.
 
 ### DFG concurrency
 
 | Workers | Vanilla PG + PM4Py | pg_ocpm + PM4Py | pg_ocpm + ocpm-engine | Engine/vanilla |
 |---:|---:|---:|---:|---:|
-| 1 | 7.46 req/s | 10.10 req/s | 90.94 req/s | 12.19x |
-| 2 | 13.27 req/s | 19.19 req/s | 168.10 req/s | 12.67x |
-| 4 | 22.61 req/s | 33.91 req/s | 295.93 req/s | 13.09x |
-| 8 | 32.31 req/s | 53.98 req/s | 480.81 req/s | 14.88x |
+| 1 | 3.53 req/s | 5.32 req/s | 34.28 req/s | 9.70x |
+| 2 | 6.98 req/s | 10.16 req/s | 69.30 req/s | 9.93x |
+| 4 | 11.68 req/s | 18.05 req/s | 127.14 req/s | 10.88x |
+| 8 | 18.88 req/s | 29.72 req/s | 203.27 req/s | 10.77x |
 
 ### Isolated peak RSS
 
 | Workload | Vanilla PG + PM4Py | pg_ocpm + PM4Py | pg_ocpm + ocpm-engine |
 |---|---:|---:|---:|
-| dfg_conformance_95pct | 190.5 MiB | 189.7 MiB | 37.5 MiB |
-| variant_conformance_95pct | 185.6 MiB | 185.8 MiB | 40.2 MiB |
-| next_activity_prediction | 189.1 MiB | 190.3 MiB | 37.5 MiB |
-| edge_bottleneck_ranking | 202.3 MiB | 202.3 MiB | 37.5 MiB |
+| dfg_conformance_95pct | 191.1 MiB | 190.2 MiB | 39.2 MiB |
+| variant_conformance_95pct | 186.3 MiB | 186.3 MiB | 43.5 MiB |
+| next_activity_prediction | 190.8 MiB | 190.5 MiB | 39.2 MiB |
+| edge_bottleneck_ranking | 202.7 MiB | 202.9 MiB | 39.0 MiB |
 
 ## sap_p2p
 
@@ -39,44 +39,44 @@ Source: **24,854 events**, **74,489 objects**, and **105,039 event-object links*
 
 | Workload | Vanilla PG + PM4Py p50/p95 (epoch range) | pg_ocpm + PM4Py p50/p95 (epoch range) | pg_ocpm + ocpm-engine p50/p95 (epoch range) | pg_ocpm PM4Py vs vanilla | Engine vs vanilla |
 |---|---:|---:|---:|---:|---:|
-| dfg_conformance_95pct | 119.10 / 122.02 ms (120.91-123.06) | 95.80 / 98.61 ms (97.67-108.15) | 24.72 / 26.30 ms (24.91-26.37) | 1.24x | 4.82x |
-| variant_conformance_95pct | 113.23 / 116.13 ms (114.22-129.81) | 90.13 / 92.02 ms (91.37-92.74) | 0.49 / 0.56 ms (0.54-0.56) | 1.26x | 231.09x |
-| next_activity_prediction | 117.23 / 120.46 ms (119.67-122.81) | 94.39 / 98.67 ms (96.39-99.60) | 24.59 / 25.06 ms (24.93-25.13) | 1.24x | 4.77x |
-| edge_bottleneck_ranking | 121.71 / 126.08 ms (124.64-133.04) | 100.91 / 104.23 ms (103.33-107.51) | 0.80 / 0.89 ms (0.87-0.94) | 1.21x | 151.38x |
+| dfg_conformance_95pct | 219.12 / 264.64 ms (262.73-270.34) | 170.18 / 213.13 ms (211.87-224.50) | 1.18 / 1.72 ms (1.42-1.87) | 1.29x | 186.49x |
+| variant_conformance_95pct | 183.59 / 221.22 ms (207.48-222.41) | 142.46 / 172.32 ms (162.72-178.25) | 1.33 / 1.99 ms (1.53-2.06) | 1.29x | 137.94x |
+| next_activity_prediction | 198.04 / 250.62 ms (204.98-257.65) | 158.37 / 197.17 ms (163.97-198.08) | 1.17 / 1.55 ms (1.33-1.66) | 1.25x | 169.56x |
+| edge_bottleneck_ranking | 231.93 / 268.69 ms (263.94-279.25) | 192.86 / 232.86 ms (220.04-233.39) | 1.13 / 1.50 ms (1.35-1.54) | 1.20x | 205.61x |
 
-Geometric-mean speedup versus vanilla: **1.24x** for pg_ocpm + PM4Py and **29.94x** for pg_ocpm + ocpm-engine. Correctness: **4/4**.
+Geometric-mean speedup versus vanilla: **1.26x** for pg_ocpm + PM4Py and **173.05x** for pg_ocpm + ocpm-engine. Correctness: **4/4**.
 
 ### DFG concurrency
 
 | Workers | Vanilla PG + PM4Py | pg_ocpm + PM4Py | pg_ocpm + ocpm-engine | Engine/vanilla |
 |---:|---:|---:|---:|---:|
-| 1 | 8.61 req/s | 10.99 req/s | 41.51 req/s | 4.82x |
-| 2 | 15.46 req/s | 20.73 req/s | 76.14 req/s | 4.93x |
-| 4 | 26.96 req/s | 37.44 req/s | 130.27 req/s | 4.83x |
-| 8 | 40.05 req/s | 57.89 req/s | 221.90 req/s | 5.54x |
+| 1 | 4.76 req/s | 5.43 req/s | 1,526.19 req/s | 320.56x |
+| 2 | 8.71 req/s | 10.09 req/s | 2,864.69 req/s | 328.86x |
+| 4 | 14.47 req/s | 18.72 req/s | 5,754.22 req/s | 397.61x |
+| 8 | 24.03 req/s | 31.66 req/s | 10,438.33 req/s | 434.35x |
 
 ### Isolated peak RSS
 
 | Workload | Vanilla PG + PM4Py | pg_ocpm + PM4Py | pg_ocpm + ocpm-engine |
 |---|---:|---:|---:|
-| dfg_conformance_95pct | 181.7 MiB | 181.7 MiB | 37.5 MiB |
-| variant_conformance_95pct | 180.9 MiB | 180.9 MiB | 37.5 MiB |
-| next_activity_prediction | 181.7 MiB | 181.8 MiB | 37.5 MiB |
-| edge_bottleneck_ranking | 184.7 MiB | 184.7 MiB | 37.5 MiB |
+| dfg_conformance_95pct | 182.3 MiB | 182.7 MiB | 39.2 MiB |
+| variant_conformance_95pct | 181.5 MiB | 181.5 MiB | 39.0 MiB |
+| next_activity_prediction | 182.3 MiB | 182.6 MiB | 39.2 MiB |
+| edge_bottleneck_ranking | 185.2 MiB | 185.2 MiB | 39.0 MiB |
 
 ## Shared storage and client footprint
 
 | Representation | Total | Indexes |
 |---|---:|---:|
 | Vanilla relational OCEL with one workload secondary B-tree | 125.3 MiB | 65.9 MiB |
-| pg_ocpm serving schema | 102.3 MiB | 19.7 MiB |
+| pg_ocpm serving schema | 102.5 MiB | 19.9 MiB |
 
 The vanilla index total also includes primary-key and uniqueness indexes required for relational integrity. Only `ocel_e2o_object` is retained as a workload-specific secondary index.
 
 | Client | Package only | Dependency closure |
 |---|---:|---:|
 | PM4Py | 16.6 MiB | 464.6 MiB |
-| ocpm-engine | 0.6 MiB | 0.6 MiB |
+| ocpm-engine | 3.9 MiB | 3.9 MiB |
 
 ## Methodology
 
@@ -88,3 +88,7 @@ The vanilla index total also includes primary-key and uniqueness indexes require
 - Peak RSS uses a fresh process for each dataset, workload, and engine path.
 - Source: Zenodo DOI `10.5281/zenodo.8261133`, CC BY 4.0.
 - PM4Py package licensing must be evaluated separately before product integration; installed metadata is retained in JSON.
+
+## Clean-room boundary
+
+PM4Py is a fixed, isolated benchmark dependency and an exact-answer oracle; it is not a product dependency or an implementation source. The `pg_ocpm` and `ocpm-engine` algorithms are independently authored from the peer-reviewed papers listed in [academic implementation provenance](academic-implementation-provenance.md).

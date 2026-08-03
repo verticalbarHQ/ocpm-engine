@@ -92,33 +92,37 @@ arbitrary aligned windows; requests larger than 256 windows are transparently
 chunked and zero-filled back into the original order. Rich event-level analyses
 continue to use the factorized event stream.
 
-For the public SAP O2C/P2P release benchmark, including latency, storage,
-concurrency, correctness gates, and published context, see
-[Public common-process-mining performance](docs/public-common-pm-performance.md).
-For the three-way comparison of lightly indexed PostgreSQL with PM4Py,
-`pg_ocpm` with PM4Py, and `pg_ocpm` with ocpm-engine, see
-[SAP PM4Py three-way performance](docs/sap-pm4py-three-way-performance.md).
-For the clean-commit 0.9 Docker comparison across OCPQ, SAP O2C, and SAP P2P,
-including all four requested arms, latency, concurrency, storage, memory, and
-dynamic-query expectations, see the
-[full 0.9 benchmark](docs/ocpm-engine-0.9-full-benchmark.md). The implementation
-details and planner boundaries are summarized in
-[ocpm-engine 0.9 performance evidence](docs/ocpm-engine-0.9-performance.md).
-For the OCPQ data evaluated across OCPQ, vanilla PostgreSQL plus PM4Py,
-`pg_ocpm` plus PM4Py, and `pg_ocpm` plus the engine, see the
-[four-way 0.9 comparison](docs/ocpq-0.9-four-way-comparison.md).
-For pairwise comparisons on each upstream project's own OCEL 2.0 input, see
-[Rust4PM versus pg_ocpm + ocpm-engine](docs/rust4pm-vs-pg-ocpm-engine.md) and
-[OCPA versus pg_ocpm + ocpm-engine](docs/ocpa-vs-pg-ocpm-engine.md). These use a
-separate common-workload suite and do not alter the strict OCPQ Q1-Q7 result.
+The clean 1.0 Docker evidence is split by compatible workload and dataset:
+
+- [strict OCPQ Q1-Q7](docs/ocpq-performance.md), including all-node exactness,
+  same-host latency, concurrency, storage, memory, and provenance gates;
+- [four-way OCPQ comparison](docs/ocpq-1.0-four-way-comparison.md) across OCPQ,
+  vanilla PostgreSQL plus fixed PM4Py, `pg_ocpm` plus the same PM4Py evaluator,
+  and `pg_ocpm` plus `ocpm-engine`;
+- [SAP O2C/P2P three-way comparison](docs/sap-pm4py-three-way-performance.md)
+  across vanilla PostgreSQL plus PM4Py, `pg_ocpm` plus unchanged PM4Py, and
+  `pg_ocpm` plus `ocpm-engine`; and
+- separate same-dataset common-workload pairs for
+  [Rust4PM](docs/rust4pm-vs-pg-ocpm-engine.md) and
+  [OCPA](docs/ocpa-vs-pg-ocpm-engine.md).
+
+The strict 1.0 OCPQ result is 16.137x faster than OCPQ 0.6.7 by same-host
+geometric-mean latency with exact parity at every tree node. Across eight SAP
+workloads, the engine is 55.529x faster than vanilla PostgreSQL plus PM4Py,
+while `pg_ocpm` plus the fixed PM4Py evaluator is 1.338x faster. The Rust4PM
+pair is publication-ready; the OCPA pair remains descriptive because its
+documented native importer failed on the unchanged upstream example.
+
+The benchmark systems are isolated black-box arms. Product algorithms are
+independently implemented from the peer-reviewed sources in the
+[academic provenance ledger](docs/academic-implementation-provenance.md).
+The benchmark reports state the timing, memory, storage, dataset, and dynamic-
+query interpretation boundaries; fixed-workload ratios are not generalized to
+unmeasured algorithms.
+
 The 0.10 root cause, general API boundaries, resource model, and peer-reviewed
-database/process-mining basis are documented in
+database/process-mining basis remain documented in
 [pg_ocpm 0.10 general aggregation design](docs/pg-ocpm-0.10-general-aggregation.md).
-The clean 0.9 strict OCPQ Q1-Q7 result uses zero warmups, ten same-host measured
-runs per query, and exact duplicate-preserving parity for every node. It is
-15.108x faster than OCPQ by geometric mean with a 7.473x minimum query
-speedup. Version 1.0 results are published only after the new exact-answer
-Docker suite completes; older 0.10 preview numbers are not relabeled as 1.0.
 For the detailed application read-path design and code references, see
 [Application query performance improvements](docs/technical-performance-improvements.md).
 For the open-source capability survey, license boundary, research review, and
@@ -142,12 +146,9 @@ pip install -e '.[dev]'
 pytest
 ```
 
-First run `make perf-sap-release-bridge-preview`, then run both self-contained
-current-versus-vanilla SAP benchmarks with `make perf-public` and validate the
-three staged artifacts with `make perf-public-preview-check`. After review and
-explicit promotion, validate committed artifacts with
-`make perf-public-release-check`. See
-[the benchmark guide](benchmarks/README.md) for the exact methodology.
+See [the benchmark guide](benchmarks/README.md) for the current Docker commands,
+artifact promotion rules, exact-answer checks, and release gates. Preview and
+dirty-tree artifacts cannot satisfy a publication check.
 
 ## Use
 

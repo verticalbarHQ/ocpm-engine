@@ -1,78 +1,83 @@
-# OCPA versus pg_ocpm + ocpm-engine 0.10
-
-Run date: 2026-08-03. Status: validated local full run, not publication-ready.
-The ocpm-engine source tree contained the benchmark implementation as
-uncommitted changes, and OCPA's documented importer did not succeed.
+# OCPA vs pg_ocpm + ocpm-engine 1.0
 
 ## Result
 
-All four workload answers were exactly equal. On OCPA's upstream OCEL 2.0
-running example, pg_ocpm + ocpm-engine had a 73.651x geometric-mean p50 serial
-latency speedup and 116.151x to 128.205x its DFG throughput.
+All 4 answer cells passed exact equality. On `ocpa_running_example` and the four fixed workloads, pg_ocpm + ocpm-engine had a 84.013x geometric-mean p50 speedup over OCPA.
 
-This result is adapter-assisted. OCPA 1.3.4's documented SQLite importer fails
-on the unchanged upstream file with `ValueError: Sample larger than population
-or is negative`. The untimed benchmark setup therefore constructs OCPA's public
-`ObjectCentricEventLog` without precomputing DFGs, variants, scores, answers, or
-benchmark-specific indexes. This is a valid comparison of the four
-steady-state computations over OCPA's model, but it is not a native-import
-performance result and does not satisfy the publication gate.
+This is the separate `ecosystem-common-pm` suite. It does not add Rust4PM or OCPA cells to the strict OCPQ Q1-Q7 benchmark.
 
-This is an `ecosystem-common-pm` pair, not an extension of the strict OCPQ
-Q1-Q7 benchmark. The OCPA arm traverses its public object-centric log and uses
-the benchmark-defined versions of the four fixed common algorithms; it does
-not measure OCPA's complete algorithm catalog.
+Publication status: not ready (OCPA native import did not succeed).
 
-## Fixed input and protocol
+The OCPA query result is adapter-assisted because OCPA's documented native importer fails on this unchanged upstream file. It is not an OCPA native-import performance result.
 
-- Input: OCPA's checked-in OCEL 2.0
-  `sample_logs/ocel2/sqlite/running-example.sqlite` at commit
-  `de056e0203a3fa4a9bbc19a95e001eada323074a`.
-- Terms: the OCPA 1.3.4 wheel contains GPL-3.0; no separate dataset terms were
-  found, so the benchmark downloads but does not redistribute the input.
-- SHA-256: `019202ee793cbd71c80636ca10d78f9701e83f3696ca818c52cc76f38d2bd38d`.
-- Size: 18,211 events, 10,011 objects, and a 3.6 MiB source SQLite file.
-- Backbone: `orders`, chosen by the suite's fixed data-dependent rule.
-- Workloads, lifecycle split, ordering, timing, concurrency, and exactness
-  gates are identical to the Rust4PM pair.
+## Fixed contract
+
+- Dataset: OCPA OCEL 2.0 running example (`ocpm/ocpa@de056e0203a3fa4a9bbc19a95e001eada323074a:sample_logs/ocel2/sqlite/running-example.sqlite`), the upstream OCPA corpus, SHA-256 `019202ee793cbd71c80636ca10d78f9701e83f3696ca818c52cc76f38d2bd38d`.
+- Source license/terms: OCPA 1.3.4 wheel contains GPL-3.0; dataset-specific terms are not stated separately.
+- Backbone: `orders`, selected by the fixed rule: maximum count of object lifecycles containing at least two events; then maximum event-object link count; then lexical object-type name.
+- Workloads: 95% DFG conformance, 95% variant conformance, next-activity prediction, and edge bottleneck ranking.
+- Split: lifecycle-containment 80/20 windows, identical for both arms.
+- Event order: event timestamp, then external event ID.
+- Invalid O2O rows excluded from PostgreSQL normalization: 0; O2O is outside the fixed workloads.
+- Latency: 10 warmups, 3 epochs of 30 measured requests, monotonic nanosecond clock.
+- Concurrency: DFG conformance at 1/2/4/8 workers, 3 epochs, at least 5 seconds and 32 requests per worker.
+- Publication gate: exact canonical answer equality for preflight, every serial sample, and every concurrency request.
+
+## Correctness
+
+| Dataset | Workload | Exact | Answer SHA-256 |
+|---|---|---:|---|
+| ocpa_running_example | dfg_conformance_95pct | yes | `6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118` |
+| ocpa_running_example | variant_conformance_95pct | yes | `80cd775e0a756938d2ce7f6c48bed2fb26d3c4a933b64ba1723e9612bac740bd` |
+| ocpa_running_example | next_activity_prediction | yes | `0d11e08bea5189f4b9bd8d8b63a71840edef2dc8b0a3d120c9a08d1d20e5739d` |
+| ocpa_running_example | edge_bottleneck_ranking | yes | `34ecb123e6a6270bca1ed9f302917df1347966c0562f4998a71c7740e3dc1528` |
 
 ## Steady-state latency
 
-| Workload | OCPA p50 | Engine p50 | Engine speedup | OCPA p95 | Engine p95 |
-|---|---:|---:|---:|---:|---:|
-| DFG conformance | 7.515 ms | 0.084 ms | 89.464x | 47.942 ms | 0.137 ms |
-| Variant conformance | 8.538 ms | 0.123 ms | 69.415x | 48.802 ms | 0.152 ms |
-| Next-activity prediction | 7.611 ms | 0.086 ms | 88.500x | 52.651 ms | 0.122 ms |
-| Edge bottleneck ranking | 10.119 ms | 0.189 ms | 53.540x | 51.842 ms | 0.208 ms |
+| Dataset | Workload | OCPA p50 | Engine p50 | Engine speedup | OCPA p95 | Engine p95 |
+|---|---|---:|---:|---:|---:|---:|
+| ocpa_running_example | dfg_conformance_95pct | 11.316 ms | 0.112 ms | 101.036x | 91.486 ms | 0.228 ms |
+| ocpa_running_example | variant_conformance_95pct | 13.804 ms | 0.171 ms | 80.725x | 99.971 ms | 0.277 ms |
+| ocpa_running_example | next_activity_prediction | 10.760 ms | 0.107 ms | 100.561x | 94.966 ms | 0.126 ms |
+| ocpa_running_example | edge_bottleneck_ranking | 15.975 ms | 0.263 ms | 60.741x | 100.318 ms | 0.525 ms |
 
-## DFG concurrency
+## Concurrency: DFG conformance
 
-| Workers | OCPA QPS | Engine QPS | Engine/OCPA | OCPA p95 | Engine p95 |
-|---:|---:|---:|---:|---:|---:|
-| 1 | 98.725 | 11,467.056 | 116.151x | 49.759 ms | 0.096 ms |
-| 2 | 168.777 | 21,638.042 | 128.205x | 66.072 ms | 0.110 ms |
-| 4 | 268.652 | 33,004.633 | 122.853x | 84.073 ms | 0.176 ms |
-| 8 | 483.518 | 57,896.002 | 119.739x | 93.835 ms | 0.191 ms |
+| Dataset | Workers | OCPA QPS | Engine QPS | Engine throughput ratio | OCPA p95 | Engine p95 |
+|---|---:|---:|---:|---:|---:|---:|
+| ocpa_running_example | 1 | 60.659 | 6487.222 | 106.946x | 94.673 ms | 0.296 ms |
+| ocpa_running_example | 2 | 110.238 | 12982.173 | 117.765x | 103.317 ms | 0.266 ms |
+| ocpa_running_example | 4 | 195.678 | 21397.852 | 109.352x | 111.922 ms | 0.306 ms |
+| ocpa_running_example | 8 | 333.734 | 36872.227 | 110.484x | 122.830 ms | 0.343 ms |
 
-## Import, memory, and storage
+## Import, resident memory, and storage
 
-The documented OCPA importer failed before model construction. The disclosed
-adapter loaded the public native model in 0.739 seconds; peak RSS during load
-was 203.8 MiB. The engine client used 43.2 MiB RSS and the pg_ocpm schema
-occupied 8.6 MiB, compared with 3.6 MiB
-for the immutable source SQLite file, so pg_ocpm did not win source storage on
-this small input.
+| Dataset | OCPA native importer | Model load | OCPA resident after load | Source SQLite |
+|---|---|---:|---:|---:|
+| ocpa_running_example | fail: ValueError | 0.974 s | 185.5 MiB | 3.6 MiB |
 
-The engine client PSS and PostgreSQL schema storage are recorded separately in
-the JSON artifact. PostgreSQL server memory was not added to engine client
-memory, so this report makes no total-deployment memory-win claim.
+The pg_ocpm schema uses 8.9 MiB for this loaded dataset. The competitor source-file sizes above are immutable input storage and do not include resident model expansion. Package and binary sizes are retained in the JSON artifact.
 
-## Interpretation
+Concurrency memory is reported in each raw epoch. OCPA reports summed worker RSS/PSS; Rust4PM reports the shared threaded process RSS/PSS; the engine artifact reports isolated client-worker RSS and keeps PostgreSQL storage/environment separately.
+The report therefore does not claim a total-deployment memory win: PostgreSQL server memory is not added to the engine client RSS, while the in-process competitor arms include their loaded model.
 
-The large gap is credible for these four repeated, preloaded analytical
-computations, but it cannot be generalized to all OCPA algorithms or arbitrary
-dynamic queries. It also cannot be presented as a clean native OCPA end-to-end
-result until upstream import succeeds without the adapter.
+## Native importer capability
 
-Reproduce with `make perf-ecosystem-ocpa`. The machine-readable result is
-written to `.benchmarks/ecosystem-ocpa-vs-pg-ocpm-engine-0.10.0.json`.
+- ocpa_running_example: documented importer failed with `ValueError`: `ValueError: Sample larger than population or is negative`
+
+The measured competitor arm uses the project's public native data model. Its per-dataset adapter field records whether that model was created by the documented importer or the disclosed setup repair. Neither route precomputes a DFG, variant table, score, expected answer, or benchmark-specific index.
+
+## Interpretation boundaries
+
+- This is a shared workload benchmark, not OCPQ Q1-Q7. The strict OCPQ benchmark remains a separate artifact.
+- Steady-state latency excludes one-time OCEL import, PostgreSQL fixture preparation, process startup, and worker startup; those costs and resident memory are reported separately.
+- Each ecosystem uses its normal scalable service model: Rust4PM shares an immutable log across threads, OCPA uses preloaded forked processes, and ocpm-engine uses process workers with persistent PostgreSQL connections. Concurrency memory is therefore architectural, not a same-runtime microbenchmark.
+- Each pair uses that competitor project's own upstream OCEL 2.0 dataset. The Rust4PM and OCPA reports therefore must not be compared as if they used the same input data.
+- Native import is probed on the unchanged source and reported separately from steady-state execution. If an upstream importer fails, a disclosed benchmark-owned setup adapter may construct the project's public native model; such a result is not a native-import performance comparison.
+- The competitor arms traverse each project's public native OCEL model and execute independently implemented versions of the four fixed common algorithms. They do not measure Rust4PM's Alpha+++ pipeline, OCPA's complete algorithm catalog, or a paper-specific end-to-end benchmark.
+
+The exact numbers describe these fixed analytical workloads and service models. They do not imply the same ratio for arbitrary dynamic OCEL queries, discovery algorithms, conformance techniques, or workloads that use attributes omitted by the common contract.
+
+## Clean-room boundary
+
+OCPA is installed only in the pinned benchmark image and exercised through its released public interface. No OCPA source was inspected, copied, translated, or used to choose product algorithms. Product implementation choices come only from the peer-reviewed papers listed in [academic implementation provenance](academic-implementation-provenance.md).

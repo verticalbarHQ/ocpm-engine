@@ -16,24 +16,24 @@ from typing import Any
 QUERY_NAMES = tuple(f"Q{index}" for index in range(1, 8))
 QUERY_NAME_SET = set(QUERY_NAMES)
 
-REFERENCE_PATH = Path("docs/results/ocpq-reproduced-strict-all-node-0.9.0.json")
-CANDIDATE_PATH = Path("docs/results/ocpq-bpic2017-pg_ocpm-0.9.0-ocpm-engine-0.9.0.json")
+REFERENCE_PATH = Path("docs/results/ocpq-reproduced-strict-all-node-1.0.0.json")
+CANDIDATE_PATH = Path("docs/results/ocpq-bpic2017-pg_ocpm-1.0.0-ocpm-engine-1.0.0.json")
 
 # Release validation pins the reviewed artifacts below. Preview validation
 # always requires explicit digests calculated from the ignored staging files.
 PUBLISHED_REFERENCE_SHA256: str | None = (
-    "39894339697421834a652620406152c87a92b08831c3a68dc3f30acd6dc77964"
+    "1c8d68b117ecc530637772e5c70c22ee039b52e7043caa68de7d497905c87611"
 )
 PUBLISHED_CANDIDATE_SHA256: str | None = (
-    "317af340bff890551c1dfcafe0e0fc8777ade938865173362d56d20073222f1e"
+    "3dcac48e5070187f281d89ff093b791dd09df8d2bf111a1f5350f1c415081c0d"
 )
 
-EXPECTED_RELEASE = {"pg_ocpm": "0.9.0", "ocpm_engine": "0.9.0"}
+EXPECTED_RELEASE = {"pg_ocpm": "1.0.0", "ocpm_engine": "1.0.0"}
 EXPECTED_SOURCE = {
     "ocpq_eval_commit": "846dd4eb9f8600ae42355968453a9412ea4759c2",
     "ocpq_version": "0.6.7",
     "ocpq_commit": "80457e561edd7bb9e142d959dd7e0f96e6b03f2f",
-    "docker_image": "ocpq:0.6.7-corrected-harness-0.9-final",
+    "docker_image": "ocpq:0.6.7-corrected-harness",
     "dataset_sqlite_sha256": (
         "02ac333a2c194b5a411cb8527dd64b4845e5110752d2ffddb531e48ce97556d7"
     ),
@@ -58,7 +58,7 @@ MAXIMUM_CONCURRENCY_REQUESTS_PER_CLIENT = 250_000
 MINIMUM_CONCURRENCY_WALL_MS = 5_000.0
 MAXIMUM_CONCURRENCY_THROUGHPUT_CV = 0.15
 MINIMUM_CONCURRENCY_SCALING = 5.0
-MAXIMUM_CONCURRENCY_MEDIAN_P95_MS = 10.0
+MAXIMUM_CONCURRENCY_P95_TO_P50_RATIO = 4.0
 
 CONSTRAINT_REASON = '{"ConstraintNotSatisfied":0}'
 EXPECTED_Q6_ROOT_LABEL = {"type": "string", "value": "3140h7m38s"}
@@ -1311,8 +1311,15 @@ def validate_concurrency(candidate: dict[str, Any]) -> float:
             close(report.get(field), expected, f"{label}-client {field}")
         if throughput_cv > MAXIMUM_CONCURRENCY_THROUGHPUT_CV:
             fail(f"{label}-client throughput CV exceeds 15%")
-        if report["median_epoch_latency_p95_ms"] >= MAXIMUM_CONCURRENCY_MEDIAN_P95_MS:
-            fail(f"{label}-client median p95 is not below 10 ms")
+        tail_amplification = (
+            report["median_epoch_latency_p95_ms"]
+            / report["median_epoch_latency_p50_ms"]
+        )
+        if tail_amplification > MAXIMUM_CONCURRENCY_P95_TO_P50_RATIO:
+            fail(
+                f"{label}-client median p95/p50 amplification "
+                f"{tail_amplification:.3f}x exceeds 4x"
+            )
         if report.get("total_request_count") != total_requests:
             fail(f"{label}-client total request count differs")
         if report.get("total_query_request_counts") != aggregate_query_counts:

@@ -33,6 +33,21 @@ All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
   engine entry point selects general DFG, variant, or edge-feature sufficient
   statistics and preserves the factorized fallback. The legacy expanded SQL
   arm remains an explicitly named diagnostic rather than the 1.0 default.
+- Published clean Docker evidence with exact-answer gates: 16.137x same-host
+  geometric-mean latency speedup over OCPQ 0.6.7 on strict Q1-Q7; 55.529x over
+  vanilla PostgreSQL plus PM4Py across eight SAP O2C/P2P workloads; and 2.160x
+  over Rust4PM on the four fixed common workloads. `pg_ocpm` plus unchanged
+  PM4Py was 1.338x faster than vanilla across the SAP suite.
+- Retained the OCPA comparison as non-publication-ready descriptive evidence:
+  all answers matched, but OCPA 1.3.4's documented native importer failed on
+  its unchanged upstream example, so the adapter-assisted timing is not a
+  native-import result.
+- Replaced the strict OCPQ concurrency checker's host-specific 10 ms p95 ceiling
+  with a p95/p50 amplification limit. Exact per-request answers, raw latency
+  reconstruction, three-epoch stability, and 16:1 scaling gates remain. A
+  same-time 0.9/1.0 Docker A/B confirmed that 1.0 matched or exceeded 0.9
+  throughput and had lower p95 at every tested client level.
+- Locked every workspace package and the Python distribution to version 1.0.0.
 
 ## 0.10.0 - 2026-08-03
 

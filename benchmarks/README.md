@@ -145,9 +145,13 @@ expected payload digest pins and report links, and run:
 make perf-public-release-check
 ```
 
-`make perf-release-check` runs the published SAP and OCPQ checks together.
-Release checks read only committed public artifacts and enforce their pinned
-file or payload digests; they do not accept ignored preview evidence.
+`make perf-release-check` runs the published SAP and OCPQ checks together. The
+1.0 SAP release artifact is
+`docs/results/sap-pm4py-three-way-1.0.0.json`; the strict OCPQ release pair is
+`docs/results/ocpq-reproduced-strict-all-node-1.0.0.json` and
+`docs/results/ocpq-bpic2017-pg_ocpm-1.0.0-ocpm-engine-1.0.0.json`. Release
+checks read only committed public artifacts and enforce their pinned file or
+payload digests; they do not accept ignored preview evidence.
 
 Concurrency uses one persistent PostgreSQL connection per prestarted worker.
 Each engine/level arm runs three independent epochs; every epoch must include an
@@ -204,12 +208,12 @@ OCPM_ENGINE_READ_PATH=factorized python benchmarks/sap_pm4py_three_way.py \
 
 This is not a standalone host command: the client must be created by the public
 Docker orchestrator so the database hostnames, prepared fixtures, immutable
-image IDs, and required provenance variables are present. The clean 0.9
-artifact is validated explicitly with:
+image IDs, and required provenance variables are present. The clean 1.0
+artifact is validated with:
 
 ```sh
 python benchmarks/check_sap_pm4py_result.py \
-  docs/results/sap-pm4py-three-way-0.9.0.json
+  docs/results/sap-pm4py-three-way-1.0.0.json
 ```
 
 The environment switch changes only the ocpm-engine arm. `auto` is the 1.0

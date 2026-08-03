@@ -1,80 +1,84 @@
-# Rust4PM versus pg_ocpm + ocpm-engine 0.10
-
-Run date: 2026-08-03. Status: validated local full run, not publication-ready
-because the ocpm-engine source tree contained the benchmark implementation as
-uncommitted changes.
+# Rust4PM vs pg_ocpm + ocpm-engine 1.0
 
 ## Result
 
-All four workload answers were exactly equal. On Rust4PM's upstream OCEL 2.0
-P2P corpus, pg_ocpm + ocpm-engine had a 2.510x geometric-mean p50 serial
-latency speedup. It also delivered 1.537x to 1.684x Rust4PM's
-DFG-conformance throughput at every tested concurrency level.
+All 4 answer cells passed exact equality. On `rust4pm_p2p` and the four fixed workloads, pg_ocpm + ocpm-engine had a 2.160x geometric-mean p50 speedup over Rust4PM.
 
-This is an `ecosystem-common-pm` pair, not an extension of the strict OCPQ
-Q1-Q7 benchmark. The Rust arm traverses Rust4PM's public `SlimLinkedOCEL` and
-uses an independently implemented version of the four fixed common algorithms;
-it does not reproduce Rust4PM's published Alpha+++ pipeline.
+This is the separate `ecosystem-common-pm` suite. It does not add Rust4PM or OCPA cells to the strict OCPQ Q1-Q7 benchmark.
 
-## Fixed input and protocol
+Publication status: ready.
 
-- Input: Procure-To-Payment OCEL 2.0 corpus, DOI
-  [10.5281/zenodo.8412920](https://doi.org/10.5281/zenodo.8412920), CC BY 4.0.
-- SHA-256: `0017c34aeecdcb7712004d4364b11b372f2cc1a9cf2639ffe295f95a0df1ee74`.
-- Size: 14,671 events, 9,543 objects, and a 13.1 MiB source SQLite file.
-- Backbone: `goods receipt`, chosen by the suite's fixed data-dependent rule.
-- Workloads: 95% DFG conformance, 95% variant conformance, next-activity
-  prediction, and edge bottleneck ranking.
-- Split: identical lifecycle-containment 80/20 windows; timestamp and external
-  event ID define deterministic order.
-- Serial timing: 10 warmups and three epochs of 30 measured requests.
-- Concurrency: three DFG epochs at 1, 2, 4, and 8 workers, each lasting at least
-  five seconds and completing at least 32 requests per worker.
-- Correctness: canonical exact equality before timing, on every serial sample,
-  and on every concurrency request.
+The engine had higher DFG-conformance throughput at every measured concurrency level and delivered 1.287x to 1.542x Rust4PM throughput.
 
-The input contains 2,028 O2O rows that refer to absent objects. Both arms omit
-those impossible relations; none of the four event-object lifecycle workloads
-uses O2O.
+## Fixed contract
+
+- Dataset: Procure-To-Payment (P2P) Object-centric Event Log in OCEL 2.0 Standard (`10.5281/zenodo.8412920`), the upstream Rust4PM corpus, SHA-256 `0017c34aeecdcb7712004d4364b11b372f2cc1a9cf2639ffe295f95a0df1ee74`.
+- Source license/terms: CC BY 4.0.
+- Backbone: `goods receipt`, selected by the fixed rule: maximum count of object lifecycles containing at least two events; then maximum event-object link count; then lexical object-type name.
+- Workloads: 95% DFG conformance, 95% variant conformance, next-activity prediction, and edge bottleneck ranking.
+- Split: lifecycle-containment 80/20 windows, identical for both arms.
+- Event order: event timestamp, then external event ID.
+- Invalid O2O rows excluded from PostgreSQL normalization: 2028; O2O is outside the fixed workloads.
+- Latency: 10 warmups, 3 epochs of 30 measured requests, monotonic nanosecond clock.
+- Concurrency: DFG conformance at 1/2/4/8 workers, 3 epochs, at least 5 seconds and 32 requests per worker.
+- Publication gate: exact canonical answer equality for preflight, every serial sample, and every concurrency request.
+
+## Correctness
+
+| Dataset | Workload | Exact | Answer SHA-256 |
+|---|---|---:|---|
+| rust4pm_p2p | dfg_conformance_95pct | yes | `60ab48203c1517581d04b17d4b025b33dab3a5567f2a2f88a20d8d3e3ff8c7d9` |
+| rust4pm_p2p | variant_conformance_95pct | yes | `1c911590ca4d2aed672b2b8e0b0680713dcda71dbc6e20ef89eac80bcf8227f1` |
+| rust4pm_p2p | next_activity_prediction | yes | `a8ea57fdec0c3e86ea487f5a71ef024e099f3bfae3e69d2dae790808e314c8b8` |
+| rust4pm_p2p | edge_bottleneck_ranking | yes | `4de113819ac516dd65201c03400cf132dc50f02a66cc0e25eebc632165e6b444` |
 
 ## Steady-state latency
 
-| Workload | Rust4PM p50 | Engine p50 | Engine speedup | Rust4PM p95 | Engine p95 |
-|---|---:|---:|---:|---:|---:|
-| DFG conformance | 1.134 ms | 0.414 ms | 2.739x | 2.037 ms | 0.559 ms |
-| Variant conformance | 1.256 ms | 0.839 ms | 1.497x | 1.654 ms | 1.143 ms |
-| Next-activity prediction | 1.139 ms | 0.389 ms | 2.928x | 1.503 ms | 0.485 ms |
-| Edge bottleneck ranking | 1.094 ms | 0.331 ms | 3.305x | 1.357 ms | 0.449 ms |
+| Dataset | Workload | Rust4PM p50 | Engine p50 | Engine speedup | Rust4PM p95 | Engine p95 |
+|---|---|---:|---:|---:|---:|---:|
+| rust4pm_p2p | dfg_conformance_95pct | 2.049 ms | 0.797 ms | 2.571x | 3.396 ms | 1.227 ms |
+| rust4pm_p2p | variant_conformance_95pct | 2.175 ms | 1.658 ms | 1.312x | 3.507 ms | 2.019 ms |
+| rust4pm_p2p | next_activity_prediction | 1.926 ms | 0.785 ms | 2.454x | 3.125 ms | 1.000 ms |
+| rust4pm_p2p | edge_bottleneck_ranking | 1.816 ms | 0.691 ms | 2.628x | 3.234 ms | 0.965 ms |
 
-## DFG concurrency
+## Concurrency: DFG conformance
 
-| Workers | Rust4PM QPS | Engine QPS | Engine/Rust4PM | Rust4PM p95 | Engine p95 |
-|---:|---:|---:|---:|---:|---:|
-| 1 | 1,486.637 | 2,504.236 | 1.684x | 0.854 ms | 0.472 ms |
-| 2 | 2,889.815 | 4,698.232 | 1.626x | 0.800 ms | 0.502 ms |
-| 4 | 5,126.888 | 8,160.255 | 1.592x | 0.885 ms | 0.577 ms |
-| 8 | 9,305.604 | 14,300.843 | 1.537x | 0.993 ms | 0.656 ms |
+| Dataset | Workers | Rust4PM QPS | Engine QPS | Engine throughput ratio | Rust4PM p95 | Engine p95 |
+|---|---:|---:|---:|---:|---:|---:|
+| rust4pm_p2p | 1 | 894.949 | 1162.355 | 1.299x | 1.539 ms | 1.145 ms |
+| rust4pm_p2p | 2 | 1948.365 | 2506.724 | 1.287x | 1.311 ms | 1.044 ms |
+| rust4pm_p2p | 4 | 3366.676 | 5053.932 | 1.501x | 1.468 ms | 1.005 ms |
+| rust4pm_p2p | 8 | 6195.718 | 9555.875 | 1.542x | 1.637 ms | 1.077 ms |
 
-## Import, memory, and storage
+## Import, resident memory, and storage
 
-Rust4PM's documented importer succeeded. Model load took 0.074 seconds and its
-resident size after load was 55.0 MiB RSS. The engine client used 39.8 MiB RSS;
-the pg_ocpm schema occupied 9.5 MiB, compared with 13.1 MiB for the immutable
-source SQLite file.
+| Dataset | Rust4PM native importer | Model load | Rust4PM resident after load | Source SQLite |
+|---|---|---:|---:|---:|
+| rust4pm_p2p | pass | 0.105 s | 51.6 MiB | 13.1 MiB |
 
-The engine client PSS and PostgreSQL schema storage are recorded separately in
-the JSON artifact. PostgreSQL server memory was not added to engine client
-memory, so this report makes no total-deployment memory-win claim.
+The pg_ocpm schema uses 9.7 MiB for this loaded dataset. The competitor source-file sizes above are immutable input storage and do not include resident model expansion. Package and binary sizes are retained in the JSON artifact.
 
-## Interpretation
+Concurrency memory is reported in each raw epoch. OCPA reports summed worker RSS/PSS; Rust4PM reports the shared threaded process RSS/PSS; the engine artifact reports isolated client-worker RSS and keeps PostgreSQL storage/environment separately.
+The report therefore does not claim a total-deployment memory win: PostgreSQL server memory is not added to the engine client RSS, while the in-process competitor arms include their loaded model.
 
-The former concurrency deficit came from reconstructing 10,284 events in the
-client for a result containing ten DFG edges. Version 0.10 instead requests an
-exact lifecycle-aware sufficient statistic from pg_ocpm. This is a public,
-parameterized multi-window API, also used by next-activity prediction; variant
-and edge workloads use separate general aggregate APIs. These numbers still do
-not predict arbitrary dynamic queries, other discovery or conformance
-algorithms, or workloads requiring attributes outside those contracts.
+## Native importer capability
 
-Reproduce with `make perf-ecosystem-rust4pm`. The machine-readable result is
-written to `.benchmarks/ecosystem-rust4pm-vs-pg-ocpm-engine-0.10.0.json`.
+- rust4pm_p2p: documented importer succeeded.
+
+The measured competitor arm uses the project's public native data model. Its per-dataset adapter field records whether that model was created by the documented importer or the disclosed setup repair. Neither route precomputes a DFG, variant table, score, expected answer, or benchmark-specific index.
+
+## Interpretation boundaries
+
+- This is a shared workload benchmark, not OCPQ Q1-Q7. The strict OCPQ benchmark remains a separate artifact.
+- Steady-state latency excludes one-time OCEL import, PostgreSQL fixture preparation, process startup, and worker startup; those costs and resident memory are reported separately.
+- Each ecosystem uses its normal scalable service model: Rust4PM shares an immutable log across threads, OCPA uses preloaded forked processes, and ocpm-engine uses process workers with persistent PostgreSQL connections. Concurrency memory is therefore architectural, not a same-runtime microbenchmark.
+- Each pair uses that competitor project's own upstream OCEL 2.0 dataset. The Rust4PM and OCPA reports therefore must not be compared as if they used the same input data.
+- Native import is probed on the unchanged source and reported separately from steady-state execution. If an upstream importer fails, a disclosed benchmark-owned setup adapter may construct the project's public native model; such a result is not a native-import performance comparison.
+- The competitor arms traverse each project's public native OCEL model and execute independently implemented versions of the four fixed common algorithms. They do not measure Rust4PM's Alpha+++ pipeline, OCPA's complete algorithm catalog, or a paper-specific end-to-end benchmark.
+- The source contains 2028 O2O rows referencing objects absent from its object table. PostgreSQL loading excludes those impossible relations; none of the four event-object lifecycle workloads uses O2O.
+
+The exact numbers describe these fixed analytical workloads and service models. They do not imply the same ratio for arbitrary dynamic OCEL queries, discovery algorithms, conformance techniques, or workloads that use attributes omitted by the common contract.
+
+## Clean-room boundary
+
+Rust4PM is compiled only inside the pinned benchmark image and exercised through its released public interface. No Rust4PM source was inspected, copied, translated, or used to choose product algorithms. Product implementation choices come only from the peer-reviewed papers listed in [academic implementation provenance](academic-implementation-provenance.md).

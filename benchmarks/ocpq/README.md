@@ -134,9 +134,17 @@ hold:
 - no more than 128 MiB serving storage, 16 MiB indexes, or 8 MiB binding data;
 - fresh-process memory evidence while the complete owned tree remains live;
 - complete, parity-checked 1/4/8/16-client sweeps with three epochs per level,
-  at least five seconds and 32 requests per client in each epoch; and
+  at least five seconds and 32 requests per client in each epoch, no more than
+  15% epoch-throughput coefficient of variation, at least 5x 16:1 scaling, and
+  median p95 no more than 4x median p50 at each level; and
 - matching source-tree, Docker-host, candidate-image, and database-image
   provenance.
+
+The tail gate uses p95/p50 amplification rather than an absolute millisecond
+ceiling because the benchmark records the Docker host but does not reserve or
+standardize its CPU capacity. Absolute latency remains fully reported; the
+scale-independent gate detects unstable tails without accepting or rejecting a
+release because of unrelated host load.
 
 See [`docs/ocpq-performance.md`](../../docs/ocpq-performance.md) for the
 published results. Preview artifacts remain ignored and must be shown for

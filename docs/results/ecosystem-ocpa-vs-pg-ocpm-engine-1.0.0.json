@@ -1,0 +1,2851 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-03T20:12:02.550905+00:00",
+  "suite": "ecosystem-common-pm",
+  "pair": "ocpa_vs_pg_ocpm_ocpm_engine",
+  "publication_ready": false,
+  "strict_ocpq_suite_modified": false,
+  "contract": {
+    "suite": "ecosystem-common-pm",
+    "train_fraction": 0.8,
+    "workloads": [
+      "dfg_conformance_95pct",
+      "variant_conformance_95pct",
+      "next_activity_prediction",
+      "edge_bottleneck_ranking"
+    ],
+    "timing_boundary": "steady-state request only; OCEL import, PostgreSQL fixture load, process startup, connection startup, and worker startup excluded",
+    "correctness": "exact canonical answer equality on every measured request",
+    "object_type_selection": {
+      "rule": "maximum count of object lifecycles containing at least two events; then maximum event-object link count; then lexical object-type name",
+      "selected": "orders",
+      "candidates": [
+        {
+          "object_type": "orders",
+          "multi_event_lifecycles": 2000,
+          "event_object_links": 6484,
+          "linked_objects": 2000
+        },
+        {
+          "object_type": "items",
+          "multi_event_lifecycles": 1508,
+          "event_object_links": 10686,
+          "linked_objects": 7670
+        },
+        {
+          "object_type": "packages",
+          "multi_event_lifecycles": 320,
+          "event_object_links": 1041,
+          "linked_objects": 320
+        },
+        {
+          "object_type": "employees",
+          "multi_event_lifecycles": 18,
+          "event_object_links": 13646,
+          "linked_objects": 18
+        },
+        {
+          "object_type": "customers",
+          "multi_event_lifecycles": 3,
+          "event_object_links": 4000,
+          "linked_objects": 3
+        }
+      ]
+    },
+    "event_order": "event timestamp, then external event ID",
+    "latency": "10 warmups; 3 epochs x 30 samples; monotonic nanosecond clock",
+    "concurrency": "DFG conformance; 3 epochs; at least 5 seconds and 32 requests per worker at 1/2/4/8 workers"
+  },
+  "source": {
+    "title": "OCPA OCEL 2.0 running example",
+    "identifier": "ocpm/ocpa@de056e0203a3fa4a9bbc19a95e001eada323074a:sample_logs/ocel2/sqlite/running-example.sqlite",
+    "upstream_project": "OCPA documented OCEL 2.0 import example",
+    "upstream_revision": "de056e0203a3fa4a9bbc19a95e001eada323074a",
+    "license": "OCPA 1.3.4 wheel contains GPL-3.0; dataset-specific terms are not stated separately"
+  },
+  "datasets": [
+    {
+      "name": "ocpa_running_example",
+      "filename": "ocpa-running-example.sqlite",
+      "sqlite_sha256": "019202ee793cbd71c80636ca10d78f9701e83f3696ca818c52cc76f38d2bd38d",
+      "source_url": "https://raw.githubusercontent.com/ocpm/ocpa/de056e0203a3fa4a9bbc19a95e001eada323074a/sample_logs/ocel2/sqlite/running-example.sqlite",
+      "source_sqlite_bytes": 3743744,
+      "source_counts": {
+        "events": 18211,
+        "objects": 10031,
+        "event_object_links": 35857,
+        "object_object_links": 25336,
+        "ignored_orphan_object_relations": 0
+      },
+      "object_type_selection": {
+        "rule": "maximum count of object lifecycles containing at least two events; then maximum event-object link count; then lexical object-type name",
+        "selected": "orders",
+        "candidates": [
+          {
+            "object_type": "orders",
+            "multi_event_lifecycles": 2000,
+            "event_object_links": 6484,
+            "linked_objects": 2000
+          },
+          {
+            "object_type": "items",
+            "multi_event_lifecycles": 1508,
+            "event_object_links": 10686,
+            "linked_objects": 7670
+          },
+          {
+            "object_type": "packages",
+            "multi_event_lifecycles": 320,
+            "event_object_links": 1041,
+            "linked_objects": 320
+          },
+          {
+            "object_type": "employees",
+            "multi_event_lifecycles": 18,
+            "event_object_links": 13646,
+            "linked_objects": 18
+          },
+          {
+            "object_type": "customers",
+            "multi_event_lifecycles": 3,
+            "event_object_links": 4000,
+            "linked_objects": 3
+          }
+        ]
+      },
+      "fixture": {
+        "dataset_name": "ocpa_running_example",
+        "baseline_dataset_id": 1,
+        "ocpm_dataset_id": 1,
+        "tenant_id": 1,
+        "object_type": "orders",
+        "from_time": "2023-04-03T12:08:17.999999+00:00",
+        "train_to": "2024-01-26T12:23:47+00:00",
+        "test_from": "2024-01-26T12:23:47.000001+00:00",
+        "to_time": "2024-05-10T10:15:11.000001+00:00",
+        "cases": 2000,
+        "train_cases": 1600,
+        "test_cases": 338
+      }
+    }
+  ],
+  "exactness": [
+    {
+      "dataset": "ocpa_running_example",
+      "workload": "dfg_conformance_95pct",
+      "exact": true,
+      "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+      "engine_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+      "competitor_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118"
+    },
+    {
+      "dataset": "ocpa_running_example",
+      "workload": "variant_conformance_95pct",
+      "exact": true,
+      "answer_sha256": "80cd775e0a756938d2ce7f6c48bed2fb26d3c4a933b64ba1723e9612bac740bd",
+      "engine_sha256": "80cd775e0a756938d2ce7f6c48bed2fb26d3c4a933b64ba1723e9612bac740bd",
+      "competitor_sha256": "80cd775e0a756938d2ce7f6c48bed2fb26d3c4a933b64ba1723e9612bac740bd"
+    },
+    {
+      "dataset": "ocpa_running_example",
+      "workload": "next_activity_prediction",
+      "exact": true,
+      "answer_sha256": "0d11e08bea5189f4b9bd8d8b63a71840edef2dc8b0a3d120c9a08d1d20e5739d",
+      "engine_sha256": "0d11e08bea5189f4b9bd8d8b63a71840edef2dc8b0a3d120c9a08d1d20e5739d",
+      "competitor_sha256": "0d11e08bea5189f4b9bd8d8b63a71840edef2dc8b0a3d120c9a08d1d20e5739d"
+    },
+    {
+      "dataset": "ocpa_running_example",
+      "workload": "edge_bottleneck_ranking",
+      "exact": true,
+      "answer_sha256": "34ecb123e6a6270bca1ed9f302917df1347966c0562f4998a71c7740e3dc1528",
+      "engine_sha256": "34ecb123e6a6270bca1ed9f302917df1347966c0562f4998a71c7740e3dc1528",
+      "competitor_sha256": "34ecb123e6a6270bca1ed9f302917df1347966c0562f4998a71c7740e3dc1528"
+    }
+  ],
+  "latency": [
+    {
+      "dataset": "ocpa_running_example",
+      "workload": "dfg_conformance_95pct",
+      "competitor_p50_ms": 11.316,
+      "competitor_p95_ms": 91.486,
+      "engine_p50_ms": 0.112,
+      "engine_p95_ms": 0.228,
+      "engine_speedup_p50": 101.036,
+      "exact": true
+    },
+    {
+      "dataset": "ocpa_running_example",
+      "workload": "variant_conformance_95pct",
+      "competitor_p50_ms": 13.804,
+      "competitor_p95_ms": 99.971,
+      "engine_p50_ms": 0.171,
+      "engine_p95_ms": 0.277,
+      "engine_speedup_p50": 80.725,
+      "exact": true
+    },
+    {
+      "dataset": "ocpa_running_example",
+      "workload": "next_activity_prediction",
+      "competitor_p50_ms": 10.76,
+      "competitor_p95_ms": 94.966,
+      "engine_p50_ms": 0.107,
+      "engine_p95_ms": 0.126,
+      "engine_speedup_p50": 100.561,
+      "exact": true
+    },
+    {
+      "dataset": "ocpa_running_example",
+      "workload": "edge_bottleneck_ranking",
+      "competitor_p50_ms": 15.975,
+      "competitor_p95_ms": 100.318,
+      "engine_p50_ms": 0.263,
+      "engine_p95_ms": 0.525,
+      "engine_speedup_p50": 60.741,
+      "exact": true
+    }
+  ],
+  "concurrency": [
+    {
+      "dataset": "ocpa_running_example",
+      "workers": 1,
+      "competitor_qps": 60.659,
+      "competitor_p95_ms": 94.673,
+      "engine_qps": 6487.222,
+      "engine_p95_ms": 0.296,
+      "engine_throughput_ratio": 106.946,
+      "exact": true
+    },
+    {
+      "dataset": "ocpa_running_example",
+      "workers": 2,
+      "competitor_qps": 110.238,
+      "competitor_p95_ms": 103.317,
+      "engine_qps": 12982.173,
+      "engine_p95_ms": 0.266,
+      "engine_throughput_ratio": 117.765,
+      "exact": true
+    },
+    {
+      "dataset": "ocpa_running_example",
+      "workers": 4,
+      "competitor_qps": 195.678,
+      "competitor_p95_ms": 111.922,
+      "engine_qps": 21397.852,
+      "engine_p95_ms": 0.306,
+      "engine_throughput_ratio": 109.352,
+      "exact": true
+    },
+    {
+      "dataset": "ocpa_running_example",
+      "workers": 8,
+      "competitor_qps": 333.734,
+      "competitor_p95_ms": 122.83,
+      "engine_qps": 36872.227,
+      "engine_p95_ms": 0.343,
+      "engine_throughput_ratio": 110.484,
+      "exact": true
+    }
+  ],
+  "summary": {
+    "exact_answer_cells": 4,
+    "exact_answer_cells_expected": 4,
+    "engine_p50_geometric_mean_speedup": 84.013,
+    "engine_p50_minimum_speedup": 60.741,
+    "engine_p50_maximum_speedup": 101.036
+  },
+  "publication_gate": {
+    "exact_answers": true,
+    "engine_source_tree_clean": true,
+    "pg_ocpm_source_tree_clean": true,
+    "competitor_native_importers": false
+  },
+  "arms": {
+    "ocpa": {
+      "schema_version": 1,
+      "generated_at": "2026-08-03T20:12:02.100969+00:00",
+      "arm": "ocpa",
+      "implementation": {
+        "ocpa_version": "1.3.4",
+        "ocpa_wheel_sha256": "52e8208d5ef8633060b905441498aa8b53e0322bf7a310c5a5deb49500da2934",
+        "python": "3.11.15",
+        "platform": "Linux-7.0.11-orbstack-00360-gc9bc4d96ac70-aarch64-with-glibc2.36",
+        "runtime_versions": {
+          "pm4py": "2.2.32",
+          "pandas": "3.0.5",
+          "numpy": "2.4.6",
+          "networkx": "3.6.1",
+          "scipy": "1.17.1",
+          "psutil": "7.0.0"
+        },
+        "image_id": "sha256:8798a51b5f1a30d3c1c311f579b44dfc488d1a22266f5dbd58134d2d0b74ac8d",
+        "controller_source_tree_clean": true
+      },
+      "method": {
+        "data_model": "ocpa.objects.log.variants.obj.ObjectCentricEventLog",
+        "adapter": "documented importer when functional; otherwise a disclosed benchmark-owned OCEL2-to-public-OCPA-model setup adapter",
+        "process_model": "preloaded read-only OCPA model with forked process workers",
+        "native_importer": "probed on the unmodified upstream source and reported separately"
+      },
+      "process_baseline_rss_bytes": 25030656,
+      "storage": {
+        "ocpa_package_bytes": 1685696,
+        "pandas_package_bytes": 74918488,
+        "networkx_package_bytes": 16573549
+      },
+      "datasets": [
+        {
+          "dataset": "ocpa_running_example",
+          "fixture": {
+            "dataset_name": "ocpa_running_example",
+            "baseline_dataset_id": 1,
+            "ocpm_dataset_id": 1,
+            "tenant_id": 1,
+            "object_type": "orders",
+            "from_time": "2023-04-03T12:08:17.999999+00:00",
+            "train_to": "2024-01-26T12:23:47+00:00",
+            "test_from": "2024-01-26T12:23:47.000001+00:00",
+            "to_time": "2024-05-10T10:15:11.000001+00:00",
+            "cases": 2000,
+            "train_cases": 1600,
+            "test_cases": 338
+          },
+          "source_sqlite_bytes": 3743744,
+          "source_sqlite_sha256": "019202ee793cbd71c80636ca10d78f9701e83f3696ca818c52cc76f38d2bd38d",
+          "native_import_probe": {
+            "documented_importer": true,
+            "success": false,
+            "elapsed_s": 1.613781,
+            "error_type": "ValueError",
+            "error": "ValueError: Sample larger than population or is negative"
+          },
+          "adapter": {
+            "adapter": "benchmark_ocel2_sqlite_to_ocpa_public_model",
+            "reason": "OCPA 1.3.4 documented importer fails on its upstream example before constructing a model",
+            "events": 18211,
+            "objects": 10011,
+            "object_types": 6,
+            "event_object_links": 35857
+          },
+          "load": {
+            "seconds": 0.973751,
+            "rss_before_bytes": 25108480,
+            "rss_after_bytes": 194510848,
+            "baseline_rss_bytes": 25108480,
+            "peak_rss_bytes": 214437888,
+            "incremental_peak_bytes": 189329408,
+            "resident_pss_bytes": 193603584
+          },
+          "serial": {
+            "dfg_conformance_95pct": {
+              "correct_within_arm": true,
+              "answer": {
+                "fitness": 1.0,
+                "conforming": 759,
+                "deviations": 0,
+                "test_total": 759,
+                "model": [
+                  [
+                    "confirm order",
+                    "payment reminder",
+                    "directly_follows"
+                  ],
+                  [
+                    "payment reminder",
+                    "payment reminder",
+                    "directly_follows"
+                  ],
+                  [
+                    "place order",
+                    "confirm order",
+                    "directly_follows"
+                  ]
+                ]
+              },
+              "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+              "input": {
+                "selected_cases": 1938,
+                "event_rows": 6250,
+                "aggregate_rows": 3,
+                "source": "ocpa.ObjectCentricEventLog",
+                "native_object_type_cases": 2000
+              },
+              "p50_ms": 11.316,
+              "p95_ms": 91.486,
+              "minimum_ms": 9.412,
+              "maximum_ms": 104.73,
+              "runs": 90,
+              "epoch_count": 3,
+              "epoch_p95_median_ms": 91.486,
+              "epoch_p95_range_ms": [
+                13.254,
+                94.368
+              ],
+              "epochs": [
+                {
+                  "epoch": 1,
+                  "p50_ms": 10.62,
+                  "p95_ms": 91.486,
+                  "minimum_ms": 9.566,
+                  "maximum_ms": 98.439,
+                  "runs": 30,
+                  "samples_ns": [
+                    10575028,
+                    10209652,
+                    9865859,
+                    10858236,
+                    10664527,
+                    9860318,
+                    9565608,
+                    9960859,
+                    11426905,
+                    9585233,
+                    10267819,
+                    98438920,
+                    12267365,
+                    10996903,
+                    11123445,
+                    11170570,
+                    13063325,
+                    11289071,
+                    10413527,
+                    10742486,
+                    11800906,
+                    10564569,
+                    10116193,
+                    10411527,
+                    12115114,
+                    10944862,
+                    10441693,
+                    91485944,
+                    10190234,
+                    10133651
+                  ]
+                },
+                {
+                  "epoch": 2,
+                  "p50_ms": 11.584,
+                  "p95_ms": 94.368,
+                  "minimum_ms": 9.412,
+                  "maximum_ms": 104.73,
+                  "runs": 30,
+                  "samples_ns": [
+                    9576733,
+                    10292319,
+                    10635236,
+                    10649402,
+                    11074403,
+                    10253026,
+                    10706486,
+                    9412274,
+                    10697652,
+                    11253238,
+                    11654780,
+                    10369068,
+                    94367619,
+                    11013153,
+                    10218818,
+                    11513279,
+                    10760861,
+                    11922947,
+                    12544866,
+                    13734244,
+                    13358159,
+                    14949539,
+                    12532616,
+                    12072448,
+                    11989531,
+                    12244656,
+                    12534324,
+                    13106033,
+                    12366740,
+                    104729687
+                  ]
+                },
+                {
+                  "epoch": 3,
+                  "p50_ms": 11.742,
+                  "p95_ms": 13.254,
+                  "minimum_ms": 10.598,
+                  "maximum_ms": 101.759,
+                  "runs": 30,
+                  "samples_ns": [
+                    12996325,
+                    12444199,
+                    12509741,
+                    13253617,
+                    11363821,
+                    11000779,
+                    11859989,
+                    11336238,
+                    10753945,
+                    11098570,
+                    11296071,
+                    12875700,
+                    11272946,
+                    11162904,
+                    11740572,
+                    101759346,
+                    12779992,
+                    12574657,
+                    12044490,
+                    12509282,
+                    11398529,
+                    11489196,
+                    11956531,
+                    11437030,
+                    10598028,
+                    11092196,
+                    12214282,
+                    11784072,
+                    11505446,
+                    11742947
+                  ]
+                }
+              ]
+            },
+            "variant_conformance_95pct": {
+              "correct_within_arm": true,
+              "answer": {
+                "fitness": 0.958579881657,
+                "conforming": 324,
+                "deviations": 14,
+                "test_total": 338,
+                "model": [
+                  "[\"place order\",\"confirm order\",\"payment reminder\",\"payment reminder\"]",
+                  "[\"place order\",\"confirm order\",\"payment reminder\"]"
+                ]
+              },
+              "answer_sha256": "80cd775e0a756938d2ce7f6c48bed2fb26d3c4a933b64ba1723e9612bac740bd",
+              "input": {
+                "selected_cases": 1938,
+                "event_rows": 6250,
+                "aggregate_rows": 6,
+                "source": "ocpa.ObjectCentricEventLog",
+                "native_object_type_cases": 2000
+              },
+              "p50_ms": 13.804,
+              "p95_ms": 99.971,
+              "minimum_ms": 12.024,
+              "maximum_ms": 105.956,
+              "runs": 90,
+              "epoch_count": 3,
+              "epoch_p95_median_ms": 101.046,
+              "epoch_p95_range_ms": [
+                97.766,
+                104.507
+              ],
+              "epochs": [
+                {
+                  "epoch": 1,
+                  "p50_ms": 14.24,
+                  "p95_ms": 101.046,
+                  "minimum_ms": 12.615,
+                  "maximum_ms": 105.956,
+                  "runs": 30,
+                  "samples_ns": [
+                    12615366,
+                    13381452,
+                    12737407,
+                    13311576,
+                    13280284,
+                    13211659,
+                    12904492,
+                    13689077,
+                    101045677,
+                    13045617,
+                    12860825,
+                    13906994,
+                    16142666,
+                    15712041,
+                    14425870,
+                    14420454,
+                    13874786,
+                    14817914,
+                    13916327,
+                    14321370,
+                    13812077,
+                    14387079,
+                    14167745,
+                    14312078,
+                    105956065,
+                    15383539,
+                    14368954,
+                    14647371,
+                    15308581,
+                    14945956
+                  ]
+                },
+                {
+                  "epoch": 2,
+                  "p50_ms": 13.949,
+                  "p95_ms": 104.507,
+                  "minimum_ms": 12.385,
+                  "maximum_ms": 104.699,
+                  "runs": 30,
+                  "samples_ns": [
+                    16461918,
+                    16341417,
+                    16239417,
+                    18491923,
+                    15316623,
+                    13819994,
+                    13371326,
+                    14127911,
+                    12892158,
+                    104506895,
+                    14122203,
+                    13685536,
+                    13644035,
+                    13173992,
+                    14470495,
+                    13795078,
+                    15294707,
+                    14075203,
+                    14731080,
+                    15222122,
+                    13822411,
+                    13223492,
+                    14397537,
+                    13207367,
+                    12385157,
+                    13404159,
+                    104699146,
+                    13373327,
+                    13523160,
+                    13654244
+                  ]
+                },
+                {
+                  "epoch": 3,
+                  "p50_ms": 13.071,
+                  "p95_ms": 97.766,
+                  "minimum_ms": 12.024,
+                  "maximum_ms": 99.971,
+                  "runs": 30,
+                  "samples_ns": [
+                    13925119,
+                    13362576,
+                    13416910,
+                    13326451,
+                    12960451,
+                    12676366,
+                    13350202,
+                    14309161,
+                    15695249,
+                    13919869,
+                    12679699,
+                    12991117,
+                    99971008,
+                    12023614,
+                    12614699,
+                    12923117,
+                    13150951,
+                    12712241,
+                    12371449,
+                    13852744,
+                    12472241,
+                    12785450,
+                    12870367,
+                    13598285,
+                    12709492,
+                    13449660,
+                    14855955,
+                    97765877,
+                    12852909,
+                    12320406
+                  ]
+                }
+              ]
+            },
+            "next_activity_prediction": {
+              "correct_within_arm": true,
+              "answer": {
+                "accuracy": 1.0,
+                "correct": 759,
+                "test_total": 759,
+                "predictions": [
+                  [
+                    "confirm order",
+                    "directly_follows",
+                    "payment reminder"
+                  ],
+                  [
+                    "payment reminder",
+                    "directly_follows",
+                    "payment reminder"
+                  ],
+                  [
+                    "place order",
+                    "directly_follows",
+                    "confirm order"
+                  ]
+                ]
+              },
+              "answer_sha256": "0d11e08bea5189f4b9bd8d8b63a71840edef2dc8b0a3d120c9a08d1d20e5739d",
+              "input": {
+                "selected_cases": 1938,
+                "event_rows": 6250,
+                "aggregate_rows": 3,
+                "source": "ocpa.ObjectCentricEventLog",
+                "native_object_type_cases": 2000
+              },
+              "p50_ms": 10.76,
+              "p95_ms": 94.966,
+              "minimum_ms": 9.171,
+              "maximum_ms": 100.501,
+              "runs": 90,
+              "epoch_count": 3,
+              "epoch_p95_median_ms": 95.22,
+              "epoch_p95_range_ms": [
+                93.388,
+                97.355
+              ],
+              "epochs": [
+                {
+                  "epoch": 1,
+                  "p50_ms": 10.518,
+                  "p95_ms": 93.388,
+                  "minimum_ms": 9.171,
+                  "maximum_ms": 94.966,
+                  "runs": 30,
+                  "samples_ns": [
+                    11235779,
+                    10749236,
+                    10454318,
+                    10143943,
+                    10675486,
+                    93387783,
+                    10214401,
+                    9672441,
+                    9717858,
+                    10629777,
+                    11323613,
+                    10033442,
+                    11000570,
+                    10732778,
+                    10218235,
+                    10581944,
+                    10691027,
+                    10639069,
+                    11292405,
+                    10113776,
+                    10392985,
+                    94966370,
+                    10763278,
+                    10231818,
+                    10068401,
+                    9931359,
+                    9842775,
+                    9170815,
+                    9780317,
+                    10713528
+                  ]
+                },
+                {
+                  "epoch": 2,
+                  "p50_ms": 10.88,
+                  "p95_ms": 95.22,
+                  "minimum_ms": 10.294,
+                  "maximum_ms": 100.501,
+                  "runs": 30,
+                  "samples_ns": [
+                    10433819,
+                    10856778,
+                    10328152,
+                    10957945,
+                    11287029,
+                    10878861,
+                    95219787,
+                    11042779,
+                    10589944,
+                    10910153,
+                    11468238,
+                    11337696,
+                    10687986,
+                    10380485,
+                    10881694,
+                    10461069,
+                    10771861,
+                    10834695,
+                    10741486,
+                    11856906,
+                    13003158,
+                    12569824,
+                    13552952,
+                    100500885,
+                    10701986,
+                    10294026,
+                    11466821,
+                    10984820,
+                    10530611,
+                    10756903
+                  ]
+                },
+                {
+                  "epoch": 3,
+                  "p50_ms": 11.127,
+                  "p95_ms": 97.355,
+                  "minimum_ms": 10.137,
+                  "maximum_ms": 100.123,
+                  "runs": 30,
+                  "samples_ns": [
+                    11257779,
+                    11236779,
+                    10566527,
+                    10596278,
+                    10795736,
+                    11059154,
+                    10341401,
+                    10443901,
+                    10137234,
+                    100122675,
+                    10694111,
+                    10727778,
+                    11273862,
+                    11431905,
+                    10535027,
+                    11135404,
+                    11335571,
+                    11445530,
+                    10734361,
+                    11770364,
+                    10936945,
+                    11405321,
+                    10553486,
+                    11272363,
+                    97354626,
+                    11915781,
+                    10571485,
+                    11118987,
+                    12399407,
+                    12909491
+                  ]
+                }
+              ]
+            },
+            "edge_bottleneck_ranking": {
+              "correct_within_arm": true,
+              "answer": [
+                [
+                  "confirm order",
+                  "payment reminder",
+                  2000,
+                  747513.717
+                ],
+                [
+                  "payment reminder",
+                  "payment reminder",
+                  484,
+                  735859.634298
+                ],
+                [
+                  "place order",
+                  "confirm order",
+                  2000,
+                  106005.8605
+                ]
+              ],
+              "answer_sha256": "34ecb123e6a6270bca1ed9f302917df1347966c0562f4998a71c7740e3dc1528",
+              "input": {
+                "selected_cases": 2000,
+                "event_rows": 6484,
+                "aggregate_rows": 3,
+                "source": "ocpa.ObjectCentricEventLog",
+                "native_object_type_cases": 2000
+              },
+              "p50_ms": 15.975,
+              "p95_ms": 100.318,
+              "minimum_ms": 13.764,
+              "maximum_ms": 108.435,
+              "runs": 90,
+              "epoch_count": 3,
+              "epoch_p95_median_ms": 100.318,
+              "epoch_p95_range_ms": [
+                100.267,
+                102.862
+              ],
+              "epochs": [
+                {
+                  "epoch": 1,
+                  "p50_ms": 16.326,
+                  "p95_ms": 100.318,
+                  "minimum_ms": 13.764,
+                  "maximum_ms": 108.435,
+                  "runs": 30,
+                  "samples_ns": [
+                    13763661,
+                    16055708,
+                    100317759,
+                    16550751,
+                    15480248,
+                    15651082,
+                    16896835,
+                    16860252,
+                    15563540,
+                    15902041,
+                    16357126,
+                    16300501,
+                    14888288,
+                    16994127,
+                    16015458,
+                    17669420,
+                    15782582,
+                    15749457,
+                    108435405,
+                    16352084,
+                    14877038,
+                    15819249,
+                    16696084,
+                    21011387,
+                    17983504,
+                    17169461,
+                    16299959,
+                    17517754,
+                    17379087,
+                    15932166
+                  ]
+                },
+                {
+                  "epoch": 2,
+                  "p50_ms": 15.988,
+                  "p95_ms": 100.267,
+                  "minimum_ms": 14.15,
+                  "maximum_ms": 103.344,
+                  "runs": 30,
+                  "samples_ns": [
+                    16513501,
+                    18059547,
+                    15864333,
+                    103343850,
+                    15981999,
+                    15107205,
+                    14503371,
+                    15438165,
+                    16858335,
+                    16066584,
+                    16683585,
+                    16035208,
+                    14646330,
+                    14679579,
+                    14149703,
+                    14895372,
+                    15557124,
+                    17255670,
+                    14973289,
+                    15873291,
+                    100267134,
+                    15993833,
+                    16086417,
+                    16093167,
+                    15437999,
+                    17383420,
+                    18645256,
+                    19010841,
+                    15967999,
+                    15437581
+                  ]
+                },
+                {
+                  "epoch": 3,
+                  "p50_ms": 15.805,
+                  "p95_ms": 102.862,
+                  "minimum_ms": 14.693,
+                  "maximum_ms": 105.447,
+                  "runs": 30,
+                  "samples_ns": [
+                    16302459,
+                    15836957,
+                    15070247,
+                    15421582,
+                    16849543,
+                    16165792,
+                    105447147,
+                    15149956,
+                    14712497,
+                    15880082,
+                    14693371,
+                    16833335,
+                    17557129,
+                    15915416,
+                    15431915,
+                    15410539,
+                    15812874,
+                    15862332,
+                    15749248,
+                    15797124,
+                    15609416,
+                    102862308,
+                    15498081,
+                    15174789,
+                    15304206,
+                    15120581,
+                    14858288,
+                    16437043,
+                    18624256,
+                    17838963
+                  ]
+                }
+              ]
+            }
+          },
+          "concurrency": {
+            "1": {
+              "workers": 1,
+              "epoch_count": 3,
+              "requests": 896,
+              "throughput_qps": 60.659,
+              "p50_ms": 10.985,
+              "p95_ms": 94.673,
+              "minimum_worker_pss_bytes_sum": 107312128,
+              "maximum_worker_rss_bytes_sum": 151064576,
+              "correct": true,
+              "epochs": [
+                {
+                  "p50_ms": 11.716,
+                  "p95_ms": 96.062,
+                  "minimum_ms": 9.343,
+                  "maximum_ms": 136.451,
+                  "runs": 285,
+                  "requests": 285,
+                  "wall_ms": 5043.971,
+                  "throughput_qps": 56.503,
+                  "worker_request_counts": [
+                    285
+                  ],
+                  "worker_rss_bytes_sum": 151040000,
+                  "worker_pss_bytes_sum": 107326464,
+                  "worker_pids": [
+                    87
+                  ],
+                  "correct": true,
+                  "epoch": 1
+                },
+                {
+                  "p50_ms": 10.985,
+                  "p95_ms": 94.673,
+                  "minimum_ms": 9.198,
+                  "maximum_ms": 118.055,
+                  "runs": 304,
+                  "requests": 304,
+                  "wall_ms": 5011.598,
+                  "throughput_qps": 60.659,
+                  "worker_request_counts": [
+                    304
+                  ],
+                  "worker_rss_bytes_sum": 151064576,
+                  "worker_pss_bytes_sum": 107312128,
+                  "worker_pids": [
+                    90
+                  ],
+                  "correct": true,
+                  "epoch": 2
+                },
+                {
+                  "p50_ms": 10.811,
+                  "p95_ms": 93.698,
+                  "minimum_ms": 9.285,
+                  "maximum_ms": 118.524,
+                  "runs": 307,
+                  "requests": 307,
+                  "wall_ms": 5004.218,
+                  "throughput_qps": 61.348,
+                  "worker_request_counts": [
+                    307
+                  ],
+                  "worker_rss_bytes_sum": 151064576,
+                  "worker_pss_bytes_sum": 107312128,
+                  "worker_pids": [
+                    93
+                  ],
+                  "correct": true,
+                  "epoch": 3
+                }
+              ]
+            },
+            "2": {
+              "workers": 2,
+              "epoch_count": 3,
+              "requests": 1618,
+              "throughput_qps": 110.238,
+              "p50_ms": 12.27,
+              "p95_ms": 103.317,
+              "minimum_worker_pss_bytes_sum": 185550848,
+              "maximum_worker_rss_bytes_sum": 302096384,
+              "correct": true,
+              "epochs": [
+                {
+                  "p50_ms": 12.27,
+                  "p95_ms": 103.317,
+                  "minimum_ms": 10.265,
+                  "maximum_ms": 127.797,
+                  "runs": 552,
+                  "requests": 552,
+                  "wall_ms": 5007.343,
+                  "throughput_qps": 110.238,
+                  "worker_request_counts": [
+                    276,
+                    276
+                  ],
+                  "worker_rss_bytes_sum": 301846528,
+                  "worker_pss_bytes_sum": 185550848,
+                  "worker_pids": [
+                    96,
+                    97
+                  ],
+                  "correct": true,
+                  "epoch": 1
+                },
+                {
+                  "p50_ms": 12.067,
+                  "p95_ms": 103.031,
+                  "minimum_ms": 10.34,
+                  "maximum_ms": 130.473,
+                  "runs": 558,
+                  "requests": 558,
+                  "wall_ms": 5008.175,
+                  "throughput_qps": 111.418,
+                  "worker_request_counts": [
+                    279,
+                    279
+                  ],
+                  "worker_rss_bytes_sum": 302096384,
+                  "worker_pss_bytes_sum": 185591808,
+                  "worker_pids": [
+                    100,
+                    101
+                  ],
+                  "correct": true,
+                  "epoch": 2
+                },
+                {
+                  "p50_ms": 13.338,
+                  "p95_ms": 109.262,
+                  "minimum_ms": 11.345,
+                  "maximum_ms": 135.876,
+                  "runs": 508,
+                  "requests": 508,
+                  "wall_ms": 5009.683,
+                  "throughput_qps": 101.404,
+                  "worker_request_counts": [
+                    254,
+                    254
+                  ],
+                  "worker_rss_bytes_sum": 301932544,
+                  "worker_pss_bytes_sum": 185596928,
+                  "worker_pids": [
+                    104,
+                    105
+                  ],
+                  "correct": true,
+                  "epoch": 3
+                }
+              ]
+            },
+            "4": {
+              "workers": 4,
+              "epoch_count": 3,
+              "requests": 2941,
+              "throughput_qps": 195.678,
+              "p50_ms": 13.944,
+              "p95_ms": 111.922,
+              "minimum_worker_pss_bytes_sum": 324847616,
+              "maximum_worker_rss_bytes_sum": 604278784,
+              "correct": true,
+              "epochs": [
+                {
+                  "p50_ms": 14.676,
+                  "p95_ms": 113.686,
+                  "minimum_ms": 12.065,
+                  "maximum_ms": 139.598,
+                  "runs": 948,
+                  "requests": 948,
+                  "wall_ms": 5013.439,
+                  "throughput_qps": 189.092,
+                  "worker_request_counts": [
+                    236,
+                    237,
+                    237,
+                    238
+                  ],
+                  "worker_rss_bytes_sum": 604278784,
+                  "worker_pss_bytes_sum": 324884480,
+                  "worker_pids": [
+                    108,
+                    109,
+                    110,
+                    111
+                  ],
+                  "correct": true,
+                  "epoch": 1
+                },
+                {
+                  "p50_ms": 13.944,
+                  "p95_ms": 111.371,
+                  "minimum_ms": 12.253,
+                  "maximum_ms": 142.211,
+                  "runs": 993,
+                  "requests": 993,
+                  "wall_ms": 5010.407,
+                  "throughput_qps": 198.187,
+                  "worker_request_counts": [
+                    248,
+                    248,
+                    248,
+                    249
+                  ],
+                  "worker_rss_bytes_sum": 603889664,
+                  "worker_pss_bytes_sum": 324847616,
+                  "worker_pids": [
+                    114,
+                    115,
+                    116,
+                    117
+                  ],
+                  "correct": true,
+                  "epoch": 2
+                },
+                {
+                  "p50_ms": 13.892,
+                  "p95_ms": 111.922,
+                  "minimum_ms": 11.997,
+                  "maximum_ms": 136.038,
+                  "runs": 1000,
+                  "requests": 1000,
+                  "wall_ms": 5110.429,
+                  "throughput_qps": 195.678,
+                  "worker_request_counts": [
+                    250,
+                    250,
+                    250,
+                    250
+                  ],
+                  "worker_rss_bytes_sum": 603738112,
+                  "worker_pss_bytes_sum": 324935680,
+                  "worker_pids": [
+                    120,
+                    121,
+                    122,
+                    123
+                  ],
+                  "correct": true,
+                  "epoch": 3
+                }
+              ]
+            },
+            "8": {
+              "workers": 8,
+              "epoch_count": 3,
+              "requests": 5068,
+              "throughput_qps": 333.734,
+              "p50_ms": 16.891,
+              "p95_ms": 122.83,
+              "minimum_worker_pss_bytes_sum": 587666432,
+              "maximum_worker_rss_bytes_sum": 1207476224,
+              "correct": true,
+              "epochs": [
+                {
+                  "p50_ms": 17.153,
+                  "p95_ms": 120.201,
+                  "minimum_ms": 12.075,
+                  "maximum_ms": 139.894,
+                  "runs": 1675,
+                  "requests": 1675,
+                  "wall_ms": 5018.972,
+                  "throughput_qps": 333.734,
+                  "worker_request_counts": [
+                    208,
+                    209,
+                    209,
+                    209,
+                    209,
+                    210,
+                    210,
+                    211
+                  ],
+                  "worker_rss_bytes_sum": 1207476224,
+                  "worker_pss_bytes_sum": 587763712,
+                  "worker_pids": [
+                    126,
+                    127,
+                    128,
+                    129,
+                    130,
+                    131,
+                    132,
+                    133
+                  ],
+                  "correct": true,
+                  "epoch": 1
+                },
+                {
+                  "p50_ms": 16.315,
+                  "p95_ms": 122.83,
+                  "minimum_ms": 14.341,
+                  "maximum_ms": 168.223,
+                  "runs": 1730,
+                  "requests": 1730,
+                  "wall_ms": 5088.379,
+                  "throughput_qps": 339.99,
+                  "worker_request_counts": [
+                    214,
+                    215,
+                    216,
+                    216,
+                    216,
+                    216,
+                    218,
+                    219
+                  ],
+                  "worker_rss_bytes_sum": 1207111680,
+                  "worker_pss_bytes_sum": 587717632,
+                  "worker_pids": [
+                    136,
+                    137,
+                    138,
+                    139,
+                    140,
+                    141,
+                    142,
+                    143
+                  ],
+                  "correct": true,
+                  "epoch": 2
+                },
+                {
+                  "p50_ms": 16.891,
+                  "p95_ms": 125.711,
+                  "minimum_ms": 13.883,
+                  "maximum_ms": 153.576,
+                  "runs": 1663,
+                  "requests": 1663,
+                  "wall_ms": 5017.48,
+                  "throughput_qps": 331.441,
+                  "worker_request_counts": [
+                    206,
+                    206,
+                    207,
+                    207,
+                    207,
+                    208,
+                    209,
+                    213
+                  ],
+                  "worker_rss_bytes_sum": 1207263232,
+                  "worker_pss_bytes_sum": 587666432,
+                  "worker_pids": [
+                    146,
+                    147,
+                    148,
+                    149,
+                    150,
+                    151,
+                    152,
+                    153
+                  ],
+                  "correct": true,
+                  "epoch": 3
+                }
+              ]
+            }
+          },
+          "memory": {
+            "dfg_conformance_95pct": {
+              "baseline_rss_bytes": 193556480,
+              "peak_rss_bytes": 193560576,
+              "incremental_peak_bytes": 4096,
+              "resident_pss_bytes": 192649216,
+              "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+              "input": {
+                "selected_cases": 1938,
+                "event_rows": 6250,
+                "aggregate_rows": 3,
+                "source": "ocpa.ObjectCentricEventLog",
+                "native_object_type_cases": 2000
+              }
+            },
+            "variant_conformance_95pct": {
+              "baseline_rss_bytes": 193556480,
+              "peak_rss_bytes": 193560576,
+              "incremental_peak_bytes": 4096,
+              "resident_pss_bytes": 192649216,
+              "answer_sha256": "80cd775e0a756938d2ce7f6c48bed2fb26d3c4a933b64ba1723e9612bac740bd",
+              "input": {
+                "selected_cases": 1938,
+                "event_rows": 6250,
+                "aggregate_rows": 6,
+                "source": "ocpa.ObjectCentricEventLog",
+                "native_object_type_cases": 2000
+              }
+            },
+            "next_activity_prediction": {
+              "baseline_rss_bytes": 193556480,
+              "peak_rss_bytes": 193560576,
+              "incremental_peak_bytes": 4096,
+              "resident_pss_bytes": 192649216,
+              "answer_sha256": "0d11e08bea5189f4b9bd8d8b63a71840edef2dc8b0a3d120c9a08d1d20e5739d",
+              "input": {
+                "selected_cases": 1938,
+                "event_rows": 6250,
+                "aggregate_rows": 3,
+                "source": "ocpa.ObjectCentricEventLog",
+                "native_object_type_cases": 2000
+              }
+            },
+            "edge_bottleneck_ranking": {
+              "baseline_rss_bytes": 193556480,
+              "peak_rss_bytes": 193560576,
+              "incremental_peak_bytes": 4096,
+              "resident_pss_bytes": 192649216,
+              "answer_sha256": "34ecb123e6a6270bca1ed9f302917df1347966c0562f4998a71c7740e3dc1528",
+              "input": {
+                "selected_cases": 2000,
+                "event_rows": 6484,
+                "aggregate_rows": 3,
+                "source": "ocpa.ObjectCentricEventLog",
+                "native_object_type_cases": 2000
+              }
+            }
+          }
+        }
+      ],
+      "isolated_artifacts": [
+        "/results/ecosystem-ocpa-ocpa_running_example.json"
+      ]
+    },
+    "pg_ocpm_ocpm_engine": {
+      "schema_version": 1,
+      "generated_at": "2026-08-03T20:10:50.586032+00:00",
+      "arm": "pg_ocpm_ocpm_engine",
+      "implementation": {
+        "pg_ocpm_version": "1.0.0",
+        "ocpm_engine_version": "1.0.0",
+        "python": "3.11.15",
+        "platform": "Linux-7.0.11-orbstack-00360-gc9bc4d96ac70-aarch64-with-glibc2.36",
+        "source_revision": "5bd7b6c7bf7050ea5f3c954971fbf8d6797bf022",
+        "source_tree_clean": true,
+        "pg_ocpm_source_revision": "44e725f0fd7bf29beab18f143c21303e148386e4",
+        "pg_ocpm_source_tree_clean": true,
+        "image_id": "sha256:6d87406f89cbc1de3593b7ad2461651ca141f3bd72774f82f05b9b2edddcb92e"
+      },
+      "method": {
+        "read_path": "capability-aware sufficient-statistic pushdown for DFG workloads; factorized event batches for event-level workloads",
+        "process_model": "one persistent PostgreSQL connection per process worker",
+        "data_import": "PostgreSQL fixture preparation reported separately"
+      },
+      "client_memory_after_connection_bytes": 46698496,
+      "client_memory_baseline_bytes": 35049472,
+      "storage": {
+        "pg_ocpm_schema": {
+          "heap_bytes": 3211264,
+          "index_bytes": 1548288,
+          "toast_bytes": 4341760,
+          "total_bytes": 9289728,
+          "indexes": [
+            {
+              "table": "binding_activity",
+              "name": "binding_activity_pkey",
+              "definition": "CREATE UNIQUE INDEX binding_activity_pkey ON ocpm.binding_activity USING btree (dataset_id, tenant_id, object_type, activity)",
+              "bytes": 8192
+            },
+            {
+              "table": "binding_event",
+              "name": "binding_event_pkey",
+              "definition": "CREATE UNIQUE INDEX binding_event_pkey ON ocpm.binding_event USING btree (dataset_id, tenant_id, activity)",
+              "bytes": 8192
+            },
+            {
+              "table": "binding_neighbor_activity",
+              "name": "binding_neighbor_activity_pkey",
+              "definition": "CREATE UNIQUE INDEX binding_neighbor_activity_pkey ON ocpm.binding_neighbor_activity USING btree (dataset_id, tenant_id, source_object_type, target_object_type, activity)",
+              "bytes": 8192
+            },
+            {
+              "table": "binding_object",
+              "name": "binding_object_pkey",
+              "definition": "CREATE UNIQUE INDEX binding_object_pkey ON ocpm.binding_object USING btree (dataset_id, tenant_id, object_type)",
+              "bytes": 8192
+            },
+            {
+              "table": "binding_relation_summary",
+              "name": "binding_relation_summary_pkey",
+              "definition": "CREATE UNIQUE INDEX binding_relation_summary_pkey ON ocpm.binding_relation_summary USING btree (dataset_id, tenant_id, source_object_type, source_activity, target_object_type, target_activity, related_object_type)",
+              "bytes": 8192
+            },
+            {
+              "table": "case_bucket",
+              "name": "case_bucket_pkey",
+              "definition": "CREATE UNIQUE INDEX case_bucket_pkey ON ocpm.case_bucket USING btree (dataset_id, tenant_id, object_type, path_hash, segment_id)",
+              "bytes": 16384
+            },
+            {
+              "table": "case_bucket",
+              "name": "ocpm_case_bucket_time",
+              "definition": "CREATE INDEX ocpm_case_bucket_time ON ocpm.case_bucket USING btree (dataset_id, tenant_id, object_type, min_start_time, max_start_time)",
+              "bytes": 16384
+            },
+            {
+              "table": "case_start_day_rollup",
+              "name": "case_start_day_rollup_pkey",
+              "definition": "CREATE UNIQUE INDEX case_start_day_rollup_pkey ON ocpm.case_start_day_rollup USING btree (dataset_id, tenant_id, start_day)",
+              "bytes": 32768
+            },
+            {
+              "table": "dataset",
+              "name": "dataset_dataset_name_key",
+              "definition": "CREATE UNIQUE INDEX dataset_dataset_name_key ON ocpm.dataset USING btree (dataset_name)",
+              "bytes": 16384
+            },
+            {
+              "table": "dataset",
+              "name": "dataset_pkey",
+              "definition": "CREATE UNIQUE INDEX dataset_pkey ON ocpm.dataset USING btree (dataset_id)",
+              "bytes": 16384
+            },
+            {
+              "table": "dataset",
+              "name": "dataset_tenant_id_key",
+              "definition": "CREATE UNIQUE INDEX dataset_tenant_id_key ON ocpm.dataset USING btree (tenant_id, dataset_id)",
+              "bytes": 16384
+            },
+            {
+              "table": "dataset_generation",
+              "name": "dataset_generation_pkey",
+              "definition": "CREATE UNIQUE INDEX dataset_generation_pkey ON ocpm.dataset_generation USING btree (tenant_id, dataset_id, generation_id)",
+              "bytes": 8192
+            },
+            {
+              "table": "edge_bucket",
+              "name": "edge_bucket_pkey",
+              "definition": "CREATE UNIQUE INDEX edge_bucket_pkey ON ocpm.edge_bucket USING btree (dataset_id, tenant_id, source_object_type, source_activity, target_activity, target_object_type, edge_type, context, segment_id)",
+              "bytes": 16384
+            },
+            {
+              "table": "edge_bucket",
+              "name": "ocpm_edge_bucket_time",
+              "definition": "CREATE INDEX ocpm_edge_bucket_time ON ocpm.edge_bucket USING btree (dataset_id, tenant_id, source_object_type, min_source_timestamp, max_source_timestamp)",
+              "bytes": 16384
+            },
+            {
+              "table": "edge_summary",
+              "name": "edge_summary_pkey",
+              "definition": "CREATE UNIQUE INDEX edge_summary_pkey ON ocpm.edge_summary USING btree (dataset_id, tenant_id, source_activity, source_object_type, target_activity, target_object_type)",
+              "bytes": 16384
+            },
+            {
+              "table": "event_activity_rollup",
+              "name": "event_activity_rollup_pkey",
+              "definition": "CREATE UNIQUE INDEX event_activity_rollup_pkey ON ocpm.event_activity_rollup USING btree (dataset_id, tenant_id, object_type, activity, segment_id)",
+              "bytes": 16384
+            },
+            {
+              "table": "event_activity_rollup",
+              "name": "ocpm_event_activity_time",
+              "definition": "CREATE INDEX ocpm_event_activity_time ON ocpm.event_activity_rollup USING btree (dataset_id, tenant_id, object_type, min_timestamp, max_timestamp)",
+              "bytes": 16384
+            },
+            {
+              "table": "event_chunk",
+              "name": "event_chunk_pkey",
+              "definition": "CREATE UNIQUE INDEX event_chunk_pkey ON ocpm.event_chunk USING btree (dataset_id, tenant_id, object_type, chunk_id)",
+              "bytes": 16384
+            },
+            {
+              "table": "event_entity",
+              "name": "event_entity_pkey",
+              "definition": "CREATE UNIQUE INDEX event_entity_pkey ON ocpm.event_entity USING btree (tenant_id, dataset_id, event_id)",
+              "bytes": 8192
+            },
+            {
+              "table": "event_entity",
+              "name": "event_entity_tenant_id_dataset_id_external_event_id_key",
+              "definition": "CREATE UNIQUE INDEX event_entity_tenant_id_dataset_id_external_event_id_key ON ocpm.event_entity USING btree (tenant_id, dataset_id, external_event_id)",
+              "bytes": 8192
+            },
+            {
+              "table": "event_entity",
+              "name": "ocpm_event_entity_activity_time",
+              "definition": "CREATE INDEX ocpm_event_entity_activity_time ON ocpm.event_entity USING btree (tenant_id, dataset_id, activity, event_timestamp) INCLUDE (event_id, event_submicro_nanos, event_sequence)",
+              "bytes": 8192
+            },
+            {
+              "table": "event_entity",
+              "name": "ocpm_event_entity_order",
+              "definition": "CREATE INDEX ocpm_event_entity_order ON ocpm.event_entity USING btree (tenant_id, dataset_id, event_timestamp, event_submicro_nanos, event_sequence, external_event_id) INCLUDE (activity, lifecycle)",
+              "bytes": 8192
+            },
+            {
+              "table": "event_locator",
+              "name": "event_locator_pkey",
+              "definition": "CREATE UNIQUE INDEX event_locator_pkey ON ocpm.event_locator USING btree (dataset_id, tenant_id, object_id, object_type, chunk_id)",
+              "bytes": 606208
+            },
+            {
+              "table": "event_object_relation",
+              "name": "event_object_relation_pkey",
+              "definition": "CREATE UNIQUE INDEX event_object_relation_pkey ON ocpm.event_object_relation USING btree (tenant_id, dataset_id, relation_id)",
+              "bytes": 8192
+            },
+            {
+              "table": "event_object_relation",
+              "name": "ocpm_e2o_event",
+              "definition": "CREATE INDEX ocpm_e2o_event ON ocpm.event_object_relation USING btree (tenant_id, dataset_id, event_id, qualifier, object_id)",
+              "bytes": 8192
+            },
+            {
+              "table": "event_object_relation",
+              "name": "ocpm_e2o_object",
+              "definition": "CREATE INDEX ocpm_e2o_object ON ocpm.event_object_relation USING btree (tenant_id, dataset_id, object_id, qualifier, event_id)",
+              "bytes": 8192
+            },
+            {
+              "table": "link_adjacency_bucket",
+              "name": "link_adjacency_bucket_pkey",
+              "definition": "CREATE UNIQUE INDEX link_adjacency_bucket_pkey ON ocpm.link_adjacency_bucket USING btree (dataset_id, tenant_id, from_object_id, from_object_type)",
+              "bytes": 516096
+            },
+            {
+              "table": "link_adjacency_rollup",
+              "name": "link_adjacency_rollup_pkey",
+              "definition": "CREATE UNIQUE INDEX link_adjacency_rollup_pkey ON ocpm.link_adjacency_rollup USING btree (dataset_id, tenant_id, from_object_type, to_object_type, segment_id)",
+              "bytes": 16384
+            },
+            {
+              "table": "link_adjacency_rollup",
+              "name": "ocpm_link_adjacency_rollup_time",
+              "definition": "CREATE INDEX ocpm_link_adjacency_rollup_time ON ocpm.link_adjacency_rollup USING btree (dataset_id, tenant_id, min_source_timestamp, max_source_timestamp)",
+              "bytes": 16384
+            },
+            {
+              "table": "migration_checkpoint",
+              "name": "migration_checkpoint_pkey",
+              "definition": "CREATE UNIQUE INDEX migration_checkpoint_pkey ON ocpm.migration_checkpoint USING btree (tenant_id, dataset_id, generation_id, phase)",
+              "bytes": 8192
+            },
+            {
+              "table": "object_attribute_history",
+              "name": "object_attribute_history_pkey",
+              "definition": "CREATE UNIQUE INDEX object_attribute_history_pkey ON ocpm.object_attribute_history USING btree (tenant_id, dataset_id, object_id, attribute_name, valid_from)",
+              "bytes": 8192
+            },
+            {
+              "table": "object_attribute_history",
+              "name": "ocpm_object_attribute_value",
+              "definition": "CREATE INDEX ocpm_object_attribute_value ON ocpm.object_attribute_history USING btree (tenant_id, dataset_id, attribute_name, valid_from, object_id) INCLUDE (value)",
+              "bytes": 8192
+            },
+            {
+              "table": "object_entity",
+              "name": "object_entity_pkey",
+              "definition": "CREATE UNIQUE INDEX object_entity_pkey ON ocpm.object_entity USING btree (tenant_id, dataset_id, object_id)",
+              "bytes": 8192
+            },
+            {
+              "table": "object_entity",
+              "name": "object_entity_tenant_id_dataset_id_external_object_id_key",
+              "definition": "CREATE UNIQUE INDEX object_entity_tenant_id_dataset_id_external_object_id_key ON ocpm.object_entity USING btree (tenant_id, dataset_id, external_object_id)",
+              "bytes": 8192
+            },
+            {
+              "table": "object_entity",
+              "name": "ocpm_object_entity_type",
+              "definition": "CREATE INDEX ocpm_object_entity_type ON ocpm.object_entity USING btree (tenant_id, dataset_id, object_type, object_id) INCLUDE (external_object_id)",
+              "bytes": 8192
+            },
+            {
+              "table": "object_object_relation",
+              "name": "object_object_relation_pkey",
+              "definition": "CREATE UNIQUE INDEX object_object_relation_pkey ON ocpm.object_object_relation USING btree (tenant_id, dataset_id, relation_id)",
+              "bytes": 8192
+            },
+            {
+              "table": "object_object_relation",
+              "name": "ocpm_o2o_source",
+              "definition": "CREATE INDEX ocpm_o2o_source ON ocpm.object_object_relation USING btree (tenant_id, dataset_id, source_object_id, qualifier, target_object_id) INCLUDE (valid_from, valid_to)",
+              "bytes": 8192
+            },
+            {
+              "table": "object_object_relation",
+              "name": "ocpm_o2o_target",
+              "definition": "CREATE INDEX ocpm_o2o_target ON ocpm.object_object_relation USING btree (tenant_id, dataset_id, target_object_id, qualifier, source_object_id) INCLUDE (valid_from, valid_to)",
+              "bytes": 8192
+            },
+            {
+              "table": "provenance_fact",
+              "name": "ocpm_provenance_actor_context_time",
+              "definition": "CREATE INDEX ocpm_provenance_actor_context_time ON ocpm.provenance_fact USING btree (dataset_id, tenant_id, actor, context, valid_from)",
+              "bytes": 8192
+            },
+            {
+              "table": "provenance_fact",
+              "name": "ocpm_provenance_object_time",
+              "definition": "CREATE INDEX ocpm_provenance_object_time ON ocpm.provenance_fact USING btree (dataset_id, tenant_id, object_id, valid_from)",
+              "bytes": 8192
+            },
+            {
+              "table": "provenance_fact",
+              "name": "ocpm_provenance_record_time",
+              "definition": "CREATE INDEX ocpm_provenance_record_time ON ocpm.provenance_fact USING btree (dataset_id, tenant_id, record_type, valid_from)",
+              "bytes": 8192
+            },
+            {
+              "table": "provenance_rollup",
+              "name": "ocpm_provenance_rollup_filter_time",
+              "definition": "CREATE INDEX ocpm_provenance_rollup_filter_time ON ocpm.provenance_rollup USING btree (dataset_id, tenant_id, record_type, min_timestamp, max_timestamp)",
+              "bytes": 8192
+            },
+            {
+              "table": "provider_schema",
+              "name": "provider_schema_pkey",
+              "definition": "CREATE UNIQUE INDEX provider_schema_pkey ON ocpm.provider_schema USING btree (operation, semantic_version)",
+              "bytes": 16384
+            },
+            {
+              "table": "result_cache",
+              "name": "result_cache_pkey",
+              "definition": "CREATE UNIQUE INDEX result_cache_pkey ON ocpm.result_cache USING btree (dataset_id, tenant_id, backbone_type, filter_hash, facet)",
+              "bytes": 8192
+            }
+          ]
+        },
+        "packages": {
+          "distribution": "ocpm-engine",
+          "version": "1.0.0",
+          "license_expression": null,
+          "package_bytes": 4280317,
+          "dependency_closure_bytes": 4280317,
+          "dependency_distributions": [
+            "ocpm-engine"
+          ],
+          "additional_database_bytes": 0
+        }
+      },
+      "database_environment": {
+        "pg_ocpm_version": "1.0.0",
+        "postgres_version": "16.14 (Debian 16.14-1.pgdg13+1)",
+        "shared_buffers": "1GB",
+        "effective_cache_size": "4GB",
+        "work_mem": "16MB",
+        "max_parallel_workers_per_gather": "4",
+        "jit": "off"
+      },
+      "datasets": [
+        {
+          "dataset": "ocpa_running_example",
+          "fixture": {
+            "dataset_name": "ocpa_running_example",
+            "baseline_dataset_id": 1,
+            "ocpm_dataset_id": 1,
+            "tenant_id": 1,
+            "object_type": "orders",
+            "from_time": "2023-04-03T12:08:17.999999+00:00",
+            "train_to": "2024-01-26T12:23:47+00:00",
+            "test_from": "2024-01-26T12:23:47.000001+00:00",
+            "to_time": "2024-05-10T10:15:11.000001+00:00",
+            "cases": 2000,
+            "train_cases": 1600,
+            "test_cases": 338
+          },
+          "serial": {
+            "dfg_conformance_95pct": {
+              "correct_within_arm": true,
+              "answer": {
+                "fitness": 1.0,
+                "conforming": 759,
+                "deviations": 0,
+                "test_total": 759,
+                "model": [
+                  [
+                    "confirm order",
+                    "payment reminder",
+                    "directly_follows"
+                  ],
+                  [
+                    "payment reminder",
+                    "payment reminder",
+                    "directly_follows"
+                  ],
+                  [
+                    "place order",
+                    "confirm order",
+                    "directly_follows"
+                  ]
+                ]
+              },
+              "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+              "input": {
+                "source": "pg_ocpm_lifecycle_dfg_window_counts",
+                "strategy": "native lifecycle DFG window aggregate",
+                "database_rows": 3,
+                "expanded_event_rows": 0,
+                "aggregate_rows": 3
+              },
+              "p50_ms": 0.112,
+              "p95_ms": 0.228,
+              "minimum_ms": 0.105,
+              "maximum_ms": 0.387,
+              "runs": 90,
+              "epoch_count": 3,
+              "epoch_p95_median_ms": 0.261,
+              "epoch_p95_range_ms": [
+                0.127,
+                0.322
+              ],
+              "epochs": [
+                {
+                  "epoch": 1,
+                  "p50_ms": 0.111,
+                  "p95_ms": 0.127,
+                  "minimum_ms": 0.105,
+                  "maximum_ms": 0.133,
+                  "runs": 30,
+                  "samples_ns": [
+                    133167,
+                    126792,
+                    118667,
+                    113375,
+                    124834,
+                    119626,
+                    110125,
+                    114667,
+                    117042,
+                    111917,
+                    109500,
+                    107208,
+                    104917,
+                    125792,
+                    109042,
+                    112084,
+                    113501,
+                    108334,
+                    109375,
+                    108542,
+                    106709,
+                    105292,
+                    117500,
+                    108292,
+                    111708,
+                    109834,
+                    106334,
+                    111125,
+                    107833,
+                    104959
+                  ]
+                },
+                {
+                  "epoch": 2,
+                  "p50_ms": 0.113,
+                  "p95_ms": 0.261,
+                  "minimum_ms": 0.106,
+                  "maximum_ms": 0.263,
+                  "runs": 30,
+                  "samples_ns": [
+                    131084,
+                    111125,
+                    111750,
+                    111875,
+                    111792,
+                    109375,
+                    106500,
+                    113333,
+                    108000,
+                    119667,
+                    180125,
+                    113084,
+                    112083,
+                    113083,
+                    135625,
+                    119708,
+                    107333,
+                    111792,
+                    107875,
+                    262834,
+                    261417,
+                    158376,
+                    150209,
+                    126417,
+                    119376,
+                    118000,
+                    112875,
+                    119625,
+                    124584,
+                    109792
+                  ]
+                },
+                {
+                  "epoch": 3,
+                  "p50_ms": 0.112,
+                  "p95_ms": 0.322,
+                  "minimum_ms": 0.106,
+                  "maximum_ms": 0.387,
+                  "runs": 30,
+                  "samples_ns": [
+                    131792,
+                    114042,
+                    110459,
+                    109500,
+                    108584,
+                    106208,
+                    108375,
+                    108750,
+                    118292,
+                    111125,
+                    111750,
+                    108708,
+                    106667,
+                    114375,
+                    110209,
+                    107542,
+                    112417,
+                    119876,
+                    111125,
+                    106834,
+                    107042,
+                    321959,
+                    152709,
+                    387418,
+                    228084,
+                    140125,
+                    125125,
+                    118750,
+                    124000,
+                    115500
+                  ]
+                }
+              ]
+            },
+            "variant_conformance_95pct": {
+              "correct_within_arm": true,
+              "answer": {
+                "fitness": 0.958579881657,
+                "conforming": 324,
+                "deviations": 14,
+                "test_total": 338,
+                "model": [
+                  "[\"place order\",\"confirm order\",\"payment reminder\",\"payment reminder\"]",
+                  "[\"place order\",\"confirm order\",\"payment reminder\"]"
+                ]
+              },
+              "answer_sha256": "80cd775e0a756938d2ce7f6c48bed2fb26d3c4a933b64ba1723e9612bac740bd",
+              "input": {
+                "source": "pg_ocpm_lifecycle_variant_window_counts",
+                "strategy": "native lifecycle variant window aggregate",
+                "database_rows": 6,
+                "expanded_event_rows": 0,
+                "aggregate_rows": 6
+              },
+              "p50_ms": 0.171,
+              "p95_ms": 0.277,
+              "minimum_ms": 0.155,
+              "maximum_ms": 0.364,
+              "runs": 90,
+              "epoch_count": 3,
+              "epoch_p95_median_ms": 0.277,
+              "epoch_p95_range_ms": [
+                0.186,
+                0.327
+              ],
+              "epochs": [
+                {
+                  "epoch": 1,
+                  "p50_ms": 0.165,
+                  "p95_ms": 0.186,
+                  "minimum_ms": 0.155,
+                  "maximum_ms": 0.275,
+                  "runs": 30,
+                  "samples_ns": [
+                    275375,
+                    179208,
+                    168334,
+                    171292,
+                    164875,
+                    159083,
+                    176876,
+                    165709,
+                    164625,
+                    174959,
+                    168709,
+                    159792,
+                    185667,
+                    157709,
+                    161167,
+                    161168,
+                    160292,
+                    173042,
+                    165418,
+                    155417,
+                    160292,
+                    160709,
+                    159834,
+                    161500,
+                    173626,
+                    158917,
+                    164625,
+                    162584,
+                    166042,
+                    166626
+                  ]
+                },
+                {
+                  "epoch": 2,
+                  "p50_ms": 0.173,
+                  "p95_ms": 0.327,
+                  "minimum_ms": 0.16,
+                  "maximum_ms": 0.364,
+                  "runs": 30,
+                  "samples_ns": [
+                    172542,
+                    159917,
+                    168376,
+                    177501,
+                    172375,
+                    197542,
+                    363667,
+                    246334,
+                    205501,
+                    204459,
+                    179168,
+                    174000,
+                    168667,
+                    171542,
+                    180917,
+                    172376,
+                    161584,
+                    171375,
+                    164042,
+                    178792,
+                    190250,
+                    171584,
+                    162375,
+                    162501,
+                    170542,
+                    164459,
+                    326668,
+                    285376,
+                    199709,
+                    183667
+                  ]
+                },
+                {
+                  "epoch": 3,
+                  "p50_ms": 0.174,
+                  "p95_ms": 0.277,
+                  "minimum_ms": 0.16,
+                  "maximum_ms": 0.356,
+                  "runs": 30,
+                  "samples_ns": [
+                    199583,
+                    172292,
+                    170584,
+                    179084,
+                    169667,
+                    180875,
+                    163876,
+                    159667,
+                    160375,
+                    223584,
+                    355626,
+                    225917,
+                    188376,
+                    174917,
+                    172876,
+                    184208,
+                    224750,
+                    167500,
+                    164667,
+                    164709,
+                    178083,
+                    174334,
+                    196958,
+                    276543,
+                    191834,
+                    173208,
+                    170042,
+                    163626,
+                    159792,
+                    163792
+                  ]
+                }
+              ]
+            },
+            "next_activity_prediction": {
+              "correct_within_arm": true,
+              "answer": {
+                "accuracy": 1.0,
+                "correct": 759,
+                "test_total": 759,
+                "predictions": [
+                  [
+                    "confirm order",
+                    "directly_follows",
+                    "payment reminder"
+                  ],
+                  [
+                    "payment reminder",
+                    "directly_follows",
+                    "payment reminder"
+                  ],
+                  [
+                    "place order",
+                    "directly_follows",
+                    "confirm order"
+                  ]
+                ]
+              },
+              "answer_sha256": "0d11e08bea5189f4b9bd8d8b63a71840edef2dc8b0a3d120c9a08d1d20e5739d",
+              "input": {
+                "source": "pg_ocpm_lifecycle_dfg_window_counts",
+                "strategy": "native lifecycle DFG window aggregate",
+                "database_rows": 3,
+                "expanded_event_rows": 0,
+                "aggregate_rows": 3
+              },
+              "p50_ms": 0.107,
+              "p95_ms": 0.126,
+              "minimum_ms": 0.102,
+              "maximum_ms": 0.221,
+              "runs": 90,
+              "epoch_count": 3,
+              "epoch_p95_median_ms": 0.118,
+              "epoch_p95_range_ms": [
+                0.118,
+                0.15
+              ],
+              "epochs": [
+                {
+                  "epoch": 1,
+                  "p50_ms": 0.106,
+                  "p95_ms": 0.118,
+                  "minimum_ms": 0.102,
+                  "maximum_ms": 0.12,
+                  "runs": 30,
+                  "samples_ns": [
+                    107542,
+                    103834,
+                    106917,
+                    107500,
+                    110751,
+                    106542,
+                    102875,
+                    119917,
+                    106625,
+                    108667,
+                    106917,
+                    107625,
+                    106458,
+                    103334,
+                    104417,
+                    103917,
+                    118292,
+                    115709,
+                    106334,
+                    104542,
+                    101709,
+                    103417,
+                    106959,
+                    103083,
+                    101626,
+                    111292,
+                    106042,
+                    104417,
+                    104000,
+                    103542
+                  ]
+                },
+                {
+                  "epoch": 2,
+                  "p50_ms": 0.106,
+                  "p95_ms": 0.118,
+                  "minimum_ms": 0.103,
+                  "maximum_ms": 0.126,
+                  "runs": 30,
+                  "samples_ns": [
+                    106625,
+                    103834,
+                    105208,
+                    105625,
+                    114042,
+                    105167,
+                    106625,
+                    106501,
+                    105458,
+                    103917,
+                    103792,
+                    105750,
+                    104292,
+                    110709,
+                    107417,
+                    107209,
+                    111126,
+                    109334,
+                    105875,
+                    103208,
+                    104625,
+                    104833,
+                    103209,
+                    125875,
+                    115209,
+                    104333,
+                    110792,
+                    111792,
+                    106584,
+                    118042
+                  ]
+                },
+                {
+                  "epoch": 3,
+                  "p50_ms": 0.111,
+                  "p95_ms": 0.15,
+                  "minimum_ms": 0.102,
+                  "maximum_ms": 0.221,
+                  "runs": 30,
+                  "samples_ns": [
+                    114125,
+                    121584,
+                    108375,
+                    104500,
+                    101666,
+                    114083,
+                    108833,
+                    104709,
+                    107001,
+                    102375,
+                    118459,
+                    112709,
+                    107459,
+                    105250,
+                    150333,
+                    220667,
+                    127792,
+                    132667,
+                    117125,
+                    110875,
+                    111917,
+                    111667,
+                    110583,
+                    108542,
+                    104709,
+                    112916,
+                    122667,
+                    106459,
+                    109292,
+                    102042
+                  ]
+                }
+              ]
+            },
+            "edge_bottleneck_ranking": {
+              "correct_within_arm": true,
+              "answer": [
+                [
+                  "confirm order",
+                  "payment reminder",
+                  2000,
+                  747513.717
+                ],
+                [
+                  "payment reminder",
+                  "payment reminder",
+                  484,
+                  735859.634298
+                ],
+                [
+                  "place order",
+                  "confirm order",
+                  2000,
+                  106005.8605
+                ]
+              ],
+              "answer_sha256": "34ecb123e6a6270bca1ed9f302917df1347966c0562f4998a71c7740e3dc1528",
+              "input": {
+                "source": "pg_ocpm_edge_feature_aggregates",
+                "strategy": "native filtered edge feature aggregate",
+                "database_rows": 3,
+                "expanded_event_rows": 0,
+                "aggregate_rows": 3
+              },
+              "p50_ms": 0.263,
+              "p95_ms": 0.525,
+              "minimum_ms": 0.237,
+              "maximum_ms": 0.654,
+              "runs": 90,
+              "epoch_count": 3,
+              "epoch_p95_median_ms": 0.525,
+              "epoch_p95_range_ms": [
+                0.406,
+                0.611
+              ],
+              "epochs": [
+                {
+                  "epoch": 1,
+                  "p50_ms": 0.268,
+                  "p95_ms": 0.525,
+                  "minimum_ms": 0.247,
+                  "maximum_ms": 0.532,
+                  "runs": 30,
+                  "samples_ns": [
+                    285876,
+                    267668,
+                    259167,
+                    257167,
+                    268417,
+                    252542,
+                    398667,
+                    532168,
+                    351626,
+                    307959,
+                    284668,
+                    267500,
+                    261584,
+                    315834,
+                    274167,
+                    261292,
+                    272834,
+                    265917,
+                    255667,
+                    254376,
+                    274375,
+                    256167,
+                    247209,
+                    254834,
+                    298001,
+                    253501,
+                    252792,
+                    259751,
+                    524668,
+                    327376
+                  ]
+                },
+                {
+                  "epoch": 2,
+                  "p50_ms": 0.259,
+                  "p95_ms": 0.406,
+                  "minimum_ms": 0.237,
+                  "maximum_ms": 0.63,
+                  "runs": 30,
+                  "samples_ns": [
+                    307376,
+                    276834,
+                    262751,
+                    334792,
+                    312084,
+                    276084,
+                    258792,
+                    274834,
+                    263709,
+                    254125,
+                    262168,
+                    257292,
+                    244250,
+                    244875,
+                    251167,
+                    254750,
+                    242125,
+                    237209,
+                    259209,
+                    245668,
+                    251251,
+                    629627,
+                    405792,
+                    287459,
+                    280751,
+                    255584,
+                    259084,
+                    248334,
+                    264209,
+                    246084
+                  ]
+                },
+                {
+                  "epoch": 3,
+                  "p50_ms": 0.266,
+                  "p95_ms": 0.611,
+                  "minimum_ms": 0.243,
+                  "maximum_ms": 0.654,
+                  "runs": 30,
+                  "samples_ns": [
+                    247501,
+                    244750,
+                    268918,
+                    243250,
+                    471376,
+                    363459,
+                    292001,
+                    272543,
+                    275542,
+                    254584,
+                    247501,
+                    338542,
+                    266418,
+                    249209,
+                    244876,
+                    253251,
+                    252375,
+                    243626,
+                    295334,
+                    610502,
+                    653585,
+                    306751,
+                    274501,
+                    301501,
+                    252626,
+                    249376,
+                    255126,
+                    295543,
+                    265209,
+                    247459
+                  ]
+                }
+              ]
+            }
+          },
+          "concurrency": {
+            "1": {
+              "workers": 1,
+              "epoch_count": 3,
+              "requests": 96378,
+              "runs": 96378,
+              "throughput_qps": 6487.222,
+              "p50_ms": 0.125,
+              "p95_ms": 0.296,
+              "p99_ms": 0.42,
+              "minimum_ms": 0.093,
+              "maximum_ms": 2.266,
+              "minimum_epoch_wall_ms": 5001.63,
+              "minimum_requests_per_worker": 31009,
+              "correct": true,
+              "epochs": [
+                {
+                  "p50_ms": 0.125,
+                  "p95_ms": 0.295,
+                  "p99_ms": 0.414,
+                  "minimum_ms": 0.095,
+                  "maximum_ms": 2.266,
+                  "requests": 32447,
+                  "wall_ms": 5001.679,
+                  "throughput_qps": 6487.222,
+                  "warmed_worker_count": 1,
+                  "worker_ids": [
+                    126
+                  ],
+                  "worker_request_counts": [
+                    32447
+                  ],
+                  "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+                  "correct": true,
+                  "epoch": 1
+                },
+                {
+                  "p50_ms": 0.129,
+                  "p95_ms": 0.305,
+                  "p99_ms": 0.42,
+                  "minimum_ms": 0.101,
+                  "maximum_ms": 1.206,
+                  "requests": 31009,
+                  "wall_ms": 5001.651,
+                  "throughput_qps": 6199.753,
+                  "warmed_worker_count": 1,
+                  "worker_ids": [
+                    129
+                  ],
+                  "worker_request_counts": [
+                    31009
+                  ],
+                  "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+                  "correct": true,
+                  "epoch": 2
+                },
+                {
+                  "p50_ms": 0.121,
+                  "p95_ms": 0.296,
+                  "p99_ms": 0.433,
+                  "minimum_ms": 0.093,
+                  "maximum_ms": 1.544,
+                  "requests": 32922,
+                  "wall_ms": 5001.63,
+                  "throughput_qps": 6582.254,
+                  "warmed_worker_count": 1,
+                  "worker_ids": [
+                    132
+                  ],
+                  "worker_request_counts": [
+                    32922
+                  ],
+                  "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+                  "correct": true,
+                  "epoch": 3
+                }
+              ]
+            },
+            "2": {
+              "workers": 2,
+              "epoch_count": 3,
+              "requests": 193051,
+              "runs": 193051,
+              "throughput_qps": 12982.173,
+              "p50_ms": 0.129,
+              "p95_ms": 0.266,
+              "p99_ms": 0.363,
+              "minimum_ms": 0.1,
+              "maximum_ms": 4.208,
+              "minimum_epoch_wall_ms": 5002.122,
+              "minimum_requests_per_worker": 30153,
+              "correct": true,
+              "epochs": [
+                {
+                  "p50_ms": 0.124,
+                  "p95_ms": 0.247,
+                  "p99_ms": 0.349,
+                  "minimum_ms": 0.1,
+                  "maximum_ms": 2.605,
+                  "requests": 67771,
+                  "wall_ms": 5002.122,
+                  "throughput_qps": 13548.451,
+                  "warmed_worker_count": 2,
+                  "worker_ids": [
+                    135,
+                    138
+                  ],
+                  "worker_request_counts": [
+                    33863,
+                    33908
+                  ],
+                  "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+                  "correct": true,
+                  "epoch": 1
+                },
+                {
+                  "p50_ms": 0.129,
+                  "p95_ms": 0.266,
+                  "p99_ms": 0.363,
+                  "minimum_ms": 0.1,
+                  "maximum_ms": 4.208,
+                  "requests": 64943,
+                  "wall_ms": 5002.475,
+                  "throughput_qps": 12982.173,
+                  "warmed_worker_count": 2,
+                  "worker_ids": [
+                    139,
+                    142
+                  ],
+                  "worker_request_counts": [
+                    32379,
+                    32564
+                  ],
+                  "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+                  "correct": true,
+                  "epoch": 2
+                },
+                {
+                  "p50_ms": 0.137,
+                  "p95_ms": 0.286,
+                  "p99_ms": 0.389,
+                  "minimum_ms": 0.101,
+                  "maximum_ms": 4.145,
+                  "requests": 60337,
+                  "wall_ms": 5002.257,
+                  "throughput_qps": 12061.955,
+                  "warmed_worker_count": 2,
+                  "worker_ids": [
+                    143,
+                    146
+                  ],
+                  "worker_request_counts": [
+                    30153,
+                    30184
+                  ],
+                  "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+                  "correct": true,
+                  "epoch": 3
+                }
+              ]
+            },
+            "4": {
+              "workers": 4,
+              "epoch_count": 3,
+              "requests": 317941,
+              "runs": 317941,
+              "throughput_qps": 21397.852,
+              "p50_ms": 0.152,
+              "p95_ms": 0.306,
+              "p99_ms": 0.407,
+              "minimum_ms": 0.114,
+              "maximum_ms": 4.442,
+              "minimum_epoch_wall_ms": 5003.306,
+              "minimum_requests_per_worker": 25642,
+              "correct": true,
+              "epochs": [
+                {
+                  "p50_ms": 0.152,
+                  "p95_ms": 0.302,
+                  "p99_ms": 0.398,
+                  "minimum_ms": 0.114,
+                  "maximum_ms": 2.59,
+                  "requests": 107680,
+                  "wall_ms": 5004.427,
+                  "throughput_qps": 21516.949,
+                  "warmed_worker_count": 4,
+                  "worker_ids": [
+                    147,
+                    150,
+                    151,
+                    152
+                  ],
+                  "worker_request_counts": [
+                    26531,
+                    26927,
+                    26997,
+                    27225
+                  ],
+                  "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+                  "correct": true,
+                  "epoch": 1
+                },
+                {
+                  "p50_ms": 0.158,
+                  "p95_ms": 0.318,
+                  "p99_ms": 0.419,
+                  "minimum_ms": 0.12,
+                  "maximum_ms": 3.22,
+                  "requests": 103201,
+                  "wall_ms": 5003.465,
+                  "throughput_qps": 20625.908,
+                  "warmed_worker_count": 4,
+                  "worker_ids": [
+                    153,
+                    156,
+                    157,
+                    158
+                  ],
+                  "worker_request_counts": [
+                    25642,
+                    25781,
+                    25836,
+                    25942
+                  ],
+                  "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+                  "correct": true,
+                  "epoch": 2
+                },
+                {
+                  "p50_ms": 0.151,
+                  "p95_ms": 0.306,
+                  "p99_ms": 0.407,
+                  "minimum_ms": 0.115,
+                  "maximum_ms": 4.442,
+                  "requests": 107060,
+                  "wall_ms": 5003.306,
+                  "throughput_qps": 21397.852,
+                  "warmed_worker_count": 4,
+                  "worker_ids": [
+                    159,
+                    162,
+                    163,
+                    164
+                  ],
+                  "worker_request_counts": [
+                    26709,
+                    26718,
+                    26802,
+                    26831
+                  ],
+                  "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+                  "correct": true,
+                  "epoch": 3
+                }
+              ]
+            },
+            "8": {
+              "workers": 8,
+              "epoch_count": 3,
+              "requests": 553837,
+              "runs": 553837,
+              "throughput_qps": 36872.227,
+              "p50_ms": 0.183,
+              "p95_ms": 0.343,
+              "p99_ms": 0.466,
+              "minimum_ms": 0.127,
+              "maximum_ms": 4.529,
+              "minimum_epoch_wall_ms": 5006.017,
+              "minimum_requests_per_worker": 22271,
+              "correct": true,
+              "epochs": [
+                {
+                  "p50_ms": 0.185,
+                  "p95_ms": 0.366,
+                  "p99_ms": 0.502,
+                  "minimum_ms": 0.127,
+                  "maximum_ms": 4.529,
+                  "requests": 179434,
+                  "wall_ms": 5006.575,
+                  "throughput_qps": 35839.669,
+                  "warmed_worker_count": 8,
+                  "worker_ids": [
+                    165,
+                    168,
+                    169,
+                    170,
+                    171,
+                    172,
+                    173,
+                    174
+                  ],
+                  "worker_request_counts": [
+                    22271,
+                    22329,
+                    22369,
+                    22394,
+                    22440,
+                    22475,
+                    22537,
+                    22619
+                  ],
+                  "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+                  "correct": true,
+                  "epoch": 1
+                },
+                {
+                  "p50_ms": 0.183,
+                  "p95_ms": 0.343,
+                  "p99_ms": 0.466,
+                  "minimum_ms": 0.135,
+                  "maximum_ms": 3.176,
+                  "requests": 184583,
+                  "wall_ms": 5006.017,
+                  "throughput_qps": 36872.227,
+                  "warmed_worker_count": 8,
+                  "worker_ids": [
+                    175,
+                    178,
+                    179,
+                    180,
+                    181,
+                    182,
+                    183,
+                    184
+                  ],
+                  "worker_request_counts": [
+                    22964,
+                    22966,
+                    22989,
+                    23021,
+                    23061,
+                    23111,
+                    23156,
+                    23315
+                  ],
+                  "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+                  "correct": true,
+                  "epoch": 2
+                },
+                {
+                  "p50_ms": 0.179,
+                  "p95_ms": 0.328,
+                  "p99_ms": 0.451,
+                  "minimum_ms": 0.134,
+                  "maximum_ms": 3.94,
+                  "requests": 189820,
+                  "wall_ms": 5006.993,
+                  "throughput_qps": 37910.977,
+                  "warmed_worker_count": 8,
+                  "worker_ids": [
+                    185,
+                    188,
+                    189,
+                    190,
+                    191,
+                    192,
+                    193,
+                    194
+                  ],
+                  "worker_request_counts": [
+                    23567,
+                    23583,
+                    23678,
+                    23678,
+                    23681,
+                    23762,
+                    23915,
+                    23956
+                  ],
+                  "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+                  "correct": true,
+                  "epoch": 3
+                }
+              ]
+            }
+          },
+          "memory": {
+            "dfg_conformance_95pct": {
+              "baseline_rss_bytes": 46690304,
+              "peak_rss_bytes": 46694400,
+              "incremental_peak_bytes": 4096,
+              "resident_pss_bytes": 43673600,
+              "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+              "input": {
+                "source": "pg_ocpm_lifecycle_dfg_window_counts",
+                "strategy": "native lifecycle DFG window aggregate",
+                "database_rows": 3,
+                "expanded_event_rows": 0,
+                "aggregate_rows": 3
+              }
+            },
+            "variant_conformance_95pct": {
+              "baseline_rss_bytes": 46690304,
+              "peak_rss_bytes": 46694400,
+              "incremental_peak_bytes": 4096,
+              "resident_pss_bytes": 43673600,
+              "answer_sha256": "80cd775e0a756938d2ce7f6c48bed2fb26d3c4a933b64ba1723e9612bac740bd",
+              "input": {
+                "source": "pg_ocpm_lifecycle_variant_window_counts",
+                "strategy": "native lifecycle variant window aggregate",
+                "database_rows": 6,
+                "expanded_event_rows": 0,
+                "aggregate_rows": 6
+              }
+            },
+            "next_activity_prediction": {
+              "baseline_rss_bytes": 46690304,
+              "peak_rss_bytes": 46694400,
+              "incremental_peak_bytes": 4096,
+              "resident_pss_bytes": 43673600,
+              "answer_sha256": "0d11e08bea5189f4b9bd8d8b63a71840edef2dc8b0a3d120c9a08d1d20e5739d",
+              "input": {
+                "source": "pg_ocpm_lifecycle_dfg_window_counts",
+                "strategy": "native lifecycle DFG window aggregate",
+                "database_rows": 3,
+                "expanded_event_rows": 0,
+                "aggregate_rows": 3
+              }
+            },
+            "edge_bottleneck_ranking": {
+              "baseline_rss_bytes": 46690304,
+              "peak_rss_bytes": 46694400,
+              "incremental_peak_bytes": 4096,
+              "resident_pss_bytes": 43673600,
+              "answer_sha256": "34ecb123e6a6270bca1ed9f302917df1347966c0562f4998a71c7740e3dc1528",
+              "input": {
+                "source": "pg_ocpm_edge_feature_aggregates",
+                "strategy": "native filtered edge feature aggregate",
+                "database_rows": 3,
+                "expanded_event_rows": 0,
+                "aggregate_rows": 3
+              }
+            }
+          }
+        }
+      ],
+      "isolated_artifacts": [
+        "/results/ecosystem-engine-ocpa_running_example.json"
+      ]
+    }
+  },
+  "limitations": [
+    "This is a shared workload benchmark, not OCPQ Q1-Q7. The strict OCPQ benchmark remains a separate artifact.",
+    "Steady-state latency excludes one-time OCEL import, PostgreSQL fixture preparation, process startup, and worker startup; those costs and resident memory are reported separately.",
+    "Each ecosystem uses its normal scalable service model: Rust4PM shares an immutable log across threads, OCPA uses preloaded forked processes, and ocpm-engine uses process workers with persistent PostgreSQL connections. Concurrency memory is therefore architectural, not a same-runtime microbenchmark.",
+    "Each pair uses that competitor project's own upstream OCEL 2.0 dataset. The Rust4PM and OCPA reports therefore must not be compared as if they used the same input data.",
+    "Native import is probed on the unchanged source and reported separately from steady-state execution. If an upstream importer fails, a disclosed benchmark-owned setup adapter may construct the project's public native model; such a result is not a native-import performance comparison.",
+    "The competitor arms traverse each project's public native OCEL model and execute independently implemented versions of the four fixed common algorithms. They do not measure Rust4PM's Alpha+++ pipeline, OCPA's complete algorithm catalog, or a paper-specific end-to-end benchmark."
+  ]
+}
