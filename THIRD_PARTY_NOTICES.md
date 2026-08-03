@@ -81,3 +81,22 @@ This notice summarizes the resolved release graph and optional benchmark
 inputs. License texts and metadata supplied by each upstream source remain
 authoritative; where an upstream source supplies none, this notice does not
 create or imply a license.
+
+## Ecosystem benchmark-only references
+
+The optional ecosystem benchmark compiles Rust4PM 0.6.0 at commit
+`b4c06f323fca55cf57eaf44ac25b46ea7c448cb4` in a disposable container.
+Rust4PM declares Apache-2.0 OR MIT licensing. Its selected OCEL 2.0 P2P input is
+the upstream test-data record DOI
+[10.5281/zenodo.8412920](https://doi.org/10.5281/zenodo.8412920), licensed CC BY
+4.0. Neither Rust4PM source nor its benchmark binary is bundled with the
+ocpm-engine wheel.
+
+The optional OCPA arm installs the checksum-verified OCPA 1.3.4 wheel in a
+disposable container. Although its package metadata reports `MIT`, the wheel's
+included `LICENSE.txt` is GPL-3.0; this project therefore treats OCPA 1.3.4 as
+GPL-3.0. OCPA is not linked into or bundled with the ocpm-engine wheel. The
+benchmark uses the exact `running-example.sqlite` named in OCPA's OCEL 2.0
+documentation at commit `de056e0203a3fa4a9bbc19a95e001eada323074a`. No
+dataset-specific license statement was found, so the benchmark downloads the
+file into the ignored local artifact directory and does not redistribute it.

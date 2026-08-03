@@ -1,0 +1,21 @@
+FROM rust:1.88-bookworm@sha256:af306cfa71d987911a781c37b59d7d67d934f49684058f96cf72079c3626bfe0 AS builder
+
+ARG CONTROLLER_REVISION=unknown
+ARG RUST4PM_REVISION=b4c06f323fca55cf57eaf44ac25b46ea7c448cb4
+
+WORKDIR /build
+COPY benchmarks/ecosystem/rust4pm/Cargo.toml ./Cargo.toml
+COPY benchmarks/ecosystem/rust4pm/Cargo.lock ./Cargo.lock
+COPY benchmarks/ecosystem/rust4pm/src ./src
+RUN test "${RUST4PM_REVISION}" = "b4c06f323fca55cf57eaf44ac25b46ea7c448cb4" \
+    && cargo build --release --locked
+
+FROM debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bbd5acbfca6ec875818
+
+ARG CONTROLLER_REVISION=unknown
+ARG RUST4PM_REVISION=b4c06f323fca55cf57eaf44ac25b46ea7c448cb4
+COPY --from=builder /build/target/release/rust4pm-ecosystem-benchmark /usr/local/bin/rust4pm-ecosystem-benchmark
+LABEL org.opencontainers.image.revision="${CONTROLLER_REVISION}" \
+      org.opencontainers.image.rust4pm.revision="${RUST4PM_REVISION}" \
+      org.opencontainers.image.rust4pm.version="0.6.0"
+CMD ["sleep", "infinity"]

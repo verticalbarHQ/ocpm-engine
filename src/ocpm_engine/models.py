@@ -19,6 +19,10 @@ class Endpoint(StrEnum):
     CASE_LIST = "case_list"
     ENTIRE_PROCESS_MAP = "entire_process_map"
     DYNAMIC_DFG = "dynamic_dfg"
+    EVENT_LOG_SUMMARY = "event_log_summary"
+    LIFECYCLE_DFG = "lifecycle_dfg"
+    LIFECYCLE_VARIANTS = "lifecycle_variants"
+    EDGE_FEATURES = "edge_features"
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,6 +146,246 @@ class DynamicDfgRequest:
             from_date=from_date,
             to_date=to_date,
             filter=DynamicFilter.from_mapping(value.get("filter")),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class EventLogWindow:
+    from_date: datetime
+    to_date: datetime
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> EventLogWindow:
+        from_date = _parse_datetime(value.get("from_date"))
+        to_date = _parse_datetime(value.get("to_date"))
+        if from_date is None or to_date is None:
+            raise ValueError("event-log windows require from_date and to_date")
+        return cls(from_date=from_date, to_date=to_date)
+
+
+@dataclass(frozen=True, slots=True)
+class EventLogRequest:
+    """One or more fully-contained case windows for native Rust summaries."""
+
+    object_type: str
+    windows: tuple[EventLogWindow, ...]
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> EventLogRequest:
+        source_windows = value.get("windows")
+        if source_windows is None:
+            source_windows = (value,)
+        return cls(
+            object_type=str(value["object_type"]),
+            windows=tuple(EventLogWindow.from_mapping(item) for item in source_windows),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class LifecycleDfgRequest:
+    """Exact directly-follows frequencies for fully-contained lifecycles."""
+
+    object_types: tuple[str, ...]
+    windows: tuple[EventLogWindow, ...]
+    source_activities: tuple[str, ...] = ()
+    target_activities: tuple[str, ...] = ()
+    minimum_total_frequency: int = 1
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> LifecycleDfgRequest:
+        source_windows = value.get("windows")
+        if source_windows is None:
+            source_windows = (value,)
+        object_types = value.get("object_types")
+        if object_types is None:
+            object_types = (value["object_type"],)
+        elif isinstance(object_types, str):
+            object_types = (object_types,)
+        return cls(
+            object_types=tuple(str(item) for item in object_types),
+            windows=tuple(EventLogWindow.from_mapping(item) for item in source_windows),
+            source_activities=tuple(
+                str(item) for item in value.get("source_activities", ())
+            ),
+            target_activities=tuple(
+                str(item) for item in value.get("target_activities", ())
+            ),
+            minimum_total_frequency=int(value.get("minimum_total_frequency", 1)),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class WindowedDfgCount:
+    object_type: str
+    source: str
+    target: str
+    frequencies: tuple[int, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class LifecycleDfgExecution:
+    strategy: str
+    database_rows: int
+    expanded_event_rows: int
+    counts: tuple[WindowedDfgCount, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class LifecycleVariantRequest:
+    """Exact complete-variant counts over arbitrary lifecycle windows."""
+
+    object_types: tuple[str, ...]
+    windows: tuple[EventLogWindow, ...]
+    statuses: tuple[str, ...] = ()
+    variant_hashes: tuple[str, ...] = ()
+    include_activities: tuple[str, ...] = ()
+    exclude_activities: tuple[str, ...] = ()
+    minimum_total_frequency: int = 1
+
+
+@dataclass(frozen=True, slots=True)
+class WindowedVariantCount:
+    object_type: str
+    path_hash: str
+    activity_path: tuple[str, ...]
+    frequencies: tuple[int, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class LifecycleVariantExecution:
+    strategy: str
+    database_rows: int
+    counts: tuple[WindowedVariantCount, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class EdgeFeatureRequest:
+    """Filtered exact edge statistics for one event-time window."""
+
+    from_date: datetime
+    to_date: datetime
+    slow_threshold: float = float("inf")
+    source_object_types: tuple[str, ...] = ()
+    target_object_types: tuple[str, ...] = ()
+    source_activities: tuple[str, ...] = ()
+    target_activities: tuple[str, ...] = ()
+    edge_types: tuple[str, ...] = ()
+    contexts: tuple[str, ...] = ()
+    minimum_frequency: int = 1
+
+
+@dataclass(frozen=True, slots=True)
+class EdgeFeature:
+    source: str
+    target: str
+    source_object_type: str
+    target_object_type: str
+    edge_type: str
+    frequency: int
+    mean_duration: float
+    minimum_duration: float
+    maximum_duration: float
+    standard_deviation: float | None
+    slow_count: int
+    slow_rate: float
+
+
+@dataclass(frozen=True, slots=True)
+class EdgeFeatureExecution:
+    strategy: str
+    database_rows: int
+    features: tuple[EdgeFeature, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class PgOcpmCapabilities:
+    version: str
+    event_log_rows: bool
+    event_log_batches: bool
+    event_log_window_batches: bool
+    lifecycle_dfg_window_counts: bool = False
+    lifecycle_variant_window_counts: bool = False
+
+    @property
+    def factorized_event_export(self) -> bool:
+        return self.event_log_batches
+
+    @property
+    def factorized_multi_window_export(self) -> bool:
+        return self.event_log_window_batches
+
+    @property
+    def lifecycle_dfg_pushdown(self) -> bool:
+        return self.lifecycle_dfg_window_counts
+
+    @property
+    def lifecycle_variant_pushdown(self) -> bool:
+        return self.lifecycle_variant_window_counts
+
+
+@dataclass(frozen=True, slots=True)
+class BindingNeighborCoverage:
+    source_object_type: str
+    target_object_type: str
+    activity: str
+
+
+@dataclass(frozen=True, slots=True)
+class BindingRelationCoverage:
+    source_object_type: str
+    source_activity: str
+    target_object_type: str
+    target_activity: str
+    related_object_type: str
+
+
+@dataclass(frozen=True, slots=True)
+class BindingIndexCoverage:
+    """Observable binding-index declarations and dataset refresh markers."""
+
+    refreshed_at: datetime | None
+    source_watermark: datetime | None
+    event_identity_complete: bool
+    object_types: tuple[str, ...]
+    activities: tuple[tuple[str, str], ...]
+    event_activities: tuple[str, ...]
+    neighbors: tuple[BindingNeighborCoverage, ...]
+    relations: tuple[BindingRelationCoverage, ...]
+
+    def covers_object_type(self, object_type: str) -> bool:
+        return object_type in self.object_types
+
+    def covers_activity(self, object_type: str, activity: str) -> bool:
+        return (object_type, activity) in self.activities
+
+    def covers_event_activity(self, activity: str) -> bool:
+        return activity in self.event_activities
+
+    def covers_neighbor(
+        self, source_object_type: str, target_object_type: str, activity: str
+    ) -> bool:
+        return (
+            BindingNeighborCoverage(source_object_type, target_object_type, activity)
+            in self.neighbors
+        )
+
+    def covers_relation(
+        self,
+        source_object_type: str,
+        source_activity: str,
+        target_object_type: str,
+        target_activity: str,
+        related_object_type: str,
+    ) -> bool:
+        return (
+            BindingRelationCoverage(
+                source_object_type,
+                source_activity,
+                target_object_type,
+                target_activity,
+                related_object_type,
+            )
+            in self.relations
         )
 
 

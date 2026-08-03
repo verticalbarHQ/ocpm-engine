@@ -152,6 +152,31 @@ def test_public_and_sap_protocols_share_release_floors() -> None:
         assert "persistent PostgreSQL connection" in method["connection_model"]
 
 
+def test_sap_release_checker_allows_version_overrides_only_in_preview() -> None:
+    expected = {"ocpm_engine": "1.1.0", "pg_ocpm": "1.1.0"}
+
+    assert (
+        SAP_CHECK.resolve_expected_release(
+            preview=True, ocpm_engine="1.1.0", pg_ocpm="1.1.0"
+        )
+        == expected
+    )
+    with pytest.raises(SystemExit, match="only the published release pair"):
+        SAP_CHECK.resolve_expected_release(
+            preview=False, ocpm_engine="1.1.0", pg_ocpm="1.1.0"
+        )
+
+
+def test_sap_programmatic_release_version_override_is_rejected() -> None:
+    with pytest.raises(SystemExit, match="only the published release pair"):
+        SAP_CHECK.validate_contract(
+            {},
+            {},
+            allow_dirty=False,
+            current_release={"ocpm_engine": "1.1.0", "pg_ocpm": "1.1.0"},
+        )
+
+
 @pytest.mark.parametrize(
     ("runner", "checker", "engines", "historical_warmups", "historical_runs"),
     (

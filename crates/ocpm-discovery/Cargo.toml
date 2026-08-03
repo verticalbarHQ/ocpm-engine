@@ -1,0 +1,14 @@
+[package]
+name = "ocpm-discovery"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+description = "Independent process and object-centric model discovery kernels"
+publish = false
+
+[dependencies]
+ocpm-core.workspace = true
+ocpm-provider.workspace = true
+serde_json.workspace = true
+

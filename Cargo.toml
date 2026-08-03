@@ -1,20 +1,44 @@
 [workspace]
 members = [
     "crates/ocpm-core",
+    "crates/ocpm-io",
+    "crates/ocpm-provider",
+    "crates/ocpm-local",
+    "crates/ocpm-query",
+    "crates/ocpm-discovery",
+    "crates/ocpm-conformance",
+    "crates/ocpm-enhancement",
+    "crates/ocpm-prediction",
+    "crates/ocpm-engine",
     "crates/ocpm-postgres",
     "crates/ocpm-python",
 ]
 resolver = "2"
 
 [workspace.package]
-version = "0.8.0"
+version = "1.0.0"
 edition = "2024"
 rust-version = "1.85"
 authors = ["ocpm-engine contributors"]
 
 [workspace.dependencies]
-ocpm-core = { path = "crates/ocpm-core", version = "0.8.0" }
+ocpm-core = { path = "crates/ocpm-core", version = "1.0.0" }
+ocpm-provider = { path = "crates/ocpm-provider", version = "1.0.0" }
+ocpm-local = { path = "crates/ocpm-local", version = "1.0.0" }
+ocpm-query = { path = "crates/ocpm-query", version = "1.0.0" }
+ocpm-discovery = { path = "crates/ocpm-discovery", version = "1.0.0" }
+ocpm-conformance = { path = "crates/ocpm-conformance", version = "1.0.0" }
+ocpm-enhancement = { path = "crates/ocpm-enhancement", version = "1.0.0" }
+ocpm-prediction = { path = "crates/ocpm-prediction", version = "1.0.0" }
+ocpm-engine = { path = "crates/ocpm-engine", version = "1.0.0" }
+ocpm-postgres = { path = "crates/ocpm-postgres", version = "1.0.0" }
+chrono = { version = "0.4.42", default-features = false, features = ["clock", "std"] }
+csv = "1.4.0"
+quick-xml = "0.41.0"
+rusqlite = { version = "0.37.0", features = ["bundled"] }
 serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+sha2 = "0.11.0"
 thiserror = "2.0.17"
 
 [profile.release]

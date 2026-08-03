@@ -2,6 +2,117 @@
 
 All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
 
+## 1.0.0 - 2026-08-03
+
+- Made `ocpm-engine` standalone through a source-neutral provider contract and
+  local provider. PostgreSQL is optional; `pg_ocpm 1.0.0` adds pushdown and
+  compact snapshot acceleration without changing algorithm semantics.
+- Added canonical event, object, E2O, O2O, attribute-history, lifecycle,
+  request, result, error, content-hash, source-watermark, and bounded columnar
+  append contracts.
+- Added typed filtering and binding queries, leading-object and connected
+  process executions, DFG/OC-DFG, Alpha, process-tree, Petri-net, OCPN, and
+  object-centric declarative discovery.
+- Added frequency coverage, token replay, resource-bounded exact DFG alignment,
+  OCPN/declarative conformance, and bounded per-execution diagnostics.
+- Added process-map, timeline, histogram, rework, lifecycle performance,
+  organizational, bottleneck, window-comparison, and localized drift results.
+- Added next-activity, remaining-time, and outcome baselines with sequential,
+  tabular, and graph-context feature contracts plus leakage-safe temporal
+  holdout evaluation.
+- Added canonical and OCEL JSON, CSV, XES, and SQLite import/export, and
+  canonical JSON, DOT, PNML, and dependency-free SVG model serialization.
+  OCEL 2.0 XML remains explicitly deferred because its detailed syntax is not
+  available in the peer-reviewed implementation evidence admitted for 1.0.
+- Added a Python `StandaloneEngine` facade, model serialization, atomic append,
+  prediction evaluation, and installed-wheel Docker tests.
+- Established a normative academic clean-room policy: algorithm logic cites
+  peer-reviewed DOI sources; comparison libraries remain separately built
+  black-box benchmark arms and are neither source nor runtime dependencies.
+- Made capability-aware `auto` routing the SAP release default, so the public
+  engine entry point selects general DFG, variant, or edge-feature sufficient
+  statistics and preserves the factorized fallback. The legacy expanded SQL
+  arm remains an explicitly named diagnostic rather than the 1.0 default.
+- Published clean Docker evidence with exact-answer gates: 16.137x same-host
+  geometric-mean latency speedup over OCPQ 0.6.7 on strict Q1-Q7; 55.529x over
+  vanilla PostgreSQL plus PM4Py across eight SAP O2C/P2P workloads; and 2.160x
+  over Rust4PM on the four fixed common workloads. `pg_ocpm` plus unchanged
+  PM4Py was 1.338x faster than vanilla across the SAP suite.
+- Retained the OCPA comparison as non-publication-ready descriptive evidence:
+  all answers matched, but OCPA 1.3.4's documented native importer failed on
+  its unchanged upstream example, so the adapter-assisted timing is not a
+  native-import result.
+- Replaced the strict OCPQ concurrency checker's host-specific 10 ms p95 ceiling
+  with a p95/p50 amplification limit. Exact per-request answers, raw latency
+  reconstruction, three-epoch stability, and 16:1 scaling gates remain. A
+  same-time 0.9/1.0 Docker A/B confirmed that 1.0 matched or exceeded 0.9
+  throughput and had lower p95 at every tested client level.
+- Locked every workspace package and the Python distribution to version 1.0.0.
+- Upgraded `quick-xml` to 0.41.0 to bound namespace processing and remediate
+  `RUSTSEC-2026-0194` and `RUSTSEC-2026-0195` before release.
+
+## 0.10.0 - 2026-08-03
+
+- Added a capability-aware lifecycle DFG API that requests exact, aligned
+  sufficient statistics from `pg_ocpm 0.10.0` instead of reconstructing full
+  event summaries when the caller only needs directly-follows frequencies.
+- Added bounded 256-window database chunks with lossless client-side alignment
+  for larger requests, multiple object types, activity filters, and minimum
+  frequency selection.
+- Applied minimum-frequency thresholds after all chunks are aligned, preserving
+  sparse edges and variants that cross the caller's threshold only across
+  multiple chunks.
+- Added general lifecycle-variant and filtered edge-feature APIs. They stream
+  complete paths, aligned variant frequencies, and duration statistics without
+  expanding event logs, while retaining an exact per-window compatibility path
+  for older extension versions.
+- Exposed the lifecycle DFG aggregate through both the Python planner and the
+  asynchronous Rust PostgreSQL adapter; neither API depends on the benchmark
+  harness or a fixed dataset/workload name.
+- Retained exact factorized or per-window fallbacks for older `pg_ocpm`
+  versions. Event-level workloads continue to use the richer factorized path
+  rather than an inapplicable aggregate shortcut.
+- Kept capability discovery outside the steady-state request path for prepared
+  service connections and added no result or expected-answer cache.
+
+## 0.9.0 - 2026-07-31
+
+- Added strict native decoding for `pg_ocpm 0.9.0` factorized event batches,
+  preserving activity paths and packed case/timestamp vectors instead of
+  expanding one PostgreSQL row and one Python object per event.
+- Added incremental event-log summaries for variants, directly-follows
+  frequency and mean duration, and activity case/occurrence/start/end
+  frequencies. The Rust kernel operates on borrowed per-case views and releases
+  Python's GIL during decoding and aggregation.
+- Added capability-aware single-window and aligned multi-window adapters in
+  Rust and Python. `pg_ocpm 0.9.0` uses one compact batch scan while
+  `pg_ocpm 0.8.0` retains an exact ordered event-row compatibility fallback.
+- Chunked requests larger than 256 windows transparently in both adapters while
+  preserving the original global window order.
+- Added transfer and expansion telemetry so callers can observe database row
+  counts, packed payload bytes, and whether event rows were materialized.
+- Made the Python event adapter consume DB-API cursors incrementally and feed
+  compact rows to a persistent native accumulator in bounded 64-row chunks,
+  avoiding whole-result Python lists and duplicate decoded-batch retention.
+- Exposed borrowed materialized-column and factorized pair-group views for
+  binding capsules, avoiding Cartesian row expansion when an algorithm can
+  consume the encoded grouping directly.
+- Added exact binding-index coverage inspection for object, activity, event,
+  neighbor, and declared relation paths. Missing or malformed metadata fails
+  closed so callers cannot mistake an undeclared path for covered.
+- Pruned event-attribute decoding to base cases and materialized non-edge
+  dynamic filters before lifecycle reconstruction, reducing work for selective
+  dynamic queries without adding dataset- or benchmark-specific plans.
+- Extended the SAP O2C/P2P three-way harness with a selectable factorized
+  engine read path while retaining the aggregate-native path for workloads
+  already expressible as sufficient statistics.
+- Published clean-commit Docker evidence across OCPQ Q1-Q7, SAP O2C, and SAP
+  P2P. The factorized engine is 25.181x faster than vanilla PostgreSQL plus
+  PM4Py across eight SAP workloads and 15.108x faster than OCPQ on the strict
+  all-node suite by geometric mean; `pg_ocpm` plus fixed PM4Py is 1.340x faster
+  than vanilla on SAP. The full report keeps the SAP OCPQ cells N/A because the
+  unchanged SAP fixtures have no object-to-object relations.
+
 ## 0.8.0 - 2026-07-20
 
 - Published checksum-pinned SAP O2C/P2P current-versus-vanilla and strict OCPQ

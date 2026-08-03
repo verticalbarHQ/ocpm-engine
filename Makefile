@@ -3,7 +3,8 @@ PYTHON ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 .PHONY: check-python perf-public perf-public-concurrency \
 	perf-public-preview-check perf-public-release-check \
 	perf-sap-release-bridge-preview perf-sap-release-bridge-preview-check \
-	perf-ocpq-preview-check perf-ocpq-release-check perf-release-check
+	perf-ocpq-preview-check perf-ocpq-release-check perf-ecosystem \
+	perf-ecosystem-rust4pm perf-ecosystem-ocpa perf-release-check
 
 check-python:
 	@$(PYTHON) -c 'import sys; sys.exit("Python 3.11 or newer is required (found %s)." % ".".join(map(str, sys.version_info[:3]))) if sys.version_info < (3, 11) else None'
@@ -63,5 +64,14 @@ perf-ocpq-preview-check: check-python
 
 perf-ocpq-release-check: check-python
 	$(PYTHON) benchmarks/check_ocpq_result.py
+
+perf-ecosystem:
+	./benchmarks/run_ecosystem_benchmark.sh
+
+perf-ecosystem-rust4pm:
+	./benchmarks/run_ecosystem_benchmark.sh --pair rust4pm
+
+perf-ecosystem-ocpa:
+	./benchmarks/run_ecosystem_benchmark.sh --pair ocpa
 
 perf-release-check: perf-public-release-check perf-ocpq-release-check

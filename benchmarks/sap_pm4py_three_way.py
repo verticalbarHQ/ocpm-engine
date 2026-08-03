@@ -57,6 +57,12 @@ ENGINES = (
     "pg_ocpm_ocpm_engine",
 )
 
+ENGINE_READ_PATH = os.environ.get("OCPM_ENGINE_READ_PATH", "auto")
+if ENGINE_READ_PATH not in {"auto", "aggregate", "factorized"}:
+    raise RuntimeError(
+        "OCPM_ENGINE_READ_PATH must be 'auto', 'aggregate', or 'factorized'"
+    )
+
 _PM4PY = None
 
 
@@ -633,7 +639,9 @@ def run_pm4py(
     raise ValueError(workload)
 
 
-def run_ocpm_engine(connection, fixture: Fixture, workload: str) -> dict[str, Any]:
+def run_ocpm_engine_aggregate(
+    connection, fixture: Fixture, workload: str
+) -> dict[str, Any]:
     from ocpm_engine import (
         TransitionCount,
         bottleneck_order,
@@ -706,6 +714,286 @@ def run_ocpm_engine(connection, fixture: Fixture, workload: str) -> dict[str, An
         return {"answer": answer, "input": {"aggregate_rows": len(rows)}}
 
     raise ValueError(workload)
+
+
+def prepare_ocpm_engine(connection, fixture: Fixture):
+    """Inspect a persistent service connection once, outside request timing."""
+
+    from ocpm_engine import OcpmEngine
+
+    engine = OcpmEngine(fixture.ocpm_dataset_id, fixture.tenant_id)
+    with connection.cursor() as capability_cursor:
+        capabilities = engine.inspect_pg_ocpm(capability_cursor)
+    return engine, capabilities
+
+
+def run_ocpm_engine_lifecycle_dfg(
+    connection,
+    fixture: Fixture,
+    workload: str,
+    prepared=None,
+) -> dict[str, Any]:
+    """Score exact DFG statistics pushed down over finalized lifecycles."""
+
+    from ocpm_engine import EventLogWindow, LifecycleDfgRequest, TransitionCount
+
+    if workload not in ("dfg_conformance_95pct", "next_activity_prediction"):
+        raise ValueError(workload)
+    engine, capabilities = prepared or prepare_ocpm_engine(connection, fixture)
+    request = LifecycleDfgRequest(
+        object_types=(fixture.object_type,),
+        windows=(
+            EventLogWindow(fixture.from_time, fixture.train_to),
+            EventLogWindow(fixture.test_from, fixture.to_time),
+        ),
+    )
+    with connection.cursor() as cursor:
+        execution = engine.execute_lifecycle_dfg(
+            cursor, request, capabilities=capabilities
+        )
+    transitions = [
+        TransitionCount(
+            edge.source,
+            edge.target,
+            "directly_follows",
+            edge.frequencies[0],
+            edge.frequencies[1],
+        )
+        for edge in execution.counts
+    ]
+    if workload == "dfg_conformance_95pct":
+        from ocpm_engine import dfg_conformance
+
+        score = dfg_conformance(transitions)
+        answer = {
+            "fitness": round(score.fitness, 12),
+            "conforming": score.conforming,
+            "deviations": score.deviations,
+            "test_total": score.test_total,
+            "model": sorted([list(item) for item in score.model]),
+        }
+    else:
+        from ocpm_engine import next_activity
+
+        score = next_activity(transitions)
+        answer = {
+            "accuracy": round(score.accuracy, 12),
+            "correct": score.correct,
+            "test_total": score.test_total,
+            "predictions": sorted([list(item) for item in score.predictions]),
+        }
+    return {
+        "answer": answer,
+        "input": {
+            "source": "pg_ocpm_lifecycle_dfg_window_counts",
+            "strategy": execution.strategy,
+            "database_rows": execution.database_rows,
+            "expanded_event_rows": execution.expanded_event_rows,
+            "aggregate_rows": len(transitions),
+        },
+    }
+
+
+def run_ocpm_engine_lifecycle_variants(
+    connection,
+    fixture: Fixture,
+    prepared=None,
+) -> dict[str, Any]:
+    """Score exact complete-variant statistics from the general engine API."""
+
+    from ocpm_engine import EventLogWindow, LifecycleVariantRequest
+
+    engine, capabilities = prepared or prepare_ocpm_engine(connection, fixture)
+    request = LifecycleVariantRequest(
+        object_types=(fixture.object_type,),
+        windows=(
+            EventLogWindow(fixture.from_time, fixture.train_to),
+            EventLogWindow(fixture.test_from, fixture.to_time),
+        ),
+    )
+    with connection.cursor() as cursor:
+        execution = engine.execute_lifecycle_variants(
+            cursor, request, capabilities=capabilities
+        )
+    train = {
+        canonical_variant(list(variant.activity_path)): variant.frequencies[0]
+        for variant in execution.counts
+    }
+    test = {
+        canonical_variant(list(variant.activity_path)): variant.frequencies[1]
+        for variant in execution.counts
+    }
+    return {
+        "answer": variant_score_from_counts(train, test),
+        "input": {
+            "source": "pg_ocpm_lifecycle_variant_window_counts",
+            "strategy": execution.strategy,
+            "database_rows": execution.database_rows,
+            "expanded_event_rows": 0,
+            "aggregate_rows": len(execution.counts),
+        },
+    }
+
+
+def run_ocpm_engine_edge_features(
+    connection,
+    fixture: Fixture,
+) -> dict[str, Any]:
+    """Rank compact edge statistics exposed by the general engine API."""
+
+    from ocpm_engine import EdgeFeatureRequest, OcpmEngine
+
+    request = EdgeFeatureRequest(
+        from_date=fixture.from_time,
+        to_date=fixture.to_time,
+        source_object_types=(fixture.object_type,),
+        target_object_types=(fixture.object_type,),
+        edge_types=("directly_follows",),
+    )
+    with connection.cursor() as cursor:
+        execution = OcpmEngine(
+            fixture.ocpm_dataset_id, fixture.tenant_id
+        ).execute_edge_features(cursor, request)
+    answer = [
+        [
+            feature.source,
+            feature.target,
+            feature.frequency,
+            round(feature.mean_duration, 6),
+        ]
+        for feature in execution.features
+    ]
+    answer.sort(key=lambda row: (-row[3], -row[2], row[0], row[1]))
+    return {
+        "answer": answer,
+        "input": {
+            "source": "pg_ocpm_edge_feature_aggregates",
+            "strategy": execution.strategy,
+            "database_rows": execution.database_rows,
+            "expanded_event_rows": 0,
+            "aggregate_rows": len(execution.features),
+        },
+    }
+
+
+def run_ocpm_engine_factorized(
+    connection, fixture: Fixture, workload: str, prepared=None
+) -> dict[str, Any]:
+    """Score pg_ocpm 0.9 batches without materializing event rows or frames."""
+
+    from ocpm_engine import EventLogRequest, EventLogWindow
+
+    engine, capabilities = prepared or prepare_ocpm_engine(connection, fixture)
+    if workload == "edge_bottleneck_ranking":
+        windows = ((fixture.from_time, fixture.to_time),)
+    else:
+        windows = (
+            (fixture.from_time, fixture.train_to),
+            (fixture.test_from, fixture.to_time),
+        )
+    request = EventLogRequest(
+        object_type=fixture.object_type,
+        windows=tuple(EventLogWindow(*window) for window in windows),
+    )
+    restore_autocommit = connection.autocommit
+    if restore_autocommit:
+        connection.autocommit = False
+    try:
+        cursor_name = f"ocpm_engine_batches_{os.getpid()}_{time.perf_counter_ns()}"
+        with connection.cursor(name=cursor_name) as event_cursor:
+            event_cursor.itersize = 64
+            execution = engine.execute_event_log_summary(
+                event_cursor, request, capabilities=capabilities
+            )
+        if restore_autocommit:
+            connection.commit()
+    except BaseException:
+        if restore_autocommit:
+            connection.rollback()
+        raise
+    finally:
+        if restore_autocommit:
+            connection.autocommit = True
+
+    if workload in ("dfg_conformance_95pct", "next_activity_prediction"):
+        train = {
+            (edge.source, edge.target): edge.frequency
+            for edge in execution.summaries[0].dfg
+        }
+        test = {
+            (edge.source, edge.target): edge.frequency
+            for edge in execution.summaries[1].dfg
+        }
+        answer = (
+            dfg_score_from_counts(train, test)
+            if workload == "dfg_conformance_95pct"
+            else next_score_from_counts(train, test)
+        )
+        aggregate_rows = len(set(train) | set(test))
+    elif workload == "variant_conformance_95pct":
+        train = {
+            canonical_variant(list(variant.activity_path)): variant.frequency
+            for variant in execution.summaries[0].variants
+        }
+        test = {
+            canonical_variant(list(variant.activity_path)): variant.frequency
+            for variant in execution.summaries[1].variants
+        }
+        answer = variant_score_from_counts(train, test)
+        aggregate_rows = len(set(train) | set(test))
+    elif workload == "edge_bottleneck_ranking":
+        answer = [
+            [
+                edge.source,
+                edge.target,
+                edge.frequency,
+                round(edge.mean_duration_seconds, 6),
+            ]
+            for edge in execution.summaries[0].dfg
+        ]
+        answer.sort(key=lambda row: (-row[3], -row[2], row[0], row[1]))
+        aggregate_rows = len(answer)
+    else:
+        raise ValueError(workload)
+
+    return {
+        "answer": answer,
+        "input": {
+            "source": "pg_ocpm_event_batches",
+            "strategy": execution.strategy,
+            "batch_rows": execution.database_rows,
+            "event_rows": sum(summary.event_count for summary in execution.summaries),
+            "expanded_event_rows": execution.expanded_event_rows,
+            "payload_bytes": sum(
+                summary.payload_bytes for summary in execution.summaries
+            ),
+            "aggregate_rows": aggregate_rows,
+        },
+    }
+
+
+def run_ocpm_engine(
+    connection, fixture: Fixture, workload: str, prepared=None
+) -> dict[str, Any]:
+    """Dispatch the benchmark engine arm to its declared general read path."""
+
+    if ENGINE_READ_PATH == "factorized":
+        return run_ocpm_engine_factorized(
+            connection, fixture, workload, prepared=prepared
+        )
+    if ENGINE_READ_PATH == "aggregate":
+        return run_ocpm_engine_aggregate(connection, fixture, workload)
+    if workload in ("dfg_conformance_95pct", "next_activity_prediction"):
+        return run_ocpm_engine_lifecycle_dfg(
+            connection, fixture, workload, prepared=prepared
+        )
+    if workload == "variant_conformance_95pct":
+        return run_ocpm_engine_lifecycle_variants(
+            connection, fixture, prepared=prepared
+        )
+    if workload == "edge_bottleneck_ranking":
+        return run_ocpm_engine_edge_features(connection, fixture)
+    return run_ocpm_engine_factorized(connection, fixture, workload, prepared=prepared)
 
 
 def canonical(value: Any) -> str:
@@ -957,6 +1245,10 @@ def concurrency_initializer(
             "startup_timeout": min(timeout_seconds, 30),
         }
     )
+    if engine == "pg_ocpm_ocpm_engine":
+        _CONCURRENCY_STATE["prepared_engine"] = prepare_ocpm_engine(
+            _CONCURRENCY_STATE["connection"], _CONCURRENCY_STATE["fixture"]
+        )
 
 
 def concurrency_request() -> tuple[float, str]:
@@ -969,7 +1261,12 @@ def concurrency_request() -> tuple[float, str]:
     elif engine == "pg_ocpm_pm4py":
         result = run_pm4py(connection, fixture, "dfg_conformance_95pct", "pg_ocpm")
     else:
-        result = run_ocpm_engine(connection, fixture, "dfg_conformance_95pct")
+        result = run_ocpm_engine(
+            connection,
+            fixture,
+            "dfg_conformance_95pct",
+            prepared=_CONCURRENCY_STATE.get("prepared_engine"),
+        )
     return time.perf_counter() - started, canonical(result["answer"])
 
 
@@ -1453,13 +1750,21 @@ def render_latency(metrics: dict[str, Any]) -> str:
 
 
 def render(result: dict[str, Any]) -> str:
+    engine_read_path = result.get("method", {}).get(
+        "ocpm_engine_read_path", "aggregate"
+    )
+    engine_input = (
+        "factorized event batches"
+        if engine_read_path == "factorized"
+        else "sufficient statistics"
+    )
     lines = [
         "# SAP O2C and P2P three-way process-mining benchmark",
         "",
         (
             "The official SAP IDES OCEL 2.0 logs are compared through three paths: "
             "PM4Py over lightly indexed relational PostgreSQL, PM4Py over `pg_ocpm` "
-            "event chunks, and ocpm-engine over `pg_ocpm` sufficient statistics. "
+            f"event chunks, and ocpm-engine over `pg_ocpm` {engine_input}. "
             "Every accepted sample passed exact three-way semantic comparison."
         ),
         "",
@@ -1714,6 +2019,7 @@ def update_concurrency_only(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def benchmark(args: argparse.Namespace) -> dict[str, Any]:
+    provenance = public_benchmark_provenance()
     rng = random.Random(args.seed)
     baseline = connect(args.baseline_host, args.database, args.timeout_seconds)
     extension = connect(args.extension_host, args.database, args.timeout_seconds)
@@ -1729,6 +2035,7 @@ def benchmark(args: argparse.Namespace) -> dict[str, Any]:
 
     for dataset_index, dataset_name in enumerate(args.datasets):
         fixture = discover_fixture(extension, baseline, args, dataset_name)
+        prepared_engine = prepare_ocpm_engine(extension, fixture)
         print(
             f"fixture {dataset_name}: {fixture.object_type}, {fixture.cases:,} cases "
             f"({fixture.train_cases:,} train/{fixture.test_cases:,} test)",
@@ -1747,7 +2054,7 @@ def benchmark(args: argparse.Namespace) -> dict[str, Any]:
                         extension, fixture, w, "pg_ocpm"
                     ),
                     "pg_ocpm_ocpm_engine": lambda w=workload: run_ocpm_engine(
-                        extension, fixture, w
+                        extension, fixture, w, prepared=prepared_engine
                     ),
                 },
                 args.warmups,
@@ -1769,7 +2076,12 @@ def benchmark(args: argparse.Namespace) -> dict[str, Any]:
             )
 
         expected = canonical(
-            run_ocpm_engine(extension, fixture, "dfg_conformance_95pct")["answer"]
+            run_ocpm_engine(
+                extension,
+                fixture,
+                "dfg_conformance_95pct",
+                prepared=prepared_engine,
+            )["answer"]
         )
         concurrency = concurrency_comparison(args, fixture, expected, dataset_index)
 
@@ -1853,7 +2165,7 @@ def benchmark(args: argparse.Namespace) -> dict[str, Any]:
             "datasets": list(args.datasets),
         },
         "environment": environment,
-        "provenance": public_benchmark_provenance(),
+        "provenance": provenance,
         "method": {
             "warmups": args.warmups,
             "measured_runs": args.runs * args.latency_epochs,
@@ -1883,6 +2195,7 @@ def benchmark(args: argparse.Namespace) -> dict[str, Any]:
                 "ocel_e2o_object"
             ),
             "result_cache_used": False,
+            "ocpm_engine_read_path": ENGINE_READ_PATH,
         },
         "summary": {
             "correct_workloads": sum(

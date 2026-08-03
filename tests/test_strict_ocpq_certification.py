@@ -455,6 +455,61 @@ def test_preview_forces_publication_not_ready_when_evidence_is_missing() -> None
     assert "preview mode" in result["blocking_evidence"]
 
 
+def test_preview_accepts_an_explicit_unpublished_release_pair() -> None:
+    reference = reference_fixture(clean=False)
+    candidate = candidate_fixture(reference, clean=False)
+    candidate["release"] = {"pg_ocpm": "0.9.0", "ocpm_engine": "0.9.0"}
+
+    result = CHECKER.certify(
+        reference,
+        candidate,
+        reference_digest=REFERENCE_DIGEST,
+        release=False,
+        expected_release=candidate["release"],
+    )
+
+    assert result["publication_ready"] is False
+    assert result["every_query_and_node_exact"] is True
+
+
+def test_release_api_rejects_an_unpublished_release_pair() -> None:
+    reference = reference_fixture()
+    candidate = candidate_fixture(reference)
+    unpublished = {"pg_ocpm": "1.1.0", "ocpm_engine": "1.1.0"}
+    candidate["release"] = unpublished
+
+    with pytest.raises(
+        CHECKER.CertificationError,
+        match="only the published release pair",
+    ):
+        CHECKER.certify(
+            reference,
+            candidate,
+            reference_digest=REFERENCE_DIGEST,
+            release=True,
+            expected_release=unpublished,
+        )
+
+
+def test_async_concurrency_does_not_require_one_runtime_thread_per_client() -> None:
+    reference = reference_fixture()
+    candidate = candidate_fixture(reference)
+    candidate["environment"]["concurrency"]["tokio_worker_threads_env"] = "3"
+
+    result = certify(reference, candidate)
+
+    assert result["concurrency_16_to_1_scaling"] == 16.0
+
+
+def test_rejects_zero_concurrency_runtime_threads() -> None:
+    reference = reference_fixture()
+    candidate = candidate_fixture(reference)
+    candidate["environment"]["concurrency"]["tokio_worker_threads_env"] = "0"
+
+    with pytest.raises(CHECKER.CertificationError, match="worker-thread provenance"):
+        certify(reference, candidate)
+
+
 def test_preview_rejects_dirty_artifact_marked_publication_ready() -> None:
     reference = reference_fixture(clean=False)
     candidate = candidate_fixture(reference, clean=False)
@@ -636,21 +691,41 @@ def test_rejects_concurrency_throughput_cv_above_fifteen_percent() -> None:
         certify(reference, candidate)
 
 
-def test_rejects_concurrency_median_p95_at_ten_ms() -> None:
+def test_rejects_concurrency_p95_amplification_over_four_times_p50() -> None:
     reference = reference_fixture()
     candidate = candidate_fixture(reference)
     report = candidate["concurrency"]["16"]
     for epoch in report["epochs"]:
+        raw_count = sum(
+            len(latencies)
+            for latencies in epoch["client_request_latencies_ns"].values()
+        )
+        high_count = CHECKER.math.floor(raw_count * 0.06) + 1
+        remaining = high_count
         for latencies in epoch["client_request_latencies_ns"].values():
-            latencies[:] = [10_000_000] * len(latencies)
-        epoch["latency_p50_ms"] = 10.0
-        epoch["latency_p95_ms"] = 10.0
-        epoch["latency_p99_ms"] = 10.0
-    report["median_epoch_latency_p50_ms"] = 10.0
-    report["median_epoch_latency_p95_ms"] = 10.0
-    report["median_epoch_latency_p99_ms"] = 10.0
+            replace = min(remaining, len(latencies))
+            if replace:
+                latencies[-replace:] = [5_000_000] * replace
+                remaining -= replace
+        raw_ms = [
+            latency / 1_000_000.0
+            for latencies in epoch["client_request_latencies_ns"].values()
+            for latency in latencies
+        ]
+        epoch["latency_p50_ms"] = CHECKER.conventional_median(raw_ms)
+        epoch["latency_p95_ms"] = CHECKER.nearest_rank(raw_ms, 0.95)
+        epoch["latency_p99_ms"] = CHECKER.nearest_rank(raw_ms, 0.99)
+    report["median_epoch_latency_p50_ms"] = CHECKER.conventional_median(
+        [epoch["latency_p50_ms"] for epoch in report["epochs"]]
+    )
+    report["median_epoch_latency_p95_ms"] = CHECKER.conventional_median(
+        [epoch["latency_p95_ms"] for epoch in report["epochs"]]
+    )
+    report["median_epoch_latency_p99_ms"] = CHECKER.conventional_median(
+        [epoch["latency_p99_ms"] for epoch in report["epochs"]]
+    )
 
-    with pytest.raises(CHECKER.CertificationError, match="not below 10 ms"):
+    with pytest.raises(CHECKER.CertificationError, match="amplification.*exceeds 4x"):
         certify(reference, candidate)
 
 

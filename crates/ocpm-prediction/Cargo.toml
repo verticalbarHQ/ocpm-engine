@@ -1,0 +1,15 @@
+[package]
+name = "ocpm-prediction"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+description = "Deterministic next-activity, remaining-time, outcome, and risk prediction"
+publish = false
+
+[dependencies]
+ocpm-core.workspace = true
+ocpm-provider.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+

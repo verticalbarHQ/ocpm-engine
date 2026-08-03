@@ -1,0 +1,20 @@
+FROM python:3.11-slim-bookworm@sha256:b18992999dbe963a45a8a4da40ac2b1975be1a776d939d098c647482bcad5cba
+
+ARG CONTROLLER_REVISION=unknown
+ARG OCPA_VERSION=1.3.4
+ARG OCPA_WHEEL_SHA256=52e8208d5ef8633060b905441498aa8b53e0322bf7a310c5a5deb49500da2934
+
+COPY benchmarks/ecosystem/requirements.ocpa.lock /tmp/requirements.ocpa.lock
+RUN python -m pip download --no-deps --dest /tmp/ocpa "ocpa==${OCPA_VERSION}" \
+    && echo "${OCPA_WHEEL_SHA256}  /tmp/ocpa/ocpa-${OCPA_VERSION}-py3-none-any.whl" | sha256sum -c - \
+    && python -m pip install --no-cache-dir --requirement /tmp/requirements.ocpa.lock \
+    && python -m pip install --no-cache-dir --no-deps /tmp/ocpa/*.whl \
+    && python -m pip check \
+    && rm -rf /tmp/ocpa
+
+WORKDIR /workspace
+COPY benchmarks ./benchmarks
+LABEL org.opencontainers.image.revision="${CONTROLLER_REVISION}" \
+      org.opencontainers.image.ocpa.version="${OCPA_VERSION}" \
+      org.opencontainers.image.ocpa.wheel-sha256="${OCPA_WHEEL_SHA256}"
+CMD ["sleep", "infinity"]

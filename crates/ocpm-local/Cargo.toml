@@ -1,0 +1,13 @@
+[package]
+name = "ocpm-local"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+description = "Complete standalone local provider for ocpm-engine"
+publish = false
+
+[dependencies]
+ocpm-core.workspace = true
+ocpm-provider.workspace = true
+

@@ -7,32 +7,38 @@ python="${PYTHON:-python3}"
 pg_ocpm_repository="${PG_OCPM_SOURCE:-}"
 pg_ocpm_remote="${PG_OCPM_REPOSITORY:-}"
 concurrency_only=false
-engine_release="0.8.0"
-pg_ocpm_release="0.8.0"
-engine_revision="f5a95ecd6b8a1f184f8ffed2371980ef419beaab"
-pg_ocpm_revision="0e15ab10f8ec87518b9e822072028fb3eda3879c"
+sap_only=false
+engine_release="${OCPM_ENGINE_RELEASE:-0.8.0}"
+pg_ocpm_release="${OCPM_PG_OCPM_RELEASE:-0.8.0}"
+engine_revision="${OCPM_ENGINE_PRODUCT_REVISION:-f5a95ecd6b8a1f184f8ffed2371980ef419beaab}"
+pg_ocpm_revision="${OCPM_PG_OCPM_PRODUCT_REVISION:-0e15ab10f8ec87518b9e822072028fb3eda3879c}"
+engine_read_path="${OCPM_ENGINE_READ_PATH:-auto}"
 public_result_name="public-common-pm-${engine_release}.json"
-sap_result_name="sap-pm4py-three-way-${engine_release}.json"
-sap_report_name="sap-pm4py-three-way-${engine_release}.md"
+sap_result_name="${OCPM_SAP_RESULT_NAME:-sap-pm4py-three-way-${engine_release}.json}"
+sap_report_name="${OCPM_SAP_REPORT_NAME:-sap-pm4py-three-way-${engine_release}.md}"
 release_bridge="$root/.benchmarks/sap-release-bridge-0.6.0-to-0.8.0.json"
 sources="$root/.benchmarks/public-sources"
-engine_source="$sources/ocpm-engine-${engine_release}"
-pg_ocpm_source="$sources/pg_ocpm-${pg_ocpm_release}"
+engine_source="$sources/ocpm-engine-${engine_release}-${engine_revision:0:12}"
+pg_ocpm_source="$sources/pg_ocpm-${pg_ocpm_release}-${pg_ocpm_revision:0:12}"
 
-if [[ "${1:-}" == "--concurrency-only" ]]; then
-    concurrency_only=true
+while (( $# > 0 )); do
+    case "$1" in
+        --concurrency-only) concurrency_only=true ;;
+        --sap-only) sap_only=true ;;
+        *)
+            echo "Public benchmark runs do not accept additional arguments: $1" >&2
+            exit 2
+            ;;
+    esac
     shift
-fi
-
-if (( $# > 0 )); then
-    echo "Public benchmark runs do not accept additional arguments." >&2
-    exit 2
-fi
+done
 
 if [[ "$concurrency_only" == true ]]; then
-    for artifact in \
-        "$root/.benchmarks/$public_result_name" \
-        "$root/.benchmarks/$sap_result_name"; do
+    artifacts=("$root/.benchmarks/$sap_result_name")
+    if [[ "$sap_only" == false ]]; then
+        artifacts+=("$root/.benchmarks/$public_result_name")
+    fi
+    for artifact in "${artifacts[@]}"; do
         if [[ ! -f "$artifact" ]]; then
             echo "Concurrency-only mode requires existing artifact: $artifact" >&2
             exit 2
@@ -40,7 +46,7 @@ if [[ "$concurrency_only" == true ]]; then
     done
 fi
 
-if [[ ! -f "$release_bridge" ]]; then
+if [[ "$sap_only" == false && ! -f "$release_bridge" ]]; then
     echo "public preview validation requires the staged matched-release bridge:" >&2
     echo "  $release_bridge" >&2
     echo "run: make perf-sap-release-bridge-preview" >&2
@@ -238,14 +244,16 @@ benchmark_exec() {
         -e OCPM_ENGINE_SOURCE_TREE_CLEAN="$engine_tree_clean" \
         -e OCPM_PG_OCPM_SOURCE_REVISION="$pg_ocpm_revision" \
         -e OCPM_PG_OCPM_SOURCE_TREE_CLEAN="$pg_ocpm_tree_clean" \
+        -e OCPM_ENGINE_READ_PATH="$engine_read_path" \
         -e OCPM_CLIENT_IMAGE_ID="$client_image_id" \
         -e OCPM_VANILLA_DATABASE_IMAGE_ID="$vanilla_image_id" \
         -e OCPM_PG_OCPM_DATABASE_IMAGE_ID="$pg_ocpm_image_id" \
         benchmark "$@"
 }
 
-benchmark_exec python -c '
+benchmark_exec env OCPM_EXPECTED_ENGINE_RELEASE="$engine_release" python -c '
 from importlib import metadata
+import os
 from pathlib import Path
 import sys
 
@@ -256,7 +264,7 @@ path = Path(ocpm_engine.__file__).resolve()
 version = metadata.version("ocpm-engine")
 if "site-packages" not in path.parts or Path("/workspace") in path.parents:
     raise SystemExit(f"ocpm_engine resolved outside site-packages: {path}")
-if version != "0.8.0":
+if version != os.environ["OCPM_EXPECTED_ENGINE_RELEASE"]:
     raise SystemExit(f"unexpected ocpm-engine version: {version}")
 '
 
@@ -268,7 +276,9 @@ benchmark_exec \
     --extension-db ocel_benchmark \
     --data-dir /data \
     --output /results/public-prepare.json
-if [[ "$concurrency_only" == true ]]; then
+if [[ "$sap_only" == true ]]; then
+    :
+elif [[ "$concurrency_only" == true ]]; then
     benchmark_exec \
         python benchmarks/public_common_pm.py \
         --baseline-host postgres_vanilla \
@@ -315,16 +325,27 @@ else
         --latency-epochs 3
 fi
 
-public_result="$root/.benchmarks/$public_result_name"
 sap_result="$root/.benchmarks/$sap_result_name"
 
-"$python" "$root/benchmarks/check_public_result.py" \
-    "$public_result" --release-bridge "$release_bridge" --preview
-"$python" "$root/benchmarks/check_sap_pm4py_result.py" \
-    "$sap_result" --release-bridge "$release_bridge" --preview
-"$python" "$root/benchmarks/check_public_provenance_pair.py" \
-    --common "$public_result" --sap "$sap_result" --preview
+sap_check=(
+    "$python" "$root/benchmarks/check_sap_pm4py_result.py"
+    "$sap_result" --preview
+    --expected-ocpm-engine-version "$engine_release"
+    --expected-pg-ocpm-version "$pg_ocpm_release"
+)
+if [[ "$sap_only" == false ]]; then
+    public_result="$root/.benchmarks/$public_result_name"
+    "$python" "$root/benchmarks/check_public_result.py" \
+        "$public_result" --release-bridge "$release_bridge" --preview
+    "${sap_check[@]}" --release-bridge "$release_bridge"
+    "$python" "$root/benchmarks/check_public_provenance_pair.py" \
+        --common "$public_result" --sap "$sap_result" --preview
+else
+    "${sap_check[@]}"
+fi
 echo "Validated staged schema-5 preview; published docs/results unchanged."
 
-echo "staged result: $public_result"
+if [[ "$sap_only" == false ]]; then
+    echo "staged result: $public_result"
+fi
 echo "staged result: $sap_result"

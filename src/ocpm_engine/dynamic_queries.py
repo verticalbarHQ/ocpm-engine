@@ -46,6 +46,7 @@ _EVENT_ROWS_CTE = """event_rows AS MATERIALIZED (
       AND chunk.object_type=%(backbone_type)s
       AND event.event_timestamp>=%(from_date)s
       AND event.event_timestamp<=%(to_date)s
+      AND event.case_id IN (SELECT case_id FROM base)
 )"""
 
 
@@ -61,11 +62,12 @@ _CONNECTED_CTE = """connected AS MATERIALIZED (
 
 
 _LIFECYCLE_EVENTS_CTE = """lifecycle_events AS MATERIALIZED (
-    SELECT case_id,activity,event_timestamp,event_ordinal
+    SELECT event.case_id,event.activity,event.event_timestamp,event.event_ordinal
     FROM ocpm.event_log_rows(
         %(dataset_id)s,%(tenant_id)s,%(backbone_type)s,
         %(from_date)s,%(to_date)s
-    )
+    ) AS event
+    JOIN preselected USING (case_id)
 )"""
 
 
@@ -269,6 +271,14 @@ def compile_dynamic_dfg(
         dynamic_filter.included_edges or dynamic_filter.excluded_edges
     )
     if has_edge_filters:
+        preselection = "SELECT case_id FROM base"
+        for source in included_sets:
+            preselection += f"\nINTERSECT\nSELECT case_id FROM {source}"
+        for source in excluded_sets:
+            preselection += f"\nEXCEPT\nSELECT case_id FROM {source}"
+        ctes.append(f"preselected AS MATERIALIZED (\n{preselection}\n)")
+        included_sets.clear()
+        excluded_sets.clear()
         ctes.extend((_LIFECYCLE_EVENTS_CTE, _LIFECYCLE_EDGES_CTE))
     included_edges = []
     for index, edge in enumerate(dynamic_filter.included_edges):
@@ -307,7 +317,11 @@ def compile_dynamic_dfg(
         )
         excluded_sets.append("edge_excluded")
 
-    selection = "SELECT case_id FROM base"
+    selection = (
+        "SELECT case_id FROM preselected"
+        if has_edge_filters
+        else "SELECT case_id FROM base"
+    )
     for source in included_sets:
         selection += f"\nINTERSECT\nSELECT case_id FROM {source}"
     for source in excluded_sets:

@@ -5,9 +5,26 @@ same-host OCPQ reproduction. The corrected protocol uses zero warmups and ten
 measured runs per query on both sides and requires duplicate-preserving parity
 for every evaluation-tree node, not only the root. Author-published timings are
 source context only; no cross-host ratio is calculated. See
-[`ocpq/README.md`](ocpq/README.md). The reviewed 0.8.0 artifacts passed every
+[`ocpq/README.md`](ocpq/README.md). The reviewed 0.9.0 artifacts pass every
 latency, memory, storage, concurrency, correctness, and provenance gate and are
 published under `docs/results/`.
+
+The descriptive 0.9 four-way comparison has a separate fail-closed verifier at
+`check_ocpq_four_way.py`. It requires explicit SHA-256 pins for the corrected
+OCPQ reference, vanilla PostgreSQL plus PM4Py, `pg_ocpm` plus PM4Py, the strict
+engine artifact, and the PM4Py runner. The full invocation and clean artifact
+digests are recorded in
+[`docs/ocpq-0.9-four-way-comparison.md`](../docs/ocpq-0.9-four-way-comparison.md).
+Passing that verifier does not promote the four-way table: the PM4Py arms use a
+different evaluator boundary and omit a cross-arm host identity. The clean
+native-engine artifact separately passes the strict release checker.
+
+The clean 0.9 engine artifact passes the official strict release checker with
+explicit immutable digests:
+
+```sh
+python3 benchmarks/check_ocpq_result.py
+```
 
 All local checker targets require Python 3.11 or newer. They use
 `.venv/bin/python` when that environment exists, otherwise `python3`. Override
@@ -128,9 +145,13 @@ expected payload digest pins and report links, and run:
 make perf-public-release-check
 ```
 
-`make perf-release-check` runs the published SAP and OCPQ checks together.
-Release checks read only committed public artifacts and enforce their pinned
-file or payload digests; they do not accept ignored preview evidence.
+`make perf-release-check` runs the published SAP and OCPQ checks together. The
+1.0 SAP release artifact is
+`docs/results/sap-pm4py-three-way-1.0.0.json`; the strict OCPQ release pair is
+`docs/results/ocpq-reproduced-strict-all-node-1.0.0.json` and
+`docs/results/ocpq-bpic2017-pg_ocpm-1.0.0-ocpm-engine-1.0.0.json`. Release
+checks read only committed public artifacts and enforce their pinned file or
+payload digests; they do not accept ignored preview evidence.
 
 Concurrency uses one persistent PostgreSQL connection per prestarted worker.
 Each engine/level arm runs three independent epochs; every epoch must include an
@@ -174,6 +195,35 @@ using the same three-epoch duration and per-worker request floors, isolated peak
 RSS, database storage, and client dependency footprints. Exact three-way
 canonical answers are required before samples are accepted.
 
+The 0.9 factorized-event diagnostic uses the same Docker Compose client and
+database images, unchanged datasets, PM4Py evaluator, randomized protocol,
+memory workers, storage snapshot, and concurrency sweep. Inside the prepared
+benchmark client, the workload command is:
+
+```sh
+OCPM_ENGINE_READ_PATH=factorized python benchmarks/sap_pm4py_three_way.py \
+  --output .benchmarks/sap-pm4py-three-way-factorized-0.9.0-final.json \
+  --report .benchmarks/sap-pm4py-three-way-factorized-0.9.0-final.md
+```
+
+This is not a standalone host command: the client must be created by the public
+Docker orchestrator so the database hostnames, prepared fixtures, immutable
+image IDs, and required provenance variables are present. The clean 1.0
+artifact is validated with:
+
+```sh
+python benchmarks/check_sap_pm4py_result.py \
+  docs/results/sap-pm4py-three-way-1.0.0.json
+```
+
+The environment switch changes only the ocpm-engine arm. `auto` is the 1.0
+default: it dispatches DFG, variant, and edge-feature requests through the
+engine's public capability-aware APIs, selecting compact sufficient statistics
+when the provider advertises them and retaining the exact factorized fallback.
+`aggregate` is retained as the legacy SQL diagnostic, and `factorized` measures
+general event-log consumers against the same vanilla PostgreSQL+PM4Py and
+pg_ocpm+PM4Py arms.
+
 The relational index reduction is applied only after the main public benchmark
 finishes, so the two suites remain independent. The recorded report is
 [SAP PM4Py three-way performance](../docs/sap-pm4py-three-way-performance.md),
@@ -194,3 +244,25 @@ The compact
 retains only source counts, fixture identity, exact answer hashes, and input
 shapes. It contains no historical latency, memory, storage, concurrency,
 environment, method, generated-summary, or dependency-footprint values.
+
+## Rust4PM and OCPA ecosystem pairs
+
+The ecosystem suite is separate from both SAP and strict OCPQ. It runs four
+fixed object-centric workloads against each competitor and pg_ocpm +
+ocpm-engine using that competitor project's own upstream OCEL 2.0 dataset:
+
+```sh
+make perf-ecosystem
+make perf-ecosystem-rust4pm
+make perf-ecosystem-ocpa
+```
+
+The full run uses checksum-pinned inputs, isolated Docker images, exact answer
+gates, 10 warmups, three 30-request serial epochs, and three 1/2/4/8-worker
+concurrency epochs. Import time, storage, and memory are reported outside
+steady-state latency. Rust4PM uses its native importer. OCPA 1.3.4's documented
+importer fails on its unchanged upstream example, so its steady-state arm uses
+a disclosed setup adapter and cannot pass the publication gate. See the
+[ecosystem benchmark contract](ecosystem/README.md), the
+[Rust4PM pair report](../docs/rust4pm-vs-pg-ocpm-engine.md), and the
+[OCPA pair report](../docs/ocpa-vs-pg-ocpm-engine.md).

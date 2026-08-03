@@ -1,0 +1,17 @@
+[package]
+name = "ocpm-io"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+description = "Independent canonical OCEL import and export for ocpm-engine"
+publish = false
+
+[dependencies]
+chrono.workspace = true
+csv.workspace = true
+ocpm-core.workspace = true
+quick-xml.workspace = true
+rusqlite.workspace = true
+serde_json.workspace = true
+

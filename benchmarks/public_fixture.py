@@ -377,11 +377,19 @@ def typed_rows(connection: sqlite3.Connection, kind: str) -> dict:
     return details
 
 
-def read_ocel(path: Path, specification: dict) -> dict:
+def read_ocel(
+    path: Path,
+    specification: dict,
+    *,
+    allow_orphan_object_relations: bool = False,
+    event_id_tiebreak: bool = False,
+) -> dict:
     source = sqlite3.connect(path)
     event_details = typed_rows(source, "event")
     object_details = typed_rows(source, "object")
     event_base = source.execute("SELECT ocel_id, ocel_type FROM event").fetchall()
+    if event_id_tiebreak:
+        event_base.sort(key=lambda row: str(row[0]))
     object_base = source.execute("SELECT ocel_id, ocel_type FROM object").fetchall()
 
     event_keys = {}
@@ -432,9 +440,18 @@ def read_ocel(path: Path, specification: dict) -> dict:
         )
 
     object_objects = []
+    ignored_orphan_object_relations = 0
     for source_id, target_id, qualifier in source.execute(
         "SELECT ocel_source_id, ocel_target_id, ocel_qualifier FROM object_object"
     ):
+        if str(source_id) not in object_keys or str(target_id) not in object_keys:
+            if allow_orphan_object_relations:
+                ignored_orphan_object_relations += 1
+                continue
+            raise ValueError(
+                "object_object relationship references an object absent from the "
+                f"object table: {source_id!r} -> {target_id!r}"
+            )
         source_row = objects[object_keys[str(source_id)] - 1]
         target_row = objects[object_keys[str(target_id)] - 1]
         object_objects.append(
@@ -456,6 +473,7 @@ def read_ocel(path: Path, specification: dict) -> dict:
         "objects": objects,
         "event_objects": event_objects,
         "object_objects": object_objects,
+        "ignored_orphan_object_relations": ignored_orphan_object_relations,
     }
 
 

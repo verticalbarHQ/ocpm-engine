@@ -33,12 +33,12 @@ REGRESSION_BASELINE = (
 )
 RELEASE_BRIDGE = ROOT / ".benchmarks/sap-release-bridge-0.6.0-to-0.8.0.json"
 EXPECTED_PAYLOAD_SHA256 = (
-    "ca3db89410fd9a7d9b71120504a571e42d684609cbfb352b81bf2b6526ee8166"
+    "8c086a36c590291624df9258bceae0067316737a8b058f8e597caac3d9710a7d"
 )
 EXPECTED_BASELINE_PAYLOAD_SHA256 = (
     "6530be1e72e249d022111f76283a4cb1393df726c0d413948b3689799c4e337b"
 )
-CURRENT_RELEASE = {"ocpm_engine": "0.8.0", "pg_ocpm": "0.8.0"}
+CURRENT_RELEASE = {"ocpm_engine": "1.0.0", "pg_ocpm": "1.0.0"}
 BASELINE_RELEASE = {"ocpm_engine": "0.4.0", "pg_ocpm": "0.5.0"}
 BASELINE_ARTIFACT_TYPE = "sap_pm4py_latency_memory_storage_regression_baseline"
 EXPECTED_SOURCE = {
@@ -88,6 +88,40 @@ EXPECTED_INPUT_FIELDS = {
         "aggregate_rows",
     },
     "pg_ocpm_ocpm_engine": {"aggregate_rows"},
+}
+FACTORIZED_ENGINE_INPUT_FIELDS = {
+    "source",
+    "strategy",
+    "batch_rows",
+    "event_rows",
+    "expanded_event_rows",
+    "payload_bytes",
+    "aggregate_rows",
+}
+PROVIDER_AGGREGATE_INPUT_FIELDS = {
+    "source",
+    "strategy",
+    "database_rows",
+    "expanded_event_rows",
+    "aggregate_rows",
+}
+PROVIDER_AGGREGATE_CONTRACTS = {
+    "dfg_conformance_95pct": (
+        "pg_ocpm_lifecycle_dfg_window_counts",
+        "native lifecycle DFG window aggregate",
+    ),
+    "variant_conformance_95pct": (
+        "pg_ocpm_lifecycle_variant_window_counts",
+        "native lifecycle variant window aggregate",
+    ),
+    "next_activity_prediction": (
+        "pg_ocpm_lifecycle_dfg_window_counts",
+        "native lifecycle DFG window aggregate",
+    ),
+    "edge_bottleneck_ranking": (
+        "pg_ocpm_edge_feature_aggregates",
+        "native filtered edge feature aggregate",
+    ),
 }
 EXPECTED_CONCURRENCY_EPOCHS = 3
 MINIMUM_CONCURRENCY_SECONDS = 5.0
@@ -139,7 +173,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "result",
         nargs="?",
-        default="docs/results/sap-pm4py-three-way-0.8.0.json",
+        default="docs/results/sap-pm4py-three-way-1.0.0.json",
     )
     parser.add_argument(
         "--baseline",
@@ -174,11 +208,44 @@ def parse_args() -> argparse.Namespace:
             "published digest pin"
         ),
     )
+    parser.add_argument(
+        "--expected-ocpm-engine-version",
+        default=CURRENT_RELEASE["ocpm_engine"],
+        help="expected installed ocpm-engine package version",
+    )
+    parser.add_argument(
+        "--expected-pg-ocpm-version",
+        default=CURRENT_RELEASE["pg_ocpm"],
+        help="expected installed pg_ocpm extension version",
+    )
     return parser.parse_args()
 
 
 def fail(message: str) -> None:
     raise SystemExit(message)
+
+
+def validate_provider_aggregate_input(
+    name: str,
+    workload: str,
+    input_value: Any,
+    prior_input: dict[str, Any],
+) -> None:
+    """Validate the public provider API without binding 1.0 to legacy SQL input."""
+
+    expected_source, expected_strategy = PROVIDER_AGGREGATE_CONTRACTS[workload]
+    if (
+        not isinstance(input_value, dict)
+        or set(input_value) != PROVIDER_AGGREGATE_INPUT_FIELDS
+        or input_value.get("source") != expected_source
+        or input_value.get("strategy") != expected_strategy
+        or type(input_value.get("database_rows")) is not int
+        or input_value["database_rows"] <= 0
+        or input_value.get("database_rows") != input_value.get("aggregate_rows")
+        or input_value.get("expanded_event_rows") != 0
+        or input_value.get("aggregate_rows") != prior_input.get("aggregate_rows")
+    ):
+        fail(f"{name}/{workload}/pg_ocpm_ocpm_engine: invalid provider aggregate input")
 
 
 def load_verified(path: Path, expected_digest: str | None = None) -> dict[str, Any]:
@@ -582,11 +649,17 @@ def validate_concurrency(
 
 
 def validate_contract(
-    result: dict[str, Any], baseline: dict[str, Any], *, allow_dirty: bool
+    result: dict[str, Any],
+    baseline: dict[str, Any],
+    *,
+    allow_dirty: bool,
+    current_release: dict[str, str] = CURRENT_RELEASE,
 ) -> tuple[
     dict[str, dict[str, Any]],
     dict[str, dict[str, Any]],
 ]:
+    if not allow_dirty and current_release != CURRENT_RELEASE:
+        fail("release validation uses only the published release pair")
     validate_artifact_shape(result)
     if result.get("schema_version") != PUBLIC_BENCHMARK_SCHEMA_VERSION:
         fail("unexpected SAP benchmark schema version")
@@ -605,14 +678,14 @@ def validate_contract(
     validate_concurrency_protocol(result)
     if (
         result["environment"]["client"].get("ocpm_engine_version")
-        != CURRENT_RELEASE["ocpm_engine"]
+        != current_release["ocpm_engine"]
     ):
-        fail(f"expected ocpm-engine {CURRENT_RELEASE['ocpm_engine']}")
+        fail(f"expected ocpm-engine {current_release['ocpm_engine']}")
     if (
         result["environment"]["database"]["pg_ocpm"].get("pg_ocpm_version")
-        != CURRENT_RELEASE["pg_ocpm"]
+        != current_release["pg_ocpm"]
     ):
-        fail(f"expected pg_ocpm {CURRENT_RELEASE['pg_ocpm']}")
+        fail(f"expected pg_ocpm {current_release['pg_ocpm']}")
     try:
         validate_recorded_public_provenance(
             result.get("provenance"), allow_dirty=allow_dirty
@@ -659,7 +732,42 @@ def validate_contract(
                 p95 = metrics.get("p95_ms", 0)
                 if not (0 < minimum <= p50 <= p95):
                     fail(f"{name}/{workload}/{engine}: invalid latency metrics")
-                if metrics.get("input") != prior_row["input"].get(engine):
+                input_value = metrics.get("input")
+                if (
+                    engine == "pg_ocpm_ocpm_engine"
+                    and result["method"].get("ocpm_engine_read_path") == "factorized"
+                ):
+                    if (
+                        not isinstance(input_value, dict)
+                        or set(input_value) != FACTORIZED_ENGINE_INPUT_FIELDS
+                        or input_value.get("source") != "pg_ocpm_event_batches"
+                        or input_value.get("strategy")
+                        not in {
+                            "factorized event batch",
+                            "factorized multi-window event batch",
+                        }
+                        or type(input_value.get("batch_rows")) is not int
+                        or input_value["batch_rows"] <= 0
+                        or input_value.get("event_rows")
+                        != prior_row["input"]["vanilla_pg_pm4py"]["event_rows"]
+                        or input_value.get("expanded_event_rows") != 0
+                        or type(input_value.get("payload_bytes")) is not int
+                        or input_value["payload_bytes"] <= 0
+                        or input_value.get("aggregate_rows")
+                        != prior_row["input"][engine]["aggregate_rows"]
+                    ):
+                        fail(f"{name}/{workload}/{engine}: invalid factorized input")
+                elif (
+                    engine == "pg_ocpm_ocpm_engine"
+                    and result["method"].get("ocpm_engine_read_path") == "auto"
+                ):
+                    validate_provider_aggregate_input(
+                        name,
+                        workload,
+                        input_value,
+                        prior_row["input"][engine],
+                    )
+                elif input_value != prior_row["input"].get(engine):
                     fail(f"{name}/{workload}/{engine}: timed input shape changed")
             speedups = row["speedups"]
             expected = {
@@ -750,7 +858,7 @@ def validate_contract(
     packages = result["storage"]["client_packages"]
     if packages["pm4py"].get("version") != "2.7.23.3":
         fail("PM4Py version changed")
-    if packages["ocpm_engine"].get("version") != CURRENT_RELEASE["ocpm_engine"]:
+    if packages["ocpm_engine"].get("version") != current_release["ocpm_engine"]:
         fail("ocpm-engine package version changed")
     if (
         packages["pm4py"].get("additional_database_bytes") != 0
@@ -773,6 +881,15 @@ def validate_regressions(
     )
 
 
+def resolve_expected_release(
+    *, preview: bool, ocpm_engine: str, pg_ocpm: str
+) -> dict[str, str]:
+    requested = {"ocpm_engine": ocpm_engine, "pg_ocpm": pg_ocpm}
+    if not preview and requested != CURRENT_RELEASE:
+        fail("release validation uses only the published release pair")
+    return requested
+
+
 def main() -> None:
     args = parse_args()
     if args.preview and (
@@ -789,7 +906,17 @@ def main() -> None:
     result = load_verified(Path(args.result), expected_digest)
     baseline = load_verified(args.baseline, EXPECTED_BASELINE_PAYLOAD_SHA256)
     validate_regression_baseline(baseline)
-    datasets, _ = validate_contract(result, baseline, allow_dirty=args.preview)
+    current_release = resolve_expected_release(
+        preview=args.preview,
+        ocpm_engine=args.expected_ocpm_engine_version,
+        pg_ocpm=args.expected_pg_ocpm_version,
+    )
+    datasets, _ = validate_contract(
+        result,
+        baseline,
+        allow_dirty=args.preview,
+        current_release=current_release,
+    )
     bridge_checked = False
     if args.release_bridge is not None:
         bridge_digest = None if args.preview else args.expected_release_bridge_sha256

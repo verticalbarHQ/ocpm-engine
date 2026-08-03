@@ -171,6 +171,71 @@ def test_sap_baseline_contract_rejects_extra_input_fields() -> None:
         CHECKER.validate_regression_baseline(baseline)
 
 
+@pytest.mark.parametrize(
+    ("workload", "source", "strategy", "rows"),
+    (
+        (
+            "dfg_conformance_95pct",
+            "pg_ocpm_lifecycle_dfg_window_counts",
+            "native lifecycle DFG window aggregate",
+            59,
+        ),
+        (
+            "variant_conformance_95pct",
+            "pg_ocpm_lifecycle_variant_window_counts",
+            "native lifecycle variant window aggregate",
+            798,
+        ),
+        (
+            "next_activity_prediction",
+            "pg_ocpm_lifecycle_dfg_window_counts",
+            "native lifecycle DFG window aggregate",
+            59,
+        ),
+        (
+            "edge_bottleneck_ranking",
+            "pg_ocpm_edge_feature_aggregates",
+            "native filtered edge feature aggregate",
+            60,
+        ),
+    ),
+)
+def test_provider_aggregate_input_contract(
+    workload: str,
+    source: str,
+    strategy: str,
+    rows: int,
+) -> None:
+    CHECKER.validate_provider_aggregate_input(
+        "sap_o2c",
+        workload,
+        {
+            "source": source,
+            "strategy": strategy,
+            "database_rows": rows,
+            "expanded_event_rows": 0,
+            "aggregate_rows": rows,
+        },
+        {"aggregate_rows": rows},
+    )
+
+
+def test_provider_aggregate_input_rejects_expanded_rows() -> None:
+    with pytest.raises(SystemExit, match="invalid provider aggregate input"):
+        CHECKER.validate_provider_aggregate_input(
+            "sap_o2c",
+            "dfg_conformance_95pct",
+            {
+                "source": "pg_ocpm_lifecycle_dfg_window_counts",
+                "strategy": "native lifecycle DFG window aggregate",
+                "database_rows": 59,
+                "expanded_event_rows": 1,
+                "aggregate_rows": 59,
+            },
+            {"aggregate_rows": 59},
+        )
+
+
 def test_matched_bridge_is_the_release_regression_gate(monkeypatch) -> None:
     result = {"artifact_type": "sap-pm4py-test"}
     bridge = {"artifact_type": "matched-release-test"}

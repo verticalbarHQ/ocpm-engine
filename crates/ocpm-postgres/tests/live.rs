@@ -1,11 +1,128 @@
 use futures_util::TryStreamExt;
 use ocpm_core::binding::BindingSchema;
 use ocpm_postgres::{
-    ActivityProfileFilter, AdapterError, PreparedBindingQuery, PreparedBindingTreeQuery,
-    PreparedEventLogQuery, RelationBindingSpec, activity_profile, binding_relation_universal_equal,
-    dfg_counts, dfg_window_counts, variant_counts, variant_window_counts,
+    ActivityProfileFilter, AdapterError, LifecycleDfgFilter, PreparedBindingQuery,
+    PreparedBindingTreeQuery, PreparedEventLogQuery, PreparedEventWindowBatchQuery,
+    RelationBindingSpec, activity_profile, binding_index_coverage,
+    binding_relation_universal_equal, dfg_counts, dfg_window_counts, event_log_summary,
+    event_log_window_summaries, lifecycle_dfg_window_counts, load_canonical_snapshot,
+    pg_ocpm_capabilities, variant_counts, variant_window_counts,
 };
 use std::time::{Duration, SystemTime};
+
+#[tokio::test]
+async fn canonical_pg_ocpm_1_snapshot_round_trips() {
+    let Ok(database_url) = std::env::var("OCPM_TEST_DATABASE_URL") else {
+        return;
+    };
+    let (client, connection) = tokio_postgres::connect(&database_url, tokio_postgres::NoTls)
+        .await
+        .expect("connect to pg_ocpm canonical provider database");
+    tokio::spawn(async move {
+        connection.await.expect("drive PostgreSQL connection");
+    });
+    let version: String = client
+        .query_one("SELECT ocpm.version()", &[])
+        .await
+        .expect("read pg_ocpm version")
+        .get(0);
+    if version
+        .split('.')
+        .next()
+        .and_then(|value| value.parse::<u32>().ok())
+        != Some(1)
+    {
+        return;
+    }
+    let tenant_id = 91_i64;
+    client
+        .execute(
+            "SELECT set_config('ocpm.tenant_id', $1, false)",
+            &[&tenant_id.to_string()],
+        )
+        .await
+        .unwrap();
+    let dataset_name = format!("ocpm-engine-v1-snapshot-{}", std::process::id());
+    let dataset_id: i64 = client
+        .query_one(
+            "SELECT ocpm.register_dataset($1, $2, '{}'::jsonb)",
+            &[&dataset_name, &tenant_id],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    let generation_id: i64 = client
+        .query_one(
+            "SELECT ocpm.begin_generation($1, $2, NULL)",
+            &[&tenant_id, &dataset_id],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    client
+        .execute(
+            "INSERT INTO ocpm.object_entity
+                 (tenant_id,dataset_id,external_object_id,object_type,last_changed_generation)
+             VALUES ($1,$2,'o1','order',$3)",
+            &[&tenant_id, &dataset_id, &generation_id],
+        )
+        .await
+        .unwrap();
+    client
+        .execute(
+            "INSERT INTO ocpm.event_entity
+                 (tenant_id,dataset_id,external_event_id,activity,event_timestamp,last_changed_generation)
+             VALUES
+                 ($1,$2,'e1','create','2026-01-01T00:00:01Z',$3),
+                 ($1,$2,'e2','approve','2026-01-01T00:00:02Z',$3)",
+            &[&tenant_id, &dataset_id, &generation_id],
+        )
+        .await
+        .unwrap();
+    client
+        .execute(
+            "INSERT INTO ocpm.event_object_relation
+                 (tenant_id,dataset_id,event_id,object_id,qualifier,last_changed_generation)
+             SELECT $1,$2,event.event_id,object.object_id,'order',$3
+             FROM ocpm.event_entity AS event
+             CROSS JOIN ocpm.object_entity AS object
+             WHERE event.tenant_id=$1 AND event.dataset_id=$2
+               AND object.tenant_id=$1 AND object.dataset_id=$2",
+            &[&tenant_id, &dataset_id, &generation_id],
+        )
+        .await
+        .unwrap();
+    client
+        .execute(
+            "SELECT ocpm.validate_generation($1,$2,$3,'{}'::jsonb,'{}'::jsonb)",
+            &[&tenant_id, &dataset_id, &generation_id],
+        )
+        .await
+        .unwrap();
+    client
+        .execute(
+            "SELECT ocpm.publish_generation($1,$2,$3)",
+            &[&tenant_id, &dataset_id, &generation_id],
+        )
+        .await
+        .unwrap();
+
+    let log = load_canonical_snapshot(&client, tenant_id, dataset_id)
+        .await
+        .expect("load canonical snapshot");
+    assert_eq!(log.events.len(), 2);
+    assert_eq!(log.objects.len(), 1);
+    assert_eq!(log.event_object_relations.len(), 2);
+    assert_eq!(log.events[0].activity, "create");
+
+    client
+        .execute(
+            "DELETE FROM ocpm.dataset WHERE dataset_id=$1",
+            &[&dataset_id],
+        )
+        .await
+        .unwrap();
+}
 
 #[tokio::test]
 async fn public_adapters_prepare_and_bind_against_pg_ocpm_0_7() {
@@ -69,6 +186,10 @@ async fn native_event_adapter_streams_pg_ocpm_0_8_rows_in_case_order() {
         .await
         .expect("read pg_ocpm version")
         .get(0);
+    let minor_version = version
+        .split('.')
+        .nth(1)
+        .and_then(|value| value.parse::<u32>().ok());
     if version
         .split('.')
         .next()
@@ -144,6 +265,148 @@ async fn native_event_adapter_streams_pg_ocpm_0_8_rows_in_case_order() {
     assert_eq!(events[0].event_ordinal, 1);
     assert_eq!(events[1].activity, "Complete");
     assert_eq!(events[1].event_ordinal, 2);
+
+    let capabilities = pg_ocpm_capabilities(&client)
+        .await
+        .expect("detect pg_ocpm event export capabilities");
+    assert_eq!(capabilities.version, version);
+    let factorized = minor_version.is_some_and(|minor| minor >= 9);
+    assert_eq!(capabilities.factorized_event_export(), factorized);
+    assert_eq!(capabilities.factorized_multi_window_export(), factorized);
+    let lifecycle_pushdown = minor_version.is_some_and(|minor| minor >= 10);
+    assert_eq!(capabilities.lifecycle_dfg_pushdown(), lifecycle_pushdown);
+    assert_eq!(
+        capabilities.lifecycle_variant_pushdown(),
+        lifecycle_pushdown
+    );
+
+    let execution = event_log_summary(
+        &client,
+        dataset_id,
+        0,
+        "Order",
+        SystemTime::UNIX_EPOCH,
+        SystemTime::UNIX_EPOCH + Duration::from_secs(4_102_444_800),
+    )
+    .await
+    .expect("summarize the event export selected by capabilities");
+    assert_eq!(
+        execution.strategy,
+        if factorized {
+            ocpm_postgres::EventLogStrategy::FactorizedBatch
+        } else {
+            ocpm_postgres::EventLogStrategy::NativeRowFallback
+        }
+    );
+    assert_eq!(execution.database_rows, if factorized { 1 } else { 2 });
+    assert_eq!(
+        (execution.summary.case_count, execution.summary.event_count),
+        (1, 2)
+    );
+    assert_eq!(
+        execution.summary.variants[0].activity_path,
+        ["Create", "Complete"]
+    );
+    assert_eq!(execution.summary.dfg[0].frequency, 1);
+    assert_eq!(execution.summary.dfg[0].mean_duration_seconds, 1.0);
+
+    let from = [SystemTime::UNIX_EPOCH, SystemTime::UNIX_EPOCH];
+    let to = [
+        SystemTime::UNIX_EPOCH + Duration::from_secs(4_102_444_800),
+        SystemTime::UNIX_EPOCH + Duration::from_secs(4_102_444_800),
+    ];
+    let summaries = event_log_window_summaries(&client, dataset_id, 0, "Order", &from, &to)
+        .await
+        .expect("summarize aligned windows with the selected export");
+    assert_eq!(summaries.len(), 2);
+    assert!(
+        summaries
+            .iter()
+            .all(|item| item.database_rows == if factorized { 1 } else { 2 })
+    );
+    assert!(summaries.iter().all(|item| item.summary.event_count == 2));
+
+    if factorized {
+        assert!(capabilities.factorized_event_export());
+        assert!(capabilities.factorized_multi_window_export());
+
+        let window_query = PreparedEventWindowBatchQuery::prepare(&client)
+            .await
+            .expect("prepare multi-window batch export");
+        let mut batches = std::pin::pin!(
+            window_query
+                .query(&client, dataset_id, 0, "Order", &from, &to)
+                .await
+                .expect("start multi-window batch export")
+        );
+        let mut ordinals = Vec::new();
+        while let Some(row) = batches.try_next().await.expect("read window batch") {
+            let batch = PreparedEventWindowBatchQuery::decode(&row)
+                .expect("decode a factorized window batch");
+            ordinals.push(batch.window_ordinal);
+            assert_eq!(batch.batch.case_count(), 1);
+        }
+        assert_eq!(ordinals, [1, 2]);
+
+        let from_many = vec![SystemTime::UNIX_EPOCH; 257];
+        let to_many = vec![SystemTime::UNIX_EPOCH + Duration::from_secs(4_102_444_800); 257];
+        let many_summaries =
+            event_log_window_summaries(&client, dataset_id, 0, "Order", &from_many, &to_many)
+                .await
+                .expect("chunk more than 256 windows in one statement snapshot");
+        assert_eq!(many_summaries.len(), 257);
+        assert!(
+            many_summaries
+                .iter()
+                .all(|item| { item.database_rows == 1 && item.summary.event_count == 2 })
+        );
+
+        let coverage = binding_index_coverage(&client, dataset_id, 0)
+            .await
+            .expect("read observable binding-index coverage");
+        assert!(coverage.refreshed_at.is_some());
+        assert!(coverage.object_types.is_empty());
+        assert!(!coverage.covers_object_type("Order"));
+    }
+
+    if lifecycle_pushdown {
+        let counts = lifecycle_dfg_window_counts(
+            &client,
+            dataset_id,
+            0,
+            &from,
+            &to,
+            &LifecycleDfgFilter {
+                object_types: Some(vec!["Order".to_owned()]),
+                ..LifecycleDfgFilter::default()
+            },
+        )
+        .await
+        .expect("read exact lifecycle DFG counts");
+        assert_eq!(counts.len(), 1);
+        assert_eq!(counts[0].transition.source, "Create");
+        assert_eq!(counts[0].transition.target, "Complete");
+        assert_eq!(counts[0].frequencies, [1, 1]);
+
+        let from_many = vec![SystemTime::UNIX_EPOCH; 257];
+        let to_many = vec![SystemTime::UNIX_EPOCH + Duration::from_secs(4_102_444_800); 257];
+        let thresholded = lifecycle_dfg_window_counts(
+            &client,
+            dataset_id,
+            0,
+            &from_many,
+            &to_many,
+            &LifecycleDfgFilter {
+                object_types: Some(vec!["Order".to_owned()]),
+                minimum_total_frequency: 2,
+                ..LifecycleDfgFilter::default()
+            },
+        )
+        .await
+        .expect("apply a frequency threshold after aligning all chunks");
+        assert_eq!(thresholded.len(), 1);
+        assert_eq!(thresholded[0].frequencies, vec![1; 257]);
+    }
 
     client
         .execute("SELECT ocpm.clear_dataset($1)", &[&dataset_id])

@@ -218,6 +218,11 @@ def arguments() -> argparse.Namespace:
     parser.add_argument("--database", default="postgres")
     parser.add_argument("--user", default="postgres")
     parser.add_argument("--password", default="pg")
+    parser.add_argument(
+        "--raw-only",
+        action="store_true",
+        help="retain only the benchmark-owned relational import for vanilla PG",
+    )
     return parser.parse_args()
 
 
@@ -300,7 +305,13 @@ def load(args: argparse.Namespace) -> None:
                 cursor.copy_expert(
                     f"COPY bench.{table} FROM STDIN WITH (FORMAT csv)", source
                 )
-        cursor.execute(NORMALIZE)
+        if args.raw_only:
+            cursor.execute(
+                "ANALYZE bench.object_dim; ANALYZE bench.event_dim; "
+                "ANALYZE bench.event_object; ANALYZE bench.object_object"
+            )
+        else:
+            cursor.execute(NORMALIZE)
     connection.close()
 
 

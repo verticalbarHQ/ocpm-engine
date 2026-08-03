@@ -166,7 +166,122 @@ impl BindingCapsule {
             entry_offset: 0,
         }
     }
+
+    /// Borrow materialized columns without constructing `BindingRow` values.
+    pub fn materialized(&self) -> Option<MaterializedBindingView<'_>> {
+        match &self.storage {
+            BindingStorage::Materialized(storage) => Some(MaterializedBindingView { storage }),
+            BindingStorage::PairGroups(_) => None,
+        }
+    }
+
+    /// Borrow factorized pair groups without expanding their Cartesian products.
+    pub fn pair_groups(&self) -> Option<PairGroupsView<'_>> {
+        match &self.storage {
+            BindingStorage::Materialized(_) => None,
+            BindingStorage::PairGroups(storage) => Some(PairGroupsView { storage }),
+        }
+    }
 }
+
+#[derive(Clone, Copy, Debug)]
+pub struct MaterializedBindingView<'a> {
+    storage: &'a MaterializedRows,
+}
+
+impl<'a> MaterializedBindingView<'a> {
+    pub fn id_column_count(&self) -> usize {
+        self.storage.id_columns.len()
+    }
+
+    pub fn id_column(&self, index: usize) -> Option<&'a [i64]> {
+        self.storage.id_columns.get(index).map(Vec::as_slice)
+    }
+
+    pub fn violations(&self) -> Option<&'a [bool]> {
+        self.storage.violations.as_deref()
+    }
+
+    pub fn values(&self) -> Option<&'a [f64]> {
+        self.storage.values.as_deref()
+    }
+
+    pub fn label(&self, row: usize) -> Option<&'a str> {
+        self.storage.label_indexes.as_ref().and_then(|indexes| {
+            indexes
+                .get(row)
+                .and_then(|index| self.storage.label_dictionary.get(*index))
+                .map(String::as_str)
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct PairGroup<'a> {
+    pub source: i64,
+    pub targets: &'a [i64],
+    pub events: &'a [i64],
+}
+
+impl PairGroup<'_> {
+    pub fn expanded_row_count(&self) -> Option<usize> {
+        self.targets.len().checked_mul(self.targets.len())
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct PairGroupsView<'a> {
+    storage: &'a PairGroups,
+}
+
+impl PairGroupsView<'_> {
+    pub fn group_count(&self) -> usize {
+        self.storage.sources.len()
+    }
+
+    pub fn entry_count(&self) -> usize {
+        self.storage.targets.len()
+    }
+
+    pub fn groups(&self) -> PairGroupIter<'_> {
+        PairGroupIter {
+            storage: self.storage,
+            group: 0,
+            offset: 0,
+        }
+    }
+}
+
+pub struct PairGroupIter<'a> {
+    storage: &'a PairGroups,
+    group: usize,
+    offset: usize,
+}
+
+impl<'a> Iterator for PairGroupIter<'a> {
+    type Item = PairGroup<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let source = *self.storage.sources.get(self.group)?;
+        let size = self.storage.sizes[self.group];
+        let end = self.offset + size;
+        let result = PairGroup {
+            source,
+            targets: &self.storage.targets[self.offset..end],
+            events: &self.storage.events[self.offset..end],
+        };
+        self.group += 1;
+        self.offset = end;
+        Some(result)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self.storage.sources.len().saturating_sub(self.group);
+        (remaining, Some(remaining))
+    }
+}
+
+impl ExactSizeIterator for PairGroupIter<'_> {}
 
 pub struct BindingRows<'a> {
     capsule: &'a BindingCapsule,
@@ -693,6 +808,50 @@ mod tests {
                 vec![20, 200, 200, 2000, 2000],
             ]
         );
+        let groups = capsule.pair_groups().unwrap();
+        assert_eq!(groups.group_count(), 2);
+        assert_eq!(groups.entry_count(), 3);
+        assert_eq!(
+            groups
+                .groups()
+                .map(|group| (
+                    group.source,
+                    group.targets.to_vec(),
+                    group.events.to_vec(),
+                    group.expanded_row_count().unwrap(),
+                ))
+                .collect::<Vec<_>>(),
+            [
+                (10, vec![100, 101], vec![1000, 1001], 4),
+                (20, vec![200], vec![2000], 1),
+            ]
+        );
+    }
+
+    #[test]
+    fn exposes_materialized_columns_and_dictionary_labels() {
+        let mut bytes = header(BindingSchema::IdLabelIdViolation, 2);
+        for delta in [10, 1, 100, 1] {
+            signed(delta, &mut bytes);
+        }
+        varint(2, &mut bytes);
+        for label in ["alice", "bob"] {
+            varint(label.len() as u64, &mut bytes);
+            bytes.extend(label.as_bytes());
+        }
+        varint(0, &mut bytes);
+        varint(1, &mut bytes);
+        bytes.push(0b0000_0010);
+
+        let capsule = BindingCapsule::decode(&bytes).unwrap();
+        let columns = capsule.materialized().unwrap();
+        assert_eq!(columns.id_column_count(), 2);
+        assert_eq!(columns.id_column(0), Some(&[10, 11][..]));
+        assert_eq!(columns.id_column(1), Some(&[100, 101][..]));
+        assert_eq!(columns.label(0), Some("alice"));
+        assert_eq!(columns.label(1), Some("bob"));
+        assert_eq!(columns.violations(), Some(&[false, true][..]));
+        assert!(capsule.pair_groups().is_none());
     }
 
     #[test]
