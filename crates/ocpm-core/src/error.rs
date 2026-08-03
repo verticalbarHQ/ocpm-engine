@@ -78,4 +78,3 @@ impl Display for OcpmError {
 }
 
 impl std::error::Error for OcpmError {}
-

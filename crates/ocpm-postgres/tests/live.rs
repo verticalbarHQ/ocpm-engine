@@ -5,9 +5,8 @@ use ocpm_postgres::{
     PreparedBindingTreeQuery, PreparedEventLogQuery, PreparedEventWindowBatchQuery,
     RelationBindingSpec, activity_profile, binding_index_coverage,
     binding_relation_universal_equal, dfg_counts, dfg_window_counts, event_log_summary,
-    event_log_window_summaries, lifecycle_dfg_window_counts, pg_ocpm_capabilities, variant_counts,
-    variant_window_counts,
-    load_canonical_snapshot,
+    event_log_window_summaries, lifecycle_dfg_window_counts, load_canonical_snapshot,
+    pg_ocpm_capabilities, variant_counts, variant_window_counts,
 };
 use std::time::{Duration, SystemTime};
 
@@ -27,7 +26,12 @@ async fn canonical_pg_ocpm_1_snapshot_round_trips() {
         .await
         .expect("read pg_ocpm version")
         .get(0);
-    if version.split('.').next().and_then(|value| value.parse::<u32>().ok()) != Some(1) {
+    if version
+        .split('.')
+        .next()
+        .and_then(|value| value.parse::<u32>().ok())
+        != Some(1)
+    {
         return;
     }
     let tenant_id = 91_i64;
@@ -112,7 +116,10 @@ async fn canonical_pg_ocpm_1_snapshot_round_trips() {
     assert_eq!(log.events[0].activity, "create");
 
     client
-        .execute("DELETE FROM ocpm.dataset WHERE dataset_id=$1", &[&dataset_id])
+        .execute(
+            "DELETE FROM ocpm.dataset WHERE dataset_id=$1",
+            &[&dataset_id],
+        )
         .await
         .unwrap();
 }

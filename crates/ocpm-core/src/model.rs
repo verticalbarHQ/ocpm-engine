@@ -24,7 +24,10 @@ pub enum ProcessTree {
     Sequence(Vec<ProcessTree>),
     Exclusive(Vec<ProcessTree>),
     Parallel(Vec<ProcessTree>),
-    Loop { body: Box<ProcessTree>, redo: Box<ProcessTree> },
+    Loop {
+        body: Box<ProcessTree>,
+        redo: Box<ProcessTree>,
+    },
     Tau,
 }
 
@@ -119,4 +122,3 @@ impl ModelArtifact {
         Ok(())
     }
 }
-

@@ -42,7 +42,10 @@ pub struct ProcessExecution {
 
 impl ProcessExecution {
     pub fn activity_path(&self) -> Vec<String> {
-        self.events.iter().map(|event| event.activity.clone()).collect()
+        self.events
+            .iter()
+            .map(|event| event.activity.clone())
+            .collect()
     }
 }
 

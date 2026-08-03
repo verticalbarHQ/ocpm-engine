@@ -6,8 +6,8 @@
 //! code from another process-mining library was consulted.
 
 use ocpm_core::{
-    content_hash, AttributeValue, DatasetView, FitPredictionRequest, OcpmError, OcpmErrorCode,
-    OcpmResult, PredictionCandidate, PredictionRequest, PredictionResult, PredictionTarget,
+    AttributeValue, DatasetView, FitPredictionRequest, OcpmError, OcpmErrorCode, OcpmResult,
+    PredictionCandidate, PredictionRequest, PredictionResult, PredictionTarget, content_hash,
 };
 use ocpm_provider::{ExecutionMode, OcpmProvider};
 use serde::{Deserialize, Serialize};
@@ -102,7 +102,10 @@ pub fn fit(
         .and_then(|value| value.as_str())
         .unwrap_or("sequential")
         .to_owned();
-    if !matches!(feature_encoding.as_str(), "sequential" | "tabular" | "graph") {
+    if !matches!(
+        feature_encoding.as_str(),
+        "sequential" | "tabular" | "graph"
+    ) {
         return Err(OcpmError::invalid_request(
             "feature_encoding must be sequential, tabular, or graph",
         ));
@@ -111,11 +114,8 @@ pub fn fit(
         .parameters
         .get("leading_object_type")
         .and_then(|value| value.as_str());
-    let executions = provider.process_executions(
-        &request.view,
-        ExecutionMode::LeadingObject,
-        leading,
-    )?;
+    let executions =
+        provider.process_executions(&request.view, ExecutionMode::LeadingObject, leading)?;
     let profile = provider.profile(&request.view)?;
     if executions.is_empty() {
         return Err(OcpmError::new(
@@ -180,9 +180,9 @@ fn build_artifact(
                         .or_default() += 1;
                 }
                 if let (Some(current), Some(last)) = (execution.events.get(index), terminal) {
-                    let remaining = (last.timestamp.epoch_nanos_utc
-                        - current.timestamp.epoch_nanos_utc) as f64
-                        / 1_000_000_000.0;
+                    let remaining =
+                        (last.timestamp.epoch_nanos_utc - current.timestamp.epoch_nanos_utc) as f64
+                            / 1_000_000_000.0;
                     remaining_samples
                         .entry(prefix.clone())
                         .or_default()
@@ -436,9 +436,9 @@ pub fn evaluate_temporal_holdout(
                     let Some(last) = terminal else {
                         continue;
                     };
-                    let actual = (last.timestamp.epoch_nanos_utc
-                        - current.timestamp.epoch_nanos_utc) as f64
-                        / 1_000_000_000.0;
+                    let actual =
+                        (last.timestamp.epoch_nanos_utc - current.timestamp.epoch_nanos_utc) as f64
+                            / 1_000_000_000.0;
                     let summary = &artifact.remaining[&key];
                     absolute_error += (summary.mean - actual).abs();
                     interval_hits += u64::from(actual >= summary.lower && actual <= summary.upper);
@@ -500,7 +500,9 @@ pub fn evaluate_temporal_holdout(
             ("metrics".to_owned(), metrics),
             (
                 "leakage_guard".to_owned(),
-                serde_json::json!("executions are sorted by completion time; the model is fit only on the earlier partition"),
+                serde_json::json!(
+                    "executions are sorted by completion time; the model is fit only on the earlier partition"
+                ),
             ),
         ]),
         ..PredictionResult::default()
@@ -511,7 +513,12 @@ fn prefix_key(values: &[String]) -> String {
     serde_json::to_string(values).expect("activity vectors are serializable")
 }
 
-fn feature_key(values: &[String], encoding: &str, prefix_length: usize, object_count: usize) -> String {
+fn feature_key(
+    values: &[String],
+    encoding: &str,
+    prefix_length: usize,
+    object_count: usize,
+) -> String {
     match encoding {
         "tabular" => serde_json::to_string(&serde_json::json!({
             "encoding": "tabular",

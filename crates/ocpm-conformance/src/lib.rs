@@ -7,9 +7,9 @@
 //! No implementation source from another process-mining library was used.
 
 use ocpm_core::{
-    ConformanceMethod, ConformanceRequest, ConformanceResultV1, DeclareConstraint,
-    DeclareTemplate, DfgModel, ModelArtifact, OcpmError, OcpmErrorCode, OcpmResult, PetriNet,
-    ProcessModel, QueryBinding,
+    ConformanceMethod, ConformanceRequest, ConformanceResultV1, DeclareConstraint, DeclareTemplate,
+    DfgModel, ModelArtifact, OcpmError, OcpmErrorCode, OcpmResult, PetriNet, ProcessModel,
+    QueryBinding,
 };
 use ocpm_provider::{ExecutionMode, OcpmProvider, ProcessExecution};
 use std::cmp::Reverse;
@@ -30,7 +30,11 @@ pub fn check(
         return Err(OcpmError::invalid_request("semantic_version must be 1.0"));
     }
     validate_artifact(&request.model)?;
-    let mode = match request.parameters.get("execution_mode").and_then(|v| v.as_str()) {
+    let mode = match request
+        .parameters
+        .get("execution_mode")
+        .and_then(|v| v.as_str())
+    {
         Some("connected_component") => ExecutionMode::ConnectedComponent,
         _ => ExecutionMode::LeadingObject,
     };
@@ -104,7 +108,10 @@ fn frequency_coverage(
     let total = conforming + deviations;
     Ok(ConformanceResultV1 {
         fitness: Some(ratio(conforming, total)),
-        precision: Some(ratio(observed.intersection(&allowed).count() as u64, allowed.len() as u64)),
+        precision: Some(ratio(
+            observed.intersection(&allowed).count() as u64,
+            allowed.len() as u64,
+        )),
         generalization: None,
         simplicity: Some(1.0 / (1.0 + allowed.len() as f64)),
         conforming,
@@ -112,7 +119,10 @@ fn frequency_coverage(
         exact: true,
         violations,
         diagnostics: BTreeMap::from([
-            ("observed_edges".to_owned(), serde_json::json!(observed.len())),
+            (
+                "observed_edges".to_owned(),
+                serde_json::json!(observed.len()),
+            ),
             ("model_edges".to_owned(), serde_json::json!(allowed.len())),
         ]),
     })
@@ -128,7 +138,7 @@ fn token_replay(
         _ => {
             return Err(OcpmError::invalid_request(
                 "token_replay requires a Petri net or object-centric Petri net",
-            ))
+            ));
         }
     };
     let mut conforming = 0_u64;
@@ -163,10 +173,22 @@ fn token_replay(
         exact: true,
         violations,
         diagnostics: BTreeMap::from([
-            ("missing_tokens".to_owned(), serde_json::json!(missing_total)),
-            ("remaining_tokens".to_owned(), serde_json::json!(remaining_total)),
-            ("consumed_tokens".to_owned(), serde_json::json!(consumed_total)),
-            ("produced_tokens".to_owned(), serde_json::json!(produced_total)),
+            (
+                "missing_tokens".to_owned(),
+                serde_json::json!(missing_total),
+            ),
+            (
+                "remaining_tokens".to_owned(),
+                serde_json::json!(remaining_total),
+            ),
+            (
+                "consumed_tokens".to_owned(),
+                serde_json::json!(consumed_total),
+            ),
+            (
+                "produced_tokens".to_owned(),
+                serde_json::json!(produced_total),
+            ),
         ]),
     })
 }
@@ -201,13 +223,9 @@ fn replay_trace(net: &PetriNet, execution: &ProcessExecution) -> Replay {
             .iter()
             .filter(|arc| arc.target == transition.id && tokens.contains_key(arc.source.as_str()))
             .collect::<Vec<_>>();
-        let enabled = incoming.iter().all(|arc| {
-            tokens
-                .get(arc.source.as_str())
-                .copied()
-                .unwrap_or_default()
-                >= arc.weight
-        });
+        let enabled = incoming
+            .iter()
+            .all(|arc| tokens.get(arc.source.as_str()).copied().unwrap_or_default() >= arc.weight);
         if !enabled {
             for arc in &incoming {
                 let available = tokens.get(arc.source.as_str()).copied().unwrap_or_default();
@@ -289,17 +307,22 @@ fn align_dfg(model: &DfgModel, trace: &[String]) -> OcpmResult<(u64, u64)> {
             "DFG alignment requires start and end activities",
         ));
     }
-    let adjacency = model.edges.iter().fold(
-        BTreeMap::<&str, Vec<&str>>::new(),
-        |mut values, edge| {
-            values
-                .entry(edge.source.as_str())
-                .or_default()
-                .push(edge.target.as_str());
-            values
-        },
-    );
-    let ends = model.end_activities.keys().map(String::as_str).collect::<BTreeSet<_>>();
+    let adjacency =
+        model
+            .edges
+            .iter()
+            .fold(BTreeMap::<&str, Vec<&str>>::new(), |mut values, edge| {
+                values
+                    .entry(edge.source.as_str())
+                    .or_default()
+                    .push(edge.target.as_str());
+                values
+            });
+    let ends = model
+        .end_activities
+        .keys()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
     let mut heap = BinaryHeap::<Reverse<(u64, usize, String)>>::new();
     let mut distance = BTreeMap::<(usize, String), u64>::new();
     for start in model.start_activities.keys() {
@@ -443,7 +466,11 @@ fn declare_holds(execution: &ProcessExecution, constraint: &DeclareConstraint) -
             .collect::<Vec<_>>()
     };
     let activation = positions(&constraint.activation);
-    let target = constraint.target.as_deref().map(positions).unwrap_or_default();
+    let target = constraint
+        .target
+        .as_deref()
+        .map(positions)
+        .unwrap_or_default();
     match constraint.template {
         DeclareTemplate::Existence => !activation.is_empty(),
         DeclareTemplate::Absence => activation.is_empty(),
@@ -457,8 +484,12 @@ fn declare_holds(execution: &ProcessExecution, constraint: &DeclareConstraint) -
             .iter()
             .all(|right| activation.iter().any(|left| left < right)),
         DeclareTemplate::Succession => {
-            activation.iter().all(|left| target.iter().any(|right| right > left))
-                && target.iter().all(|right| activation.iter().any(|left| left < right))
+            activation
+                .iter()
+                .all(|left| target.iter().any(|right| right > left))
+                && target
+                    .iter()
+                    .all(|right| activation.iter().any(|left| left < right))
         }
         DeclareTemplate::Coexistence => activation.is_empty() == target.is_empty(),
         DeclareTemplate::NotCoexistence => activation.is_empty() || target.is_empty(),
@@ -501,6 +532,11 @@ mod tests {
                 frequency: 1,
             }],
         };
-        assert_eq!(align_dfg(&model, &["a".to_owned(), "b".to_owned()]).unwrap().0, 0);
+        assert_eq!(
+            align_dfg(&model, &["a".to_owned(), "b".to_owned()])
+                .unwrap()
+                .0,
+            0
+        );
     }
 }

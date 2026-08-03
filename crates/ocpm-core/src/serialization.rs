@@ -47,7 +47,11 @@ pub fn model_dot(artifact: &ModelArtifact) -> String {
                     target,
                     constraint.object_type.as_deref().unwrap_or("*")
                 );
-                let _ = writeln!(output, "  c{index} [shape=box,label=\"{}\"];", dot_text(&label));
+                let _ = writeln!(
+                    output,
+                    "  c{index} [shape=box,label=\"{}\"];",
+                    dot_text(&label)
+                );
             }
         }
     }
@@ -166,12 +170,7 @@ fn write_petri_dot(net: &PetriNet, output: &mut String) {
     }
 }
 
-fn write_tree_dot(
-    tree: &ProcessTree,
-    parent: Option<u64>,
-    next: &mut u64,
-    output: &mut String,
-) {
+fn write_tree_dot(tree: &ProcessTree, parent: Option<u64>, next: &mut u64, output: &mut String) {
     let id = *next;
     *next += 1;
     let (label, children): (&str, Vec<&ProcessTree>) = match tree {
@@ -254,7 +253,10 @@ fn hex(bytes: &[u8]) -> String {
 }
 
 fn dot_text(value: &str) -> String {
-    value.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n")
+    value
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', "\\n")
 }
 
 fn xml_text(value: &str) -> String {

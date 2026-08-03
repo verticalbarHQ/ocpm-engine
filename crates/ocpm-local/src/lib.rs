@@ -5,8 +5,8 @@
 //! doi:10.1007/978-3-031-92474-3_23. No upstream library source was consulted.
 
 use ocpm_core::{
-    CanonicalLog, Constraint, DatasetProfile, DatasetView, Event, EventId,
-    ObjectId, OcpmError, OcpmResult, QueryBinding, QueryRequest, QueryResult,
+    CanonicalLog, Constraint, DatasetProfile, DatasetView, Event, EventId, ObjectId, OcpmError,
+    OcpmResult, QueryBinding, QueryRequest, QueryResult,
 };
 use ocpm_provider::{
     ExecutionMode, OcpmProvider, ProcessExecution, ProviderCapability, ProviderEstimate,
@@ -124,21 +124,23 @@ impl LocalProvider {
         let mut event_ids = BTreeSet::new();
         let allowed_qualifiers = view.qualifiers.iter().collect::<BTreeSet<_>>();
         for object_id in object_ids {
-            event_ids.extend(self.log.event_object_relations.iter().filter_map(|relation| {
-                (relation.object_id == *object_id
-                    && (allowed_qualifiers.is_empty()
-                        || allowed_qualifiers.contains(&relation.qualifier)))
-                .then_some(relation.event_id)
-            }));
+            event_ids.extend(
+                self.log
+                    .event_object_relations
+                    .iter()
+                    .filter_map(|relation| {
+                        (relation.object_id == *object_id
+                            && (allowed_qualifiers.is_empty()
+                                || allowed_qualifiers.contains(&relation.qualifier)))
+                        .then_some(relation.event_id)
+                    }),
+            );
         }
         let mut events = self
             .log
             .events
             .iter()
-            .filter(|event| {
-                event_ids.contains(&event.id)
-                    && self.event_matches_view(view, event)
-            })
+            .filter(|event| event_ids.contains(&event.id) && self.event_matches_view(view, event))
             .cloned()
             .collect::<Vec<_>>();
         events.sort_by(|left, right| {
@@ -155,7 +157,8 @@ impl LocalProvider {
         view: &DatasetView,
         leading_object_type: Option<&str>,
     ) -> Vec<ProcessExecution> {
-        let leading_type = leading_object_type.or_else(|| view.object_types.first().map(String::as_str));
+        let leading_type =
+            leading_object_type.or_else(|| view.object_types.first().map(String::as_str));
         self.log
             .objects
             .iter()
@@ -215,12 +218,14 @@ impl LocalProvider {
             .filter_map(|(root, mut object_ids)| {
                 object_ids.sort_unstable();
                 let events = self.filtered_events_for_objects(view, &object_ids);
-                (!events.is_empty() && Self::execution_duration_matches(view, &events)).then(|| ProcessExecution {
-                    id: format!("component:{root}"),
-                    object_type: "connected_component".to_owned(),
-                    event_object_ids: self.event_objects(&object_ids),
-                    object_ids,
-                    events,
+                (!events.is_empty() && Self::execution_duration_matches(view, &events)).then(|| {
+                    ProcessExecution {
+                        id: format!("component:{root}"),
+                        object_type: "connected_component".to_owned(),
+                        event_object_ids: self.event_objects(&object_ids),
+                        object_ids,
+                        events,
+                    }
                 })
             })
             .collect()
@@ -249,24 +254,31 @@ impl LocalProvider {
                 .events
                 .iter()
                 .any(|event| event.attributes.get(name) == Some(value)),
-            Constraint::ObjectAttributeEquals { name, value } => execution
-                .object_ids
-                .iter()
-                .any(|object_id| {
+            Constraint::ObjectAttributeEquals { name, value } => {
+                execution.object_ids.iter().any(|object_id| {
                     self.object_attribute_value_at(
                         *object_id,
                         name,
                         execution.events.last().map(|event| &event.timestamp),
                     ) == Some(value)
-                }),
+                })
+            }
             Constraint::ObjectType { object_types } => execution.object_ids.iter().any(|id| {
                 self.log
                     .object(*id)
                     .is_some_and(|object| object_types.contains(&object.object_type))
             }),
             Constraint::E2oQualifier { qualifiers } => {
-                let events = execution.events.iter().map(|event| event.id).collect::<BTreeSet<_>>();
-                let objects = execution.object_ids.iter().copied().collect::<BTreeSet<_>>();
+                let events = execution
+                    .events
+                    .iter()
+                    .map(|event| event.id)
+                    .collect::<BTreeSet<_>>();
+                let objects = execution
+                    .object_ids
+                    .iter()
+                    .copied()
+                    .collect::<BTreeSet<_>>();
                 self.log.event_object_relations.iter().any(|relation| {
                     events.contains(&relation.event_id)
                         && objects.contains(&relation.object_id)
@@ -274,7 +286,11 @@ impl LocalProvider {
                 })
             }
             Constraint::O2oQualifier { qualifiers } => {
-                let objects = execution.object_ids.iter().copied().collect::<BTreeSet<_>>();
+                let objects = execution
+                    .object_ids
+                    .iter()
+                    .copied()
+                    .collect::<BTreeSet<_>>();
                 self.log.object_object_relations.iter().any(|relation| {
                     objects.contains(&relation.source_object_id)
                         && objects.contains(&relation.target_object_id)
@@ -300,26 +316,34 @@ impl LocalProvider {
                 target,
                 minimum_nanos,
                 maximum_nanos,
-            } => execution.events.iter().enumerate().any(|(left_index, left)| {
-                left.activity == *source
-                    && execution.events[left_index + 1..].iter().any(|right| {
-                        if right.activity != *target {
-                            return false;
-                        }
-                        let distance = right
-                            .timestamp
-                            .epoch_nanos_utc
-                            .saturating_sub(left.timestamp.epoch_nanos_utc);
-                        minimum_nanos.is_none_or(|minimum| distance >= minimum)
-                            && maximum_nanos.is_none_or(|maximum| distance <= maximum)
-                    })
-            }),
+            } => execution
+                .events
+                .iter()
+                .enumerate()
+                .any(|(left_index, left)| {
+                    left.activity == *source
+                        && execution.events[left_index + 1..].iter().any(|right| {
+                            if right.activity != *target {
+                                return false;
+                            }
+                            let distance = right
+                                .timestamp
+                                .epoch_nanos_utc
+                                .saturating_sub(left.timestamp.epoch_nanos_utc);
+                            minimum_nanos.is_none_or(|minimum| distance >= minimum)
+                                && maximum_nanos.is_none_or(|maximum| distance <= maximum)
+                        })
+                }),
             Constraint::Relationship {
                 source_object_type,
                 target_object_type,
                 qualifier,
             } => {
-                let objects = execution.object_ids.iter().copied().collect::<BTreeSet<_>>();
+                let objects = execution
+                    .object_ids
+                    .iter()
+                    .copied()
+                    .collect::<BTreeSet<_>>();
                 self.log.object_object_relations.iter().any(|relation| {
                     objects.contains(&relation.source_object_id)
                         && objects.contains(&relation.target_object_id)
@@ -338,7 +362,11 @@ impl LocalProvider {
                         })
                 })
             }
-            Constraint::ChildCount { child, minimum, maximum } => {
+            Constraint::ChildCount {
+                child,
+                minimum,
+                maximum,
+            } => {
                 let count = execution
                     .events
                     .iter()
@@ -485,20 +513,24 @@ impl OcpmProvider for LocalProvider {
             ..DatasetProfile::default()
         };
         for event in events {
-            *profile.activities.entry(event.activity.clone()).or_default() += 1;
-            profile.start = Some(
-                profile
-                    .start
-                    .map_or_else(|| event.timestamp.clone(), |value| value.min(event.timestamp.clone())),
-            );
-            profile.end = Some(
-                profile
-                    .end
-                    .map_or_else(|| event.timestamp.clone(), |value| value.max(event.timestamp.clone())),
-            );
+            *profile
+                .activities
+                .entry(event.activity.clone())
+                .or_default() += 1;
+            profile.start = Some(profile.start.map_or_else(
+                || event.timestamp.clone(),
+                |value| value.min(event.timestamp.clone()),
+            ));
+            profile.end = Some(profile.end.map_or_else(
+                || event.timestamp.clone(),
+                |value| value.max(event.timestamp.clone()),
+            ));
         }
         for object in objects {
-            *profile.object_types.entry(object.object_type.clone()).or_default() += 1;
+            *profile
+                .object_types
+                .entry(object.object_type.clone())
+                .or_default() += 1;
         }
         Ok(profile)
     }
@@ -747,7 +779,11 @@ mod tests {
     fn leading_execution_is_ordered() {
         let provider = LocalProvider::new(fixture()).unwrap();
         let executions = provider
-            .process_executions(&DatasetView::default(), ExecutionMode::LeadingObject, Some("order"))
+            .process_executions(
+                &DatasetView::default(),
+                ExecutionMode::LeadingObject,
+                Some("order"),
+            )
             .unwrap();
         assert_eq!(executions[0].activity_path(), vec!["create", "approve"]);
     }

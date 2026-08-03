@@ -16,8 +16,9 @@ pub fn execute(provider: &dyn OcpmProvider, request: &QueryRequest) -> OcpmResul
 
 pub fn validate(request: &QueryRequest) -> OcpmResult<()> {
     if request.semantic_version != "1.0" {
-        return Err(OcpmError::invalid_request("semantic_version must be 1.0")
-            .at("semantic_version"));
+        return Err(
+            OcpmError::invalid_request("semantic_version must be 1.0").at("semantic_version")
+        );
     }
     if request.limit == 0 {
         return Err(OcpmError::invalid_request("limit must be greater than zero").at("limit"));
@@ -27,16 +28,17 @@ pub fn validate(request: &QueryRequest) -> OcpmResult<()> {
 
 fn validate_constraint(constraint: &Constraint, depth: usize) -> OcpmResult<()> {
     if depth > 64 {
-        return Err(OcpmError::invalid_request("constraint nesting exceeds 64 levels")
-            .at("constraint"));
+        return Err(
+            OcpmError::invalid_request("constraint nesting exceeds 64 levels").at("constraint"),
+        );
     }
     match constraint {
         Constraint::EventActivity { activities } if activities.is_empty() => {
             Err(OcpmError::invalid_request("activities must not be empty"))
         }
-        Constraint::EventAttributeEquals { name, .. } if name.is_empty() => {
-            Err(OcpmError::invalid_request("attribute name must not be empty"))
-        }
+        Constraint::EventAttributeEquals { name, .. } if name.is_empty() => Err(
+            OcpmError::invalid_request("attribute name must not be empty"),
+        ),
         Constraint::ObjectType { object_types } if object_types.is_empty() => {
             Err(OcpmError::invalid_request("object_types must not be empty"))
         }
@@ -49,7 +51,9 @@ fn validate_constraint(constraint: &Constraint, depth: usize) -> OcpmResult<()> 
         | Constraint::EventuallyFollows { source, target }
             if source.is_empty() || target.is_empty() =>
         {
-            Err(OcpmError::invalid_request("follow activities must not be empty"))
+            Err(OcpmError::invalid_request(
+                "follow activities must not be empty",
+            ))
         }
         Constraint::ChildCount {
             child,

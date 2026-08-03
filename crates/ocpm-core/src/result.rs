@@ -108,4 +108,3 @@ pub enum EngineResult {
     Enhancement(EnhancementResult),
     Prediction(PredictionResult),
 }
-

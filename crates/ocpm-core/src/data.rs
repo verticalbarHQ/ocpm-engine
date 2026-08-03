@@ -314,8 +314,10 @@ impl CanonicalLog {
             }
             if !event_ids.contains(&relation.event_id) || !object_ids.contains(&relation.object_id)
             {
-                return Err(OcpmError::invalid_data("E2O relation endpoint does not exist")
-                    .at(format!("event_object_relations[{index}]")));
+                return Err(
+                    OcpmError::invalid_data("E2O relation endpoint does not exist")
+                        .at(format!("event_object_relations[{index}]")),
+                );
             }
         }
         for (index, relation) in self.object_object_relations.iter().enumerate() {
@@ -326,8 +328,10 @@ impl CanonicalLog {
             if !object_ids.contains(&relation.source_object_id)
                 || !object_ids.contains(&relation.target_object_id)
             {
-                return Err(OcpmError::invalid_data("O2O relation endpoint does not exist")
-                    .at(format!("object_object_relations[{index}]")));
+                return Err(
+                    OcpmError::invalid_data("O2O relation endpoint does not exist")
+                        .at(format!("object_object_relations[{index}]")),
+                );
             }
             if relation
                 .valid_from
@@ -335,15 +339,19 @@ impl CanonicalLog {
                 .zip(relation.valid_to.as_ref())
                 .is_some_and(|(from, to)| to <= from)
             {
-                return Err(OcpmError::invalid_data("O2O valid_to must be after valid_from")
-                    .at(format!("object_object_relations[{index}]")));
+                return Err(
+                    OcpmError::invalid_data("O2O valid_to must be after valid_from")
+                        .at(format!("object_object_relations[{index}]")),
+                );
             }
         }
         let mut attribute_keys = BTreeSet::new();
         for (index, change) in self.object_attribute_history.iter().enumerate() {
             if !object_ids.contains(&change.object_id) || change.name.is_empty() {
-                return Err(OcpmError::invalid_data("invalid object attribute history row")
-                    .at(format!("object_attribute_history[{index}]")));
+                return Err(
+                    OcpmError::invalid_data("invalid object attribute history row")
+                        .at(format!("object_attribute_history[{index}]")),
+                );
             }
             if !attribute_keys.insert((change.object_id, &change.name, &change.valid_from)) {
                 return Err(OcpmError::invalid_data(
@@ -369,8 +377,10 @@ impl CanonicalLog {
                 .cmp(&right.object_type)
                 .then_with(|| left.external_id.cmp(&right.external_id))
         });
-        self.event_object_relations.sort_by_key(|relation| relation.relation_id);
-        self.object_object_relations.sort_by_key(|relation| relation.relation_id);
+        self.event_object_relations
+            .sort_by_key(|relation| relation.relation_id);
+        self.object_object_relations
+            .sort_by_key(|relation| relation.relation_id);
         self.object_attribute_history.sort_by(|left, right| {
             left.object_id
                 .cmp(&right.object_id)
@@ -413,6 +423,9 @@ mod tests {
             }],
             ..CanonicalLog::default()
         };
-        assert_eq!(log.validate().unwrap_err().code, crate::OcpmErrorCode::InvalidData);
+        assert_eq!(
+            log.validate().unwrap_err().code,
+            crate::OcpmErrorCode::InvalidData
+        );
     }
 }

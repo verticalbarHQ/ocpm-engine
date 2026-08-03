@@ -7,8 +7,8 @@
 //! was consulted.
 
 use ocpm_core::{
-    AttributeValue, EnhancementKind, EnhancementRequest, EnhancementResult, OcpmError,
-    OcpmResult, PerformanceMetric,
+    AttributeValue, EnhancementKind, EnhancementRequest, EnhancementResult, OcpmError, OcpmResult,
+    PerformanceMetric,
 };
 use ocpm_provider::{ExecutionMode, OcpmProvider, ProcessExecution};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
@@ -26,7 +26,11 @@ pub fn enhance(
     if request.semantic_version != "1.0" {
         return Err(OcpmError::invalid_request("semantic_version must be 1.0"));
     }
-    let mode = match request.parameters.get("execution_mode").and_then(|v| v.as_str()) {
+    let mode = match request
+        .parameters
+        .get("execution_mode")
+        .and_then(|v| v.as_str())
+    {
         Some("connected_component") => ExecutionMode::ConnectedComponent,
         _ => ExecutionMode::LeadingObject,
     };
@@ -125,8 +129,16 @@ fn histogram(executions: &[ProcessExecution]) -> OcpmResult<EnhancementResult> {
             ..EnhancementResult::default()
         });
     }
-    let minimum = values.iter().copied().min_by(f64::total_cmp).unwrap_or_default();
-    let maximum = values.iter().copied().max_by(f64::total_cmp).unwrap_or(minimum);
+    let minimum = values
+        .iter()
+        .copied()
+        .min_by(f64::total_cmp)
+        .unwrap_or_default();
+    let maximum = values
+        .iter()
+        .copied()
+        .max_by(f64::total_cmp)
+        .unwrap_or(minimum);
     let width = ((maximum - minimum) / 10.0).max(f64::EPSILON);
     let mut bins = vec![0_u64; 10];
     for value in &values {
@@ -164,7 +176,10 @@ fn performance(executions: &[ProcessExecution]) -> OcpmResult<EnhancementResult>
     let mut flow_values = Vec::new();
     for execution in executions {
         if let (Some(first), Some(last)) = (execution.events.first(), execution.events.last()) {
-            cycle_values.push(duration_seconds(first.timestamp.epoch_nanos_utc, last.timestamp.epoch_nanos_utc)?);
+            cycle_values.push(duration_seconds(
+                first.timestamp.epoch_nanos_utc,
+                last.timestamp.epoch_nanos_utc,
+            )?);
         }
         for pair in execution.events.windows(2) {
             let duration = duration_seconds(
@@ -190,9 +205,10 @@ fn performance(executions: &[ProcessExecution]) -> OcpmResult<EnhancementResult>
                 .iter()
                 .filter_map(|object_id| object_ready.get(object_id).copied())
                 .collect::<Vec<_>>();
-            if let (Some(minimum), Some(maximum)) =
-                (readiness.iter().min().copied(), readiness.iter().max().copied())
-            {
+            if let (Some(minimum), Some(maximum)) = (
+                readiness.iter().min().copied(),
+                readiness.iter().max().copied(),
+            ) {
                 if readiness.len() > 1 {
                     synchronization_values.push(duration_seconds(minimum, maximum)?);
                 }
@@ -205,7 +221,12 @@ fn performance(executions: &[ProcessExecution]) -> OcpmResult<EnhancementResult>
             for object_id in involved {
                 object_ready.insert(object_id, event.timestamp.epoch_nanos_utc);
             }
-            match event.lifecycle.as_deref().map(str::to_ascii_lowercase).as_deref() {
+            match event
+                .lifecycle
+                .as_deref()
+                .map(str::to_ascii_lowercase)
+                .as_deref()
+            {
                 Some("start") => {
                     starts
                         .entry(event.activity.clone())
@@ -217,16 +238,12 @@ fn performance(executions: &[ProcessExecution]) -> OcpmResult<EnhancementResult>
                         .get_mut(&event.activity)
                         .and_then(VecDeque::pop_front)
                     {
-                        service_values.push(duration_seconds(
-                            start,
-                            event.timestamp.epoch_nanos_utc,
-                        )?);
+                        service_values
+                            .push(duration_seconds(start, event.timestamp.epoch_nanos_utc)?);
                         if let Some(previous) = previous_completion {
                             waiting_values.push(duration_seconds(previous, start)?);
-                            sojourn_values.push(duration_seconds(
-                                previous,
-                                event.timestamp.epoch_nanos_utc,
-                            )?);
+                            sojourn_values
+                                .push(duration_seconds(previous, event.timestamp.epoch_nanos_utc)?);
                         }
                     }
                     previous_completion = Some(event.timestamp.epoch_nanos_utc);
@@ -258,12 +275,14 @@ fn performance(executions: &[ProcessExecution]) -> OcpmResult<EnhancementResult>
             .then_with(|| left["source"].as_str().cmp(&right["source"].as_str()))
             .then_with(|| left["target"].as_str().cmp(&right["target"].as_str()))
     });
-    groups.insert("bottleneck_edges".to_owned(), serde_json::json!(bottlenecks));
+    groups.insert(
+        "bottleneck_edges".to_owned(),
+        serde_json::json!(bottlenecks),
+    );
     let mut warnings = Vec::new();
     if service_values.is_empty() {
         warnings.push(
-            "service, waiting, and sojourn time require start/complete lifecycle labels"
-                .to_owned(),
+            "service, waiting, and sojourn time require start/complete lifecycle labels".to_owned(),
         );
     }
     Ok(EnhancementResult {
@@ -291,7 +310,10 @@ fn rework(executions: &[ProcessExecution]) -> OcpmResult<EnhancementResult> {
         for event in &execution.events {
             *counts.entry(&event.activity).or_default() += 1;
         }
-        let repeated = counts.values().map(|count| count.saturating_sub(1)).sum::<u64>();
+        let repeated = counts
+            .values()
+            .map(|count| count.saturating_sub(1))
+            .sum::<u64>();
         repeated_per_execution.push(repeated as f64);
         for (activity, count) in counts {
             *by_activity.entry(activity.to_owned()).or_default() += count.saturating_sub(1);
@@ -348,10 +370,15 @@ fn organizational(
             })
             .collect::<Vec<_>>();
         for pair in path.windows(2) {
-            *handovers.entry((pair[0].clone(), pair[1].clone())).or_default() += 1;
+            *handovers
+                .entry((pair[0].clone(), pair[1].clone()))
+                .or_default() += 1;
         }
     }
-    let workload = resources.values().map(|value| *value as f64).collect::<Vec<_>>();
+    let workload = resources
+        .values()
+        .map(|value| *value as f64)
+        .collect::<Vec<_>>();
     let mut groups = BTreeMap::new();
     groups.insert("resources".to_owned(), serde_json::json!(resources));
     groups.insert(
@@ -408,11 +435,19 @@ fn drift(
     let comparison_cycles = cycle_times(comparison)?;
     let baseline_mean = mean(&baseline_cycles);
     let comparison_mean = mean(&comparison_cycles);
-    let performance_delta = comparison_mean.zip(baseline_mean).map(|(right, left)| right - left);
+    let performance_delta = comparison_mean
+        .zip(baseline_mean)
+        .map(|(right, left)| right - left);
     let mut groups = BTreeMap::new();
-    groups.insert("activity".to_owned(), serde_json::json!(activity_contributions));
+    groups.insert(
+        "activity".to_owned(),
+        serde_json::json!(activity_contributions),
+    );
     groups.insert("dfg".to_owned(), serde_json::json!(dfg_contributions));
-    groups.insert("variant".to_owned(), serde_json::json!(variant_contributions));
+    groups.insert(
+        "variant".to_owned(),
+        serde_json::json!(variant_contributions),
+    );
     groups.insert(
         "performance".to_owned(),
         serde_json::json!({
@@ -423,9 +458,24 @@ fn drift(
     );
     Ok(EnhancementResult {
         metrics: vec![
-            scalar_metric("activity_jensen_shannon_divergence", "bits", activity_support, activity_divergence),
-            scalar_metric("dfg_jensen_shannon_divergence", "bits", dfg_support, dfg_divergence),
-            scalar_metric("variant_jensen_shannon_divergence", "bits", variant_support, variant_divergence),
+            scalar_metric(
+                "activity_jensen_shannon_divergence",
+                "bits",
+                activity_support,
+                activity_divergence,
+            ),
+            scalar_metric(
+                "dfg_jensen_shannon_divergence",
+                "bits",
+                dfg_support,
+                dfg_divergence,
+            ),
+            scalar_metric(
+                "variant_jensen_shannon_divergence",
+                "bits",
+                variant_support,
+                variant_divergence,
+            ),
             PerformanceMetric {
                 name: "mean_cycle_time_delta".to_owned(),
                 unit: "seconds".to_owned(),
@@ -501,7 +551,10 @@ fn cycle_times(executions: &[ProcessExecution]) -> OcpmResult<Vec<f64>> {
         .iter()
         .filter_map(|execution| execution.events.first().zip(execution.events.last()))
         .map(|(first, last)| {
-            duration_seconds(first.timestamp.epoch_nanos_utc, last.timestamp.epoch_nanos_utc)
+            duration_seconds(
+                first.timestamp.epoch_nanos_utc,
+                last.timestamp.epoch_nanos_utc,
+            )
         })
         .collect()
 }

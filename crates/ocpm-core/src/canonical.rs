@@ -46,4 +46,3 @@ fn normalize(value: Value) -> Value {
         other => other,
     }
 }
-

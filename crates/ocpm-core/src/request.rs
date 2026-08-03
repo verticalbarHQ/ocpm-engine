@@ -42,16 +42,40 @@ impl DatasetView {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Constraint {
-    EventId { event_ids: Vec<EventId> },
-    ObjectId { object_ids: Vec<ObjectId> },
-    EventActivity { activities: Vec<String> },
-    EventAttributeEquals { name: String, value: AttributeValue },
-    ObjectAttributeEquals { name: String, value: AttributeValue },
-    ObjectType { object_types: Vec<String> },
-    E2oQualifier { qualifiers: Vec<String> },
-    O2oQualifier { qualifiers: Vec<String> },
-    DirectlyFollows { source: String, target: String },
-    EventuallyFollows { source: String, target: String },
+    EventId {
+        event_ids: Vec<EventId>,
+    },
+    ObjectId {
+        object_ids: Vec<ObjectId>,
+    },
+    EventActivity {
+        activities: Vec<String>,
+    },
+    EventAttributeEquals {
+        name: String,
+        value: AttributeValue,
+    },
+    ObjectAttributeEquals {
+        name: String,
+        value: AttributeValue,
+    },
+    ObjectType {
+        object_types: Vec<String>,
+    },
+    E2oQualifier {
+        qualifiers: Vec<String>,
+    },
+    O2oQualifier {
+        qualifiers: Vec<String>,
+    },
+    DirectlyFollows {
+        source: String,
+        target: String,
+    },
+    EventuallyFollows {
+        source: String,
+        target: String,
+    },
     TemporalDistance {
         source: String,
         target: String,
@@ -68,11 +92,24 @@ pub enum Constraint {
         #[serde(skip_serializing_if = "Option::is_none")]
         qualifier: Option<String>,
     },
-    ChildCount { child: Box<Constraint>, minimum: u64, maximum: Option<u64> },
-    And { children: Vec<Constraint> },
-    Or { children: Vec<Constraint> },
-    Not { child: Box<Constraint> },
-    Label { name: String, child: Box<Constraint> },
+    ChildCount {
+        child: Box<Constraint>,
+        minimum: u64,
+        maximum: Option<u64>,
+    },
+    And {
+        children: Vec<Constraint>,
+    },
+    Or {
+        children: Vec<Constraint>,
+    },
+    Not {
+        child: Box<Constraint>,
+    },
+    Label {
+        name: String,
+        child: Box<Constraint>,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

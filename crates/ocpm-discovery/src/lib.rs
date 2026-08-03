@@ -8,9 +8,9 @@
 //! implementation and uses no process-mining library source code.
 
 use ocpm_core::{
-    DeclareConstraint, DeclareTemplate, DfgEdge, DfgModel, DiscoveryAlgorithm,
-    DiscoveryRequest, ModelArtifact, ObjectCentricPetriNet, OcpmError, OcpmResult, PetriArc,
-    PetriNet, Place, ProcessModel, ProcessTree, Transition,
+    DeclareConstraint, DeclareTemplate, DfgEdge, DfgModel, DiscoveryAlgorithm, DiscoveryRequest,
+    ModelArtifact, ObjectCentricPetriNet, OcpmError, OcpmResult, PetriArc, PetriNet, Place,
+    ProcessModel, ProcessTree, Transition,
 };
 use ocpm_provider::{ExecutionMode, OcpmProvider, ProcessExecution};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
@@ -32,13 +32,17 @@ pub fn discover(
     if request.semantic_version != "1.0" {
         return Err(OcpmError::invalid_request("semantic_version must be 1.0"));
     }
-    let mode = match request.parameters.get("execution_mode").and_then(|v| v.as_str()) {
+    let mode = match request
+        .parameters
+        .get("execution_mode")
+        .and_then(|v| v.as_str())
+    {
         Some("connected_component") => ExecutionMode::ConnectedComponent,
         Some("leading_object") | None => ExecutionMode::LeadingObject,
         Some(value) => {
             return Err(OcpmError::invalid_request(format!(
                 "unsupported execution_mode {value}"
-            )))
+            )));
         }
     };
     let leading = request
@@ -62,9 +66,9 @@ pub fn discover(
         DiscoveryAlgorithm::InductiveProcessTree => {
             ProcessModel::ProcessTree(discover_process_tree(&executions))
         }
-        DiscoveryAlgorithm::ObjectCentricPetriNet => ProcessModel::ObjectCentricPetriNet(
-            discover_object_centric_petri_net(&executions)?,
-        ),
+        DiscoveryAlgorithm::ObjectCentricPetriNet => {
+            ProcessModel::ObjectCentricPetriNet(discover_object_centric_petri_net(&executions)?)
+        }
         DiscoveryAlgorithm::OcDeclare => {
             let minimum_support = request
                 .parameters
@@ -131,7 +135,9 @@ pub fn discover_dfg(executions: &[ProcessExecution], object_centric: bool) -> Df
     let decode_boundary = |values: BTreeMap<String, u64>| {
         let mut output = BTreeMap::new();
         for (key, frequency) in values {
-            let activity = key.split_once('\u{1f}').map_or(key.as_str(), |(_, value)| value);
+            let activity = key
+                .split_once('\u{1f}')
+                .map_or(key.as_str(), |(_, value)| value);
             *output.entry(activity.to_owned()).or_default() += frequency;
         }
         output
@@ -278,10 +284,11 @@ fn valid_alpha_pair(
     causal: &BTreeSet<(String, String)>,
     follows: &BTreeSet<(String, String)>,
 ) -> bool {
-    sources
-        .iter()
-        .all(|source| targets.iter().all(|target| causal.contains(&(source.clone(), target.clone()))))
-        && pairwise_unrelated(sources, follows)
+    sources.iter().all(|source| {
+        targets
+            .iter()
+            .all(|target| causal.contains(&(source.clone(), target.clone())))
+    }) && pairwise_unrelated(sources, follows)
         && pairwise_unrelated(targets, follows)
 }
 
@@ -322,11 +329,7 @@ fn process_tree_cut(traces: &[Vec<String>], depth: usize) -> ProcessTree {
     if traces.is_empty() {
         return ProcessTree::Tau;
     }
-    let activities = traces
-        .iter()
-        .flatten()
-        .cloned()
-        .collect::<BTreeSet<_>>();
+    let activities = traces.iter().flatten().cloned().collect::<BTreeSet<_>>();
     if activities.len() == 1 {
         return ProcessTree::Activity(activities.into_iter().next().unwrap());
     }
@@ -352,7 +355,13 @@ fn process_tree_cut(traces: &[Vec<String>], depth: usize) -> ProcessTree {
     if let Some(last) = common_boundary(traces, false) {
         let heads = traces
             .iter()
-            .map(|trace| trace.iter().take(trace.len() - 1).cloned().collect::<Vec<_>>())
+            .map(|trace| {
+                trace
+                    .iter()
+                    .take(trace.len() - 1)
+                    .cloned()
+                    .collect::<Vec<_>>()
+            })
             .collect::<Vec<_>>();
         return compact_sequence(vec![
             process_tree_cut(&heads, depth + 1),
@@ -362,7 +371,10 @@ fn process_tree_cut(traces: &[Vec<String>], depth: usize) -> ProcessTree {
 
     let mut by_first = BTreeMap::<String, Vec<Vec<String>>>::new();
     for trace in traces {
-        by_first.entry(trace[0].clone()).or_default().push(trace.clone());
+        by_first
+            .entry(trace[0].clone())
+            .or_default()
+            .push(trace.clone());
     }
     let activity_partitions = by_first
         .values()
@@ -391,9 +403,7 @@ fn process_tree_cut(traces: &[Vec<String>], depth: usize) -> ProcessTree {
         })
     });
     if all_parallel {
-        return ProcessTree::Parallel(
-            activities.into_iter().map(ProcessTree::Activity).collect(),
-        );
+        return ProcessTree::Parallel(activities.into_iter().map(ProcessTree::Activity).collect());
     }
 
     let order = topological_activity_order(&activities, &follows);
@@ -556,7 +566,12 @@ pub fn discover_declare(
     for activity in &activities {
         let containing = executions
             .iter()
-            .filter(|execution| execution.events.iter().any(|event| event.activity == *activity))
+            .filter(|execution| {
+                execution
+                    .events
+                    .iter()
+                    .any(|event| event.activity == *activity)
+            })
             .count() as f64;
         let support = containing / total;
         if support >= minimum_support {
@@ -577,7 +592,12 @@ pub fn discover_declare(
             }
             let activated = executions
                 .iter()
-                .filter(|execution| execution.events.iter().any(|event| event.activity == *activation))
+                .filter(|execution| {
+                    execution
+                        .events
+                        .iter()
+                        .any(|event| event.activity == *activation)
+                })
                 .count();
             if activated == 0 {
                 continue;

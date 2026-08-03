@@ -8,9 +8,8 @@
 
 use chrono::{DateTime, Utc};
 use ocpm_core::{
-    AttributeValue, CanonicalLog, Event, EventObjectRelation, Object,
-    ObjectAttributeChange, ObjectObjectRelation, OcpmError, OcpmErrorCode, OcpmResult,
-    Timestamp,
+    AttributeValue, CanonicalLog, Event, EventObjectRelation, Object, ObjectAttributeChange,
+    ObjectObjectRelation, OcpmError, OcpmErrorCode, OcpmResult, Timestamp,
 };
 use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event as XmlEvent};
@@ -202,11 +201,7 @@ fn read_ocel2_json_value(root: &Value) -> OcpmResult<CanonicalLog> {
         .iter()
         .map(parse_raw_event)
         .collect::<OcpmResult<Vec<_>>>()?;
-    raw_events.sort_by(|left, right| {
-        left.2
-            .cmp(&right.2)
-            .then_with(|| left.0.cmp(&right.0))
-    });
+    raw_events.sort_by(|left, right| left.2.cmp(&right.2).then_with(|| left.0.cmp(&right.0)));
     let mut events = Vec::with_capacity(raw_events.len());
     let mut event_object_relations = Vec::new();
     for (index, (external_id, activity, timestamp, attributes, relationships)) in
@@ -296,11 +291,11 @@ fn parse_raw_object(value: &Value) -> OcpmResult<RawObject> {
         .into_iter()
         .flatten()
         .map(|attribute| {
-            let attribute = attribute.as_object().ok_or_else(|| {
-                OcpmError::invalid_data("object attribute must be an object")
-            })?;
+            let attribute = attribute
+                .as_object()
+                .ok_or_else(|| OcpmError::invalid_data("object attribute must be an object"))?;
             Ok((
-                required_string_any(attribute, &["name", "ocel:name"] )?,
+                required_string_any(attribute, &["name", "ocel:name"])?,
                 parse_timestamp(
                     attribute
                         .get("time")
@@ -353,11 +348,11 @@ fn parse_event_attributes(value: Option<&Value>) -> OcpmResult<BTreeMap<String, 
         Some(Value::Array(values)) => values
             .iter()
             .map(|value| {
-                let value = value.as_object().ok_or_else(|| {
-                    OcpmError::invalid_data("event attribute must be an object")
-                })?;
+                let value = value
+                    .as_object()
+                    .ok_or_else(|| OcpmError::invalid_data("event attribute must be an object"))?;
                 Ok((
-                    required_string_any(value, &["name", "ocel:name"] )?,
+                    required_string_any(value, &["name", "ocel:name"])?,
                     json_to_attribute(value.get("value").unwrap_or(&Value::Null))?,
                 ))
             })
@@ -378,7 +373,7 @@ fn parse_relationships(value: Option<&Value>) -> OcpmResult<Vec<(String, String)
                 .as_object()
                 .ok_or_else(|| OcpmError::invalid_data("relationship must be an object"))?;
             Ok((
-                required_string_any(relation, &["objectId", "object_id", "ocel:oid"] )?,
+                required_string_any(relation, &["objectId", "object_id", "ocel:oid"])?,
                 relation
                     .get("qualifier")
                     .or_else(|| relation.get("ocel:qualifier"))
@@ -421,10 +416,7 @@ pub fn read_csv(reader: impl Read, mapping: &CsvMapping) -> OcpmResult<Canonical
             row.get(index)
                 .filter(|value| !value.is_empty())
                 .ok_or_else(|| {
-                    OcpmError::invalid_data(format!(
-                        "CSV row {} has no {name}",
-                        row_index + 2
-                    ))
+                    OcpmError::invalid_data(format!("CSV row {} has no {name}", row_index + 2))
                 })
         };
         let case_id = required(case_column, &mapping.case_id)?.to_owned();
@@ -454,11 +446,7 @@ pub fn read_csv(reader: impl Read, mapping: &CsvMapping) -> OcpmResult<Canonical
     build_flat_log(rows, &mapping.object_type, "csv")
 }
 
-pub fn write_csv(
-    writer: impl Write,
-    log: &CanonicalLog,
-    mapping: &CsvMapping,
-) -> OcpmResult<()> {
+pub fn write_csv(writer: impl Write, log: &CanonicalLog, mapping: &CsvMapping) -> OcpmResult<()> {
     log.validate()?;
     let mut attributes = log
         .events
@@ -555,7 +543,10 @@ pub fn read_xes(reader: impl BufRead) -> OcpmResult<CanonicalLog> {
                 timestamp = None;
             }
             Ok(XmlEvent::Empty(start)) | Ok(XmlEvent::Start(start))
-                if matches!(start.name().as_ref(), b"string" | b"date" | b"int" | b"float" | b"boolean") =>
+                if matches!(
+                    start.name().as_ref(),
+                    b"string" | b"date" | b"int" | b"float" | b"boolean"
+                ) =>
             {
                 let (key, value) = xes_attribute(&xml, &start)?;
                 if in_event {
@@ -576,14 +567,18 @@ pub fn read_xes(reader: impl BufRead) -> OcpmResult<CanonicalLog> {
             Ok(XmlEvent::End(end)) if end.name().as_ref() == b"event" => {
                 row_number += 1;
                 rows.push((
-                    event_id.take().unwrap_or_else(|| format!("event-{row_number}")),
-                    case_id.clone().unwrap_or_else(|| "trace-unknown".to_owned()),
-                    activity.take().ok_or_else(|| {
-                        OcpmError::invalid_data("XES event lacks concept:name")
-                    })?,
-                    timestamp.take().ok_or_else(|| {
-                        OcpmError::invalid_data("XES event lacks time:timestamp")
-                    })?,
+                    event_id
+                        .take()
+                        .unwrap_or_else(|| format!("event-{row_number}")),
+                    case_id
+                        .clone()
+                        .unwrap_or_else(|| "trace-unknown".to_owned()),
+                    activity
+                        .take()
+                        .ok_or_else(|| OcpmError::invalid_data("XES event lacks concept:name"))?,
+                    timestamp
+                        .take()
+                        .ok_or_else(|| OcpmError::invalid_data("XES event lacks time:timestamp"))?,
                     std::mem::take(&mut event_attributes),
                 ));
                 in_event = false;
@@ -594,7 +589,7 @@ pub fn read_xes(reader: impl BufRead) -> OcpmResult<CanonicalLog> {
                 return Err(OcpmError::invalid_data(format!(
                     "invalid XES at byte {}: {error}",
                     xml.buffer_position()
-                )))
+                )));
             }
             _ => {}
         }
@@ -668,7 +663,10 @@ pub fn write_xes(mut writer: impl Write, log: &CanonicalLog, object_type: &str) 
     writer.write_all(b"</log>\n").map_err(io_error)
 }
 
-fn xes_attribute<R: BufRead>(xml: &Reader<R>, start: &BytesStart<'_>) -> OcpmResult<(String, String)> {
+fn xes_attribute<R: BufRead>(
+    xml: &Reader<R>,
+    start: &BytesStart<'_>,
+) -> OcpmResult<(String, String)> {
     let mut key = None;
     let mut value = None;
     for attribute in start.attributes() {
@@ -690,9 +688,19 @@ fn xes_attribute<R: BufRead>(xml: &Reader<R>, start: &BytesStart<'_>) -> OcpmRes
     ))
 }
 
-type FlatRow = (String, String, String, Timestamp, BTreeMap<String, AttributeValue>);
+type FlatRow = (
+    String,
+    String,
+    String,
+    Timestamp,
+    BTreeMap<String, AttributeValue>,
+);
 
-fn build_flat_log(rows: Vec<FlatRow>, object_type: &str, dataset_id: &str) -> OcpmResult<CanonicalLog> {
+fn build_flat_log(
+    rows: Vec<FlatRow>,
+    object_type: &str,
+    dataset_id: &str,
+) -> OcpmResult<CanonicalLog> {
     let object_external_ids = rows
         .iter()
         .map(|row| row.1.clone())
@@ -774,7 +782,11 @@ pub fn write_sqlite(path: impl AsRef<Path>, log: &CanonicalLog) -> OcpmResult<()
         transaction
             .execute(
                 "INSERT INTO event(id,type,time) VALUES (?1,?2,?3)",
-                (&event.external_id, &event.activity, timestamp_text(&event.timestamp)?),
+                (
+                    &event.external_id,
+                    &event.activity,
+                    timestamp_text(&event.timestamp)?,
+                ),
             )
             .map_err(sqlite_error)?;
     }
@@ -811,7 +823,9 @@ pub fn read_sqlite_connection(connection: &Connection) -> OcpmResult<CanonicalLo
             .prepare("SELECT id, type FROM object ORDER BY id")
             .map_err(sqlite_error)?;
         let rows = statement
-            .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })
             .map_err(sqlite_error)?;
         for row in rows {
             let (external_id, object_type) = row.map_err(sqlite_error)?;
@@ -923,20 +937,24 @@ fn parse_timestamp(value: &Value, format: Option<&str>) -> OcpmResult<Timestamp>
     if let Some(value) = value.as_i64() {
         return Ok(Timestamp::from_epoch_nanos(value as i128));
     }
-    let value = value
-        .as_str()
-        .ok_or_else(|| OcpmError::invalid_data("timestamp must be a string or integer nanoseconds"))?;
+    let value = value.as_str().ok_or_else(|| {
+        OcpmError::invalid_data("timestamp must be a string or integer nanoseconds")
+    })?;
     let parsed = if let Some(format) = format {
         chrono::NaiveDateTime::parse_from_str(value, format)
             .map(|value| value.and_utc())
-            .map_err(|error| OcpmError::invalid_data(format!("invalid timestamp {value}: {error}")))?
+            .map_err(|error| {
+                OcpmError::invalid_data(format!("invalid timestamp {value}: {error}"))
+            })?
     } else {
         DateTime::parse_from_rfc3339(value)
             .map(|value| value.with_timezone(&Utc))
-            .map_err(|error| OcpmError::invalid_data(format!("invalid RFC3339 timestamp {value}: {error}")))?
+            .map_err(|error| {
+                OcpmError::invalid_data(format!("invalid RFC3339 timestamp {value}: {error}"))
+            })?
     };
-    let nanos = parsed.timestamp() as i128 * 1_000_000_000
-        + parsed.timestamp_subsec_nanos() as i128;
+    let nanos =
+        parsed.timestamp() as i128 * 1_000_000_000 + parsed.timestamp_subsec_nanos() as i128;
     Ok(Timestamp {
         epoch_nanos_utc: nanos,
         source: Some(value.to_owned()),
@@ -1021,8 +1039,12 @@ mod tests {
 
     #[test]
     fn imports_quoted_csv() {
-        let input = b"case_id,activity,timestamp,event_id,note\n1,create,2024-01-01T00:00:00Z,e1,\"a,b\"\n";
+        let input =
+            b"case_id,activity,timestamp,event_id,note\n1,create,2024-01-01T00:00:00Z,e1,\"a,b\"\n";
         let log = read_csv(&input[..], &CsvMapping::default()).unwrap();
-        assert_eq!(log.events[0].attributes["note"], AttributeValue::String("a,b".to_owned()));
+        assert_eq!(
+            log.events[0].attributes["note"],
+            AttributeValue::String("a,b".to_owned())
+        );
     }
 }

@@ -2027,9 +2027,7 @@ fn json_object_attributes(
         .collect()
 }
 
-fn json_attribute(
-    value: serde_json::Value,
-) -> Result<ocpm_core::AttributeValue, AdapterError> {
+fn json_attribute(value: serde_json::Value) -> Result<ocpm_core::AttributeValue, AdapterError> {
     match value {
         serde_json::Value::Null => Ok(ocpm_core::AttributeValue::Null),
         serde_json::Value::String(value) => Ok(ocpm_core::AttributeValue::String(value)),

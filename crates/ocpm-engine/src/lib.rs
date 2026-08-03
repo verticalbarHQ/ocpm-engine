@@ -6,16 +6,16 @@
 //! each kernel crate and summarized in `docs/academic-implementation-provenance.md`.
 
 use ocpm_core::{
-    AppendBatch, CanonicalLog, ConformanceRequest, ConformanceResultV1, DatasetProfile, DatasetView,
-    DiscoveryRequest, EnhancementRequest, EnhancementResult, ExecutionPlan, ExecutionStep,
-    FitPredictionRequest, ModelArtifact, OcpmResult, PredictionRequest, PredictionResult,
-    QueryRequest, QueryResult,
+    AppendBatch, CanonicalLog, ConformanceRequest, ConformanceResultV1, DatasetProfile,
+    DatasetView, DiscoveryRequest, EnhancementRequest, EnhancementResult, ExecutionPlan,
+    ExecutionStep, FitPredictionRequest, ModelArtifact, OcpmResult, PredictionRequest,
+    PredictionResult, QueryRequest, QueryResult,
 };
 use ocpm_local::LocalProvider;
 use ocpm_prediction::PredictionArtifact;
 use ocpm_provider::{OcpmProvider, ProviderCapability};
-use std::sync::Arc;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 pub use ocpm_io::CsvMapping;
 pub use ocpm_provider::{ExecutionMode, ProcessExecution};
@@ -112,7 +112,13 @@ impl Engine {
                 .zip(batch.events.lifecycle)
                 .zip(batch.events.attributes)
                 .map(
-                    |(((((((id, external_id), activity), timestamp), source), sequence), lifecycle), attributes)| {
+                    |(
+                        (
+                            (((((id, external_id), activity), timestamp), source), sequence),
+                            lifecycle,
+                        ),
+                        attributes,
+                    )| {
                         ocpm_core::Event {
                             id,
                             external_id,
@@ -162,12 +168,13 @@ impl Engine {
             relation_id = relation_id.checked_add(1).ok_or_else(|| {
                 ocpm_core::OcpmError::resource_limit("relation ID overflow", u64::MAX, u64::MAX)
             })?;
-            log.event_object_relations.push(ocpm_core::EventObjectRelation {
-                relation_id,
-                event_id,
-                object_id,
-                qualifier,
-            });
+            log.event_object_relations
+                .push(ocpm_core::EventObjectRelation {
+                    relation_id,
+                    event_id,
+                    object_id,
+                    qualifier,
+                });
         }
         for ((((source_object_id, target_object_id), qualifier), valid_from), valid_to) in batch
             .object_object_relations
@@ -181,14 +188,15 @@ impl Engine {
             relation_id = relation_id.checked_add(1).ok_or_else(|| {
                 ocpm_core::OcpmError::resource_limit("relation ID overflow", u64::MAX, u64::MAX)
             })?;
-            log.object_object_relations.push(ocpm_core::ObjectObjectRelation {
-                relation_id,
-                source_object_id,
-                target_object_id,
-                qualifier,
-                valid_from: valid_from.map(ocpm_core::Timestamp::from_epoch_nanos),
-                valid_to: valid_to.map(ocpm_core::Timestamp::from_epoch_nanos),
-            });
+            log.object_object_relations
+                .push(ocpm_core::ObjectObjectRelation {
+                    relation_id,
+                    source_object_id,
+                    target_object_id,
+                    qualifier,
+                    valid_from: valid_from.map(ocpm_core::Timestamp::from_epoch_nanos),
+                    valid_to: valid_to.map(ocpm_core::Timestamp::from_epoch_nanos),
+                });
         }
         log.object_attribute_history.extend(
             batch
@@ -198,14 +206,14 @@ impl Engine {
                 .zip(batch.object_attribute_history.name)
                 .zip(batch.object_attribute_history.valid_from_nanos_utc)
                 .zip(batch.object_attribute_history.value)
-                .map(|(((object_id, name), valid_from), value)| {
-                    ocpm_core::ObjectAttributeChange {
+                .map(
+                    |(((object_id, name), valid_from), value)| ocpm_core::ObjectAttributeChange {
                         object_id,
                         name,
                         valid_from: ocpm_core::Timestamp::from_epoch_nanos(valid_from),
                         value,
-                    }
-                }),
+                    },
+                ),
         );
         if batch.source_watermark.is_some() {
             log.source_watermark = batch.source_watermark;
@@ -263,10 +271,7 @@ impl Engine {
         ocpm_discovery::discover(self.provider.as_ref(), request)
     }
 
-    pub fn conformance(
-        &self,
-        request: &ConformanceRequest,
-    ) -> OcpmResult<ConformanceResultV1> {
+    pub fn conformance(&self, request: &ConformanceRequest) -> OcpmResult<ConformanceResultV1> {
         ocpm_conformance::check(self.provider.as_ref(), request)
     }
 
@@ -274,10 +279,7 @@ impl Engine {
         ocpm_enhancement::enhance(self.provider.as_ref(), request)
     }
 
-    pub fn fit_prediction(
-        &self,
-        request: &FitPredictionRequest,
-    ) -> OcpmResult<PredictionArtifact> {
+    pub fn fit_prediction(&self, request: &FitPredictionRequest) -> OcpmResult<PredictionArtifact> {
         ocpm_prediction::fit(self.provider.as_ref(), request)
     }
 
@@ -394,6 +396,9 @@ mod tests {
         };
         let engine = Engine::from_log(log).unwrap();
         assert_eq!(engine.provider_name(), "local");
-        assert_eq!(engine.profile(&DatasetView::default()).unwrap().event_count, 1);
+        assert_eq!(
+            engine.profile(&DatasetView::default()).unwrap().event_count,
+            1
+        );
     }
 }
