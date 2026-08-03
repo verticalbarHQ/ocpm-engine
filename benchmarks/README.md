@@ -212,11 +212,13 @@ python benchmarks/check_sap_pm4py_result.py \
   docs/results/sap-pm4py-three-way-0.9.0.json
 ```
 
-The environment switch changes only the ocpm-engine arm. `aggregate` remains
-the default because workloads already expressible as compact sufficient
-statistics should not be routed through an event export merely to improve a
-benchmark narrative. The factorized mode exists to measure general event-log
-consumers against the same vanilla PostgreSQL+PM4Py and pg_ocpm+PM4Py arms.
+The environment switch changes only the ocpm-engine arm. `auto` is the 1.0
+default: it dispatches DFG, variant, and edge-feature requests through the
+engine's public capability-aware APIs, selecting compact sufficient statistics
+when the provider advertises them and retaining the exact factorized fallback.
+`aggregate` is retained as the legacy SQL diagnostic, and `factorized` measures
+general event-log consumers against the same vanilla PostgreSQL+PM4Py and
+pg_ocpm+PM4Py arms.
 
 The relational index reduction is applied only after the main public benchmark
 finishes, so the two suites remain independent. The recorded report is

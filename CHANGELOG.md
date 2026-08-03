@@ -29,6 +29,10 @@ All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
 - Established a normative academic clean-room policy: algorithm logic cites
   peer-reviewed DOI sources; comparison libraries remain separately built
   black-box benchmark arms and are neither source nor runtime dependencies.
+- Made capability-aware `auto` routing the SAP release default, so the public
+  engine entry point selects general DFG, variant, or edge-feature sufficient
+  statistics and preserves the factorized fallback. The legacy expanded SQL
+  arm remains an explicitly named diagnostic rather than the 1.0 default.
 
 ## 0.10.0 - 2026-08-03
 

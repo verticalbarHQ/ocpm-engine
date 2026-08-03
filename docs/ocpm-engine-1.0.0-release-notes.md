@@ -19,6 +19,8 @@ typed requests can use data-local scans and sufficient-statistic pushdown.
   evaluation and feature-provenance metadata.
 - Canonical/OCEL JSON, CSV, XES, and SQLite I/O; JSON, DOT, PNML, and SVG model
   serialization; Rust and Python entry points.
+- Capability-aware routing is the default for release benchmarks and service
+  integrations; legacy expanded SQL remains diagnostic-only.
 
 ## Clean-room and compatibility boundary
 
