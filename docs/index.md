@@ -25,8 +25,8 @@ stable-ABI bindings that release the GIL during native work.
 - [Installation guide](https://github.com/verticalbarHQ/ocpm-engine/blob/main/INSTALL.md):
   private wheel registry, source builds, DuckDB requirement, and PostgreSQL
   setup with pg_ocpm
-- [API reference](api-reference.md): every public module and function with
-  example usages
+- [Module reference](api-reference.md): every public module with API and
+  function specs and example usages
 - [README](https://github.com/verticalbarHQ/ocpm-engine#readme): API examples
   for the standalone facade, compatibility API, and dynamic filters
 - Benchmarks: start with the

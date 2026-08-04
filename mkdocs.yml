@@ -53,7 +53,16 @@ nav:
   - Home: index.md
   - Installation: https://github.com/verticalbarHQ/ocpm-engine/blob/main/INSTALL.md
   - Getting started: getting-started.md
-  - API reference: api-reference.md
+  - Modules:
+      - Overview: api-reference.md
+      - standalone: modules/standalone.md
+      - engine: modules/engine.md
+      - analytics: modules/analytics.md
+      - event_batches: modules/event_batches.md
+      - bindings: modules/bindings.md
+      - models: modules/models.md
+      - queries: modules/queries.md
+      - dynamic_queries: modules/dynamic_queries.md
   - Benchmarks:
       - OCPQ strict result (1.0): ocpq-performance.md
       - OCPQ four-way comparison (1.0): ocpq-1.0-four-way-comparison.md

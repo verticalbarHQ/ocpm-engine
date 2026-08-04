@@ -39,7 +39,7 @@ model = engine.discover(
 
 XES and SQLite loaders follow the same pattern (`from_xes`, `from_sqlite`);
 the full constructor and method surface is in the
-[API reference](api-reference.md).
+[standalone module reference](modules/standalone.md).
 
 ## 3. Score conformance from compact aggregates
 
