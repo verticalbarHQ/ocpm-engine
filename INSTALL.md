@@ -145,7 +145,11 @@ from ocpm_engine import StandaloneEngine
 
 engine = StandaloneEngine.from_duckdb_parquet(
     {
-        "database": {"kind": "existing", "path": "/catalog/analytics.duckdb", "read_only": True},
+        "database": {
+            "kind": "existing",
+            "path": "/catalog/analytics.duckdb",
+            "read_only": True,
+        },
         "location": {"kind": "local", "root": "/data/ocel-parquet"},
         "snapshot": {"kind": "current", "pointer": "CURRENT"},
         "layout": {"kind": "canonical_v1"},
