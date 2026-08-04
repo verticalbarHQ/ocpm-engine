@@ -14,6 +14,9 @@ Legacy PostgreSQL planner compatibility: Required extension version: `pg_ocpm >=
 
 Current engine version: **1.1.0**. See the [release notes](CHANGELOG.md) and
 [academic implementation provenance](docs/academic-implementation-provenance.md).
+OCPA, Rust4PM, and PM4Py are isolated as benchmark references under the
+[production dependency boundary](docs/dependency-boundary.md). OCPQ appears
+only in the archived benchmark results; no OCPQ benchmark code is supplied.
 
 ## Native capabilities
 
@@ -143,6 +146,16 @@ exactness, concurrency, process RSS, storage, conversion, and connection-open
 boundaries.
 
 ## Install
+
+The complete installation guide, covering the private wheel registry, source
+builds, the external DuckDB requirement, and PostgreSQL setup with
+[`pg_ocpm`](https://github.com/verticalbarHQ/pg_ocpm), is in
+[INSTALL.md](INSTALL.md).
+
+Authorized binary releases are installed from the private wheel registry. The
+wheel-only procedure, external DuckDB requirement, and registry controls are in
+[`docs/private-distribution.md`](docs/private-distribution.md). Public PyPI and
+npm are not release channels for this package.
 
 ```sh
 python -m pip install .
@@ -364,10 +377,24 @@ Application-only response decoration, authorization, labels, and external
 record URLs should remain in the API service. New server-side primitives belong
 in `pg_ocpm` only when they are useful across OCPM workloads.
 
-## Project status and licensing
+## License and contributions
 
-The dependency graph is locked and license-gated; see
-[third-party notices](THIRD_PARTY_NOTICES.md). This repository currently grants
-no open-source license. The
+Copyright 2026 [Vertical Bar, Inc.](https://vertical.bar).
+
+Licensed under the [Apache License, Version 2.0](LICENSE). The Apache license
+permits commercial use and redistribution subject to its terms. It does not
+grant trademark rights or support obligations. The dependency graph is locked
+and license-gated; see [NOTICE](NOTICE), the
+[third-party notices](THIRD_PARTY_NOTICES.md), and the generated
+[dependency license bundle](THIRD_PARTY_LICENSES.html).
+
+Contributions require the applicable [Contributor License Agreement](CLA.md),
+which allows Vertical Bar, Inc. to keep the public project Apache-2.0 and offer
+separately licensed commercial editions.
+
+See [governance](GOVERNANCE.md), the [code of conduct](CODE_OF_CONDUCT.md),
+[security policy](SECURITY.md), and [first public-release strategy](docs/open-source-release.md).
+
+The
 [prior-art and ICPM roadmap](docs/prior-art-and-icpm-roadmap.md) separates known
 prior work from candidate research contributions and required evidence.

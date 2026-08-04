@@ -1,0 +1,73 @@
+site_name: ocpm-engine
+site_description: Standalone Rust-first object-centric process-mining engine
+site_url: https://verticalbarhq.github.io/ocpm-engine/
+repo_url: https://github.com/verticalbarHQ/ocpm-engine
+repo_name: verticalbarHQ/ocpm-engine
+copyright: Copyright 2026 Vertical Bar, Inc. Licensed under Apache-2.0.
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: black
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+exclude_docs: |
+  results/
+  open-source-patent-icpm-assessment.md
+  prior-art-and-icpm-roadmap.md
+  ocpm-mcp-feasibility.md
+
+nav:
+  - Home: index.md
+  - Installation: https://github.com/verticalbarHQ/ocpm-engine/blob/main/INSTALL.md
+  - Benchmarks:
+      - OCPQ strict result (1.0): ocpq-performance.md
+      - OCPQ four-way comparison (1.0): ocpq-1.0-four-way-comparison.md
+      - SAP O2C/P2P three-way (1.0): sap-pm4py-three-way-performance.md
+      - SAP O2C/P2P four-way with DuckDB (1.1): duckdb-sap-pm4py-four-way-performance.md
+      - Rust4PM comparison (1.1): duckdb-vs-rust4pm-performance.md
+      - OCPA comparison (1.1): duckdb-vs-ocpa-performance.md
+      - Rust4PM vs pg_ocpm + engine (1.0): rust4pm-vs-pg-ocpm-engine.md
+      - OCPA vs pg_ocpm + engine (1.0): ocpa-vs-pg-ocpm-engine.md
+      - Common public workloads (0.8): public-common-pm-performance.md
+      - 0.9 full benchmark: ocpm-engine-0.9-full-benchmark.md
+      - 0.9 performance: ocpm-engine-0.9-performance.md
+      - OCPQ 0.9 four-way: ocpq-0.9-four-way-comparison.md
+  - Design:
+      - 1.0.0 specification: ocpm-engine-1.0.0-spec.md
+      - DuckDB Parquet provider spec: duckdb-parquet-provider-spec.md
+      - Process-mining capability map: process-mining-capability-map.md
+      - pg_ocpm 0.10 general aggregation: pg-ocpm-0.10-general-aggregation.md
+      - Application query performance: technical-performance-improvements.md
+  - Releases:
+      - 1.0.0 release notes: ocpm-engine-1.0.0-release-notes.md
+  - Project:
+      - Academic implementation provenance: academic-implementation-provenance.md
+      - Production dependency boundary: dependency-boundary.md
+      - Private wheel distribution: private-distribution.md
+      - Open-source release strategy: open-source-release.md
