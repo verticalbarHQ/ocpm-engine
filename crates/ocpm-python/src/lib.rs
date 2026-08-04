@@ -698,7 +698,7 @@ fn decode_binding_pair_groups(
 
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add("__version__", "1.0.0")?;
+    module.add("__version__", "1.1.0")?;
     module.add_function(wrap_pyfunction!(dfg_conformance, module)?)?;
     module.add_function(wrap_pyfunction!(next_activity, module)?)?;
     module.add_function(wrap_pyfunction!(variant_conformance, module)?)?;
