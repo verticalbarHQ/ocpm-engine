@@ -189,7 +189,6 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
         )
     )
     limitations = [
-        "This common-workload suite is separate from strict OCPQ Q1-Q7.",
         "Import, snapshot conversion, process startup, and connection startup are excluded from steady-state latency and reported by each arm.",
         "Concurrency uses each architecture's normal scalable service model; memory is reported per arm and is not normalized into an artificial single runtime.",
         "The results apply to the declared fixed workloads and do not imply the same ratio for arbitrary dynamic queries.",

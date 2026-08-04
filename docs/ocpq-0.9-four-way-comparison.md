@@ -41,24 +41,8 @@ versus native-engine artifact passes all strict publication gates. See the
 [full benchmark](ocpm-engine-0.9-full-benchmark.md) for concurrency, memory,
 storage, SAP generalization, and dynamic-query limits.
 
-## Verify
+## Archival status
 
-```bash
-python3 benchmarks/check_ocpq_four_way.py \
-  .benchmarks/ocpq-reproduced-strict-all-node-0.9-final.json \
-  .benchmarks/ocpq-vanilla-pg-pm4py-0.9-final.json \
-  .benchmarks/ocpq-pg_ocpm-0.9-pm4py-final.json \
-  .benchmarks/ocpq-bpic2017-pg_ocpm-0.9.0-ocpm-engine-0.9.0-final.json \
-  --reference-sha256 39894339697421834a652620406152c87a92b08831c3a68dc3f30acd6dc77964 \
-  --vanilla-sha256 12ae7b81f6b67d075b7d491f29fde4e2868f87c8c31828400ee2489c8e83e036 \
-  --pg-pm4py-sha256 a460e2145d8966def16fa5672e4e9f186572d83226ec1a39ea5b68b382be721a \
-  --engine-sha256 317af340bff890551c1dfcafe0e0fc8777ade938865173362d56d20073222f1e \
-  --pm4py-runner ../pg_ocpm/benchmarks/ocpq_pm4py.py \
-  --pm4py-runner-sha256 a431ed3ac827fb86011ddda60c33aeaa9d304a7836800168750cb923ef925486
-```
-
-The strict release verification is:
-
-```bash
-python3 benchmarks/check_ocpq_result.py
-```
+This report and its published result artifacts are retained as historical
+evidence only. The repository no longer supplies the OCPQ benchmark runner,
+checker, adapter, dataset loader, image builder, or reproduction commands.

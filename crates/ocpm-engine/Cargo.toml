@@ -4,6 +4,8 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
+license.workspace = true
+repository.workspace = true
 description = "Standalone object-centric process-mining engine and provider facade"
 publish = false
 

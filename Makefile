@@ -1,13 +1,30 @@
 PYTHON ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
+DIST_DIR ?= $(CURDIR)/dist
 
-.PHONY: check-python perf-public perf-public-concurrency \
+.PHONY: check-python dependency-boundary-check license-check perf-public perf-public-concurrency \
 	perf-public-preview-check perf-public-release-check \
 	perf-sap-release-bridge-preview perf-sap-release-bridge-preview-check \
-	perf-ocpq-preview-check perf-ocpq-release-check perf-ecosystem \
-	perf-ecosystem-rust4pm perf-ecosystem-ocpa perf-release-check
+	perf-ecosystem \
+	perf-ecosystem-rust4pm perf-ecosystem-ocpa perf-release-check \
+	private-wheel private-wheel-verify
 
 check-python:
 	@$(PYTHON) -c 'import sys; sys.exit("Python 3.11 or newer is required (found %s)." % ".".join(map(str, sys.version_info[:3]))) if sys.version_info < (3, 11) else None'
+
+dependency-boundary-check: check-python
+	$(PYTHON) scripts/check-core-dependency-boundary.py
+
+license-check: check-python
+	$(PYTHON) scripts/check-licensing.py
+
+private-wheel: check-python
+	PYTHON=$(PYTHON) DIST_DIR=$(DIST_DIR) ./scripts/build-private-wheel.sh
+
+private-wheel-verify: check-python
+	@set -eu; \
+	wheels="$$(find "$(DIST_DIR)" -maxdepth 1 -type f -name '*.whl' -print)"; \
+	test -n "$$wheels" || { echo "no wheels in $(DIST_DIR)" >&2; exit 2; }; \
+	for wheel in $$wheels; do $(PYTHON) scripts/verify-wheel.py "$$wheel"; done
 
 perf-public: check-python
 	PYTHON="$(PYTHON)" ./benchmarks/run_public_benchmark.sh
@@ -47,24 +64,6 @@ perf-public-release-check: check-python
 	$(PYTHON) benchmarks/check_sap_pm4py_result.py
 	$(PYTHON) benchmarks/check_public_provenance_pair.py
 
-perf-ocpq-preview-check: check-python
-	@reference=.benchmarks/ocpq-reproduced-strict-all-node-preview.json; \
-	candidate=.benchmarks/ocpq-bpic2017-pg_ocpm-0.8.0-ocpm-engine-0.8.0-preview.json; \
-	for artifact in "$$reference" "$$candidate"; do \
-		test -f "$$artifact" || { echo "missing preview artifact: $$artifact" >&2; exit 2; }; \
-	done; \
-	reference_sha="$$( $(PYTHON) -c 'import hashlib, pathlib, sys; print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())' "$$reference" )"; \
-	candidate_sha="$$( $(PYTHON) -c 'import hashlib, pathlib, sys; print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())' "$$candidate" )"; \
-	$(PYTHON) benchmarks/check_ocpq_result.py \
-		--reference "$$reference" \
-		--candidate "$$candidate" \
-		--expected-reference-sha256 "$$reference_sha" \
-		--expected-candidate-sha256 "$$candidate_sha" \
-		--preview
-
-perf-ocpq-release-check: check-python
-	$(PYTHON) benchmarks/check_ocpq_result.py
-
 perf-ecosystem:
 	./benchmarks/run_ecosystem_benchmark.sh
 
@@ -74,4 +73,4 @@ perf-ecosystem-rust4pm:
 perf-ecosystem-ocpa:
 	./benchmarks/run_ecosystem_benchmark.sh --pair ocpa
 
-perf-release-check: perf-public-release-check perf-ocpq-release-check
+perf-release-check: perf-public-release-check

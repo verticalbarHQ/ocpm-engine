@@ -1,0 +1,3 @@
+# Benchmark-client dependency only. OCPA itself is installed separately from
+# its exact checksum-verified wheel in Dockerfile.ocpa.
+ocpa==1.3.4

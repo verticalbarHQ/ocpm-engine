@@ -1,30 +1,9 @@
 # Performance regression suites
 
-The public suite also includes the BPIC 2017-derived Q1-Q7 comparison with a
-same-host OCPQ reproduction. The corrected protocol uses zero warmups and ten
-measured runs per query on both sides and requires duplicate-preserving parity
-for every evaluation-tree node, not only the root. Author-published timings are
-source context only; no cross-host ratio is calculated. See
-[`ocpq/README.md`](ocpq/README.md). The reviewed 0.9.0 artifacts pass every
-latency, memory, storage, concurrency, correctness, and provenance gate and are
-published under `docs/results/`.
-
-The descriptive 0.9 four-way comparison has a separate fail-closed verifier at
-`check_ocpq_four_way.py`. It requires explicit SHA-256 pins for the corrected
-OCPQ reference, vanilla PostgreSQL plus PM4Py, `pg_ocpm` plus PM4Py, the strict
-engine artifact, and the PM4Py runner. The full invocation and clean artifact
-digests are recorded in
-[`docs/ocpq-0.9-four-way-comparison.md`](../docs/ocpq-0.9-four-way-comparison.md).
-Passing that verifier does not promote the four-way table: the PM4Py arms use a
-different evaluator boundary and omit a cross-arm host identity. The clean
-native-engine artifact separately passes the strict release checker.
-
-The clean 0.9 engine artifact passes the official strict release checker with
-explicit immutable digests:
-
-```sh
-python3 benchmarks/check_ocpq_result.py
-```
+Previously published OCPQ comparison results remain under `docs/` and
+`docs/results/` as archival evidence. This repository intentionally supplies no
+OCPQ runner, checker, adapter, dataset loader, image builder, or reproduction
+instructions. OCPQ is not part of the executable benchmark suite.
 
 All local checker targets require Python 3.11 or newer. They use
 `.venv/bin/python` when that environment exists, otherwise `python3`. Override
@@ -145,13 +124,10 @@ expected payload digest pins and report links, and run:
 make perf-public-release-check
 ```
 
-`make perf-release-check` runs the published SAP and OCPQ checks together. The
-1.0 SAP release artifact is
-`docs/results/sap-pm4py-three-way-1.0.0.json`; the strict OCPQ release pair is
-`docs/results/ocpq-reproduced-strict-all-node-1.0.0.json` and
-`docs/results/ocpq-bpic2017-pg_ocpm-1.0.0-ocpm-engine-1.0.0.json`. Release
-checks read only committed public artifacts and enforce their pinned file or
-payload digests; they do not accept ignored preview evidence.
+`make perf-release-check` runs the published SAP checks. The 1.0 SAP release
+artifact is `docs/results/sap-pm4py-three-way-1.0.0.json`. Release checks read
+only committed public artifacts and enforce their pinned file or payload
+digests; they do not accept ignored preview evidence.
 
 Concurrency uses one persistent PostgreSQL connection per prestarted worker.
 Each engine/level arm runs three independent epochs; every epoch must include an
@@ -247,9 +223,9 @@ environment, method, generated-summary, or dependency-footprint values.
 
 ## Rust4PM and OCPA ecosystem pairs
 
-The ecosystem suite is separate from both SAP and strict OCPQ. It runs four
-fixed object-centric workloads against each competitor and pg_ocpm +
-ocpm-engine using that competitor project's own upstream OCEL 2.0 dataset:
+The ecosystem suite is separate from SAP. It runs four fixed object-centric
+workloads against each competitor and pg_ocpm + ocpm-engine using that
+competitor project's own upstream OCEL 2.0 dataset:
 
 ```sh
 make perf-ecosystem
@@ -289,12 +265,8 @@ canonical answer hash. DuckDB cached and cache-disabled samples are distinct;
 conversion and connection/materialization time are excluded from steady-state
 latency and reported separately.
 
-The strict OCPQ Q1-Q7 suite is not relabeled as a DuckDB comparison. Its public
-contract measures every intermediate node of OCPQ's evaluation tree through a
-PostgreSQL binding-capsule protocol, while the provider-neutral engine API does
-not expose that intermediate tree. The existing clean OCPQ-versus-PostgreSQL
-evidence remains the valid comparison until a source-neutral all-node contract
-exists; substituting root-level engine answers would weaken the exactness gate.
+The archived OCPQ result is not relabeled as a DuckDB comparison and has no
+runnable benchmark integration in this repository.
 
 Published reports and retained raw evidence:
 

@@ -20,7 +20,9 @@ resolver = "2"
 version = "1.1.0"
 edition = "2024"
 rust-version = "1.85.1"
-authors = ["ocpm-engine contributors"]
+authors = ["Daniel Sol Eun"]
+license = "Apache-2.0"
+repository = "https://github.com/verticalbarHQ/ocpm-engine"
 
 [workspace.dependencies]
 ocpm-core = { path = "crates/ocpm-core", version = "1.1.0" }

@@ -1,0 +1,5 @@
+# Benchmark-client dependencies only. These packages are never installed by
+# the ocpm-engine package or any production build.
+pm4py==2.7.23.3
+psutil==7.2.2
+psycopg2-binary==2.9.12

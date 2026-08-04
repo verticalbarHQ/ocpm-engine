@@ -4,6 +4,8 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
+license.workspace = true
+repository.workspace = true
 description = "Independent process and object-centric conformance kernels"
 publish = false
 
@@ -11,4 +13,3 @@ publish = false
 ocpm-core.workspace = true
 ocpm-provider.workspace = true
 serde_json.workspace = true
-

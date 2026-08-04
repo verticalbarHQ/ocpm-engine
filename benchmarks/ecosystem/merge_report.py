@@ -171,10 +171,6 @@ def build_result(
     )
     limitations = [
         (
-            "This is a shared workload benchmark, not OCPQ Q1-Q7. The strict "
-            "OCPQ benchmark remains a separate artifact."
-        ),
-        (
             "Steady-state latency excludes one-time OCEL import, PostgreSQL "
             "fixture preparation, process startup, and worker startup; those "
             "costs and resident memory are reported separately."
@@ -224,7 +220,6 @@ def build_result(
         "publication_ready": (
             engine_clean and pg_ocpm_clean and native_importers_succeeded
         ),
-        "strict_ocpq_suite_modified": False,
         "contract": manifest["contract"],
         "source": manifest["source"],
         "datasets": manifest["datasets"],
@@ -302,11 +297,6 @@ def render_report(result: dict[str, Any], competitor_name: str) -> str:
             "pg_ocpm + ocpm-engine had a "
             f"{result['summary']['engine_p50_geometric_mean_speedup']:.3f}x "
             f"geometric-mean p50 speedup over {display}."
-        ),
-        "",
-        (
-            "This is the separate `ecosystem-common-pm` suite. It does not add "
-            "Rust4PM or OCPA cells to the strict OCPQ Q1-Q7 benchmark."
         ),
         "",
         (

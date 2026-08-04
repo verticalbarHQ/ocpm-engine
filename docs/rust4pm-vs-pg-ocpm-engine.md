@@ -4,8 +4,6 @@
 
 All 4 answer cells passed exact equality. On `rust4pm_p2p` and the four fixed workloads, pg_ocpm + ocpm-engine had a 2.160x geometric-mean p50 speedup over Rust4PM.
 
-This is the separate `ecosystem-common-pm` suite. It does not add Rust4PM or OCPA cells to the strict OCPQ Q1-Q7 benchmark.
-
 Publication status: ready.
 
 The engine had higher DFG-conformance throughput at every measured concurrency level and delivered 1.287x to 1.542x Rust4PM throughput.
@@ -69,7 +67,6 @@ The measured competitor arm uses the project's public native data model. Its per
 
 ## Interpretation boundaries
 
-- This is a shared workload benchmark, not OCPQ Q1-Q7. The strict OCPQ benchmark remains a separate artifact.
 - Steady-state latency excludes one-time OCEL import, PostgreSQL fixture preparation, process startup, and worker startup; those costs and resident memory are reported separately.
 - Each ecosystem uses its normal scalable service model: Rust4PM shares an immutable log across threads, OCPA uses preloaded forked processes, and ocpm-engine uses process workers with persistent PostgreSQL connections. Concurrency memory is therefore architectural, not a same-runtime microbenchmark.
 - Each pair uses that competitor project's own upstream OCEL 2.0 dataset. The Rust4PM and OCPA reports therefore must not be compared as if they used the same input data.

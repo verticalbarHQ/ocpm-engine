@@ -1,23 +1,30 @@
 [build-system]
-requires = ["maturin>=1.9,<2"]
+requires = ["maturin==1.14.1"]
 build-backend = "maturin"
 
 [project]
 name = "ocpm-engine"
 version = "1.1.0"
-description = "Rust-first process-mining companion library for pg_ocpm"
+description = "Standalone Rust-first object-centric process-mining engine"
 readme = "README.md"
 requires-python = ">=3.11"
-authors = [{ name = "ocpm-engine contributors" }]
+authors = [{ name = "Daniel Sol Eun" }]
+license = "Apache-2.0"
+license-files = [
+    "LICENSE",
+    "NOTICE",
+    "COPYRIGHT.md",
+    "THIRD_PARTY_NOTICES.md",
+    "THIRD_PARTY_LICENSES.html",
+]
 dependencies = []
+
+[project.urls]
+Homepage = "https://vertical.bar"
+Repository = "https://github.com/verticalbarHQ/ocpm-engine"
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<9", "ruff>=0.9,<1"]
-benchmark = [
-    "pm4py==2.7.23.3",
-    "psutil==7.2.2",
-    "psycopg2-binary==2.9.12",
-]
 
 [tool.maturin]
 manifest-path = "crates/ocpm-python/Cargo.toml"

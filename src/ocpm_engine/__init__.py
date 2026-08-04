@@ -1,5 +1,6 @@
 """Standalone Rust-first object-centric process-mining engine."""
 
+from . import _native as _native
 from .analytics import (
     ConformanceScore,
     DriftContributor,
@@ -57,6 +58,8 @@ from .models import (
 )
 from .standalone import StandaloneEngine, serialize_model
 
+__version__ = _native.__version__
+
 __all__ = [
     "BindingIndexCoverage",
     "BindingNeighborCoverage",
@@ -108,4 +111,5 @@ __all__ = [
     "summarize_event_batch_rows",
     "summarize_event_window_batch_rows",
     "variant_conformance",
+    "__version__",
 ]

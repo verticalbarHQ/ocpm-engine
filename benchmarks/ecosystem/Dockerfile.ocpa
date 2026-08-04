@@ -7,13 +7,15 @@ ARG OCPA_WHEEL_SHA256=52e8208d5ef8633060b905441498aa8b53e0322bf7a310c5a5deb49500
 COPY benchmarks/ecosystem/requirements.ocpa.lock /tmp/requirements.ocpa.lock
 RUN python -m pip download --no-deps --dest /tmp/ocpa "ocpa==${OCPA_VERSION}" \
     && echo "${OCPA_WHEEL_SHA256}  /tmp/ocpa/ocpa-${OCPA_VERSION}-py3-none-any.whl" | sha256sum -c - \
-    && python -m pip install --no-cache-dir --requirement /tmp/requirements.ocpa.lock \
+    && python -m pip install --no-cache-dir --require-hashes --requirement /tmp/requirements.ocpa.lock \
     && python -m pip install --no-cache-dir --no-deps /tmp/ocpa/*.whl \
     && python -m pip check \
     && rm -rf /tmp/ocpa
 
 WORKDIR /workspace
-COPY benchmarks ./benchmarks
+RUN mkdir -p benchmarks/ecosystem
+COPY benchmarks/__init__.py ./benchmarks/__init__.py
+COPY benchmarks/ecosystem/__init__.py benchmarks/ecosystem/common.py benchmarks/ecosystem/ocpa_arm.py ./benchmarks/ecosystem/
 LABEL org.opencontainers.image.revision="${CONTROLLER_REVISION}" \
       org.opencontainers.image.ocpa.version="${OCPA_VERSION}" \
       org.opencontainers.image.ocpa.wheel-sha256="${OCPA_WHEEL_SHA256}"

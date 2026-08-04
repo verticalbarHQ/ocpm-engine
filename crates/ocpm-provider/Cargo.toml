@@ -4,10 +4,11 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
+license.workspace = true
+repository.workspace = true
 description = "Source-neutral provider contract for ocpm-engine"
 publish = false
 
 [dependencies]
 ocpm-core.workspace = true
 serde.workspace = true
-

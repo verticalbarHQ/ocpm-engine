@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+"""Regenerate the runtime dependency license bundle with cargo-about 0.8.4."""
+
+from __future__ import annotations
+
+import hashlib
+import pathlib
+import subprocess
+import tempfile
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+INPUTS = ("Cargo.lock", "about.toml", "about.hbs")
+EXPECTED_VERSION = "cargo-about 0.8.4"
+
+
+def input_digest() -> str:
+    digest = hashlib.sha256()
+    for name in INPUTS:
+        digest.update((ROOT / name).read_bytes())
+    return digest.hexdigest()
+
+
+def main() -> None:
+    version = subprocess.run(
+        ["cargo", "about", "--version"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    if version != EXPECTED_VERSION:
+        raise SystemExit(f"{EXPECTED_VERSION} is required, found {version!r}")
+
+    with tempfile.TemporaryDirectory(prefix="ocpm-licenses-") as temp_dir:
+        generated = pathlib.Path(temp_dir, "THIRD_PARTY_LICENSES.html")
+        with generated.open("wb") as output:
+            subprocess.run(
+                ["cargo", "about", "generate", "about.hbs"],
+                cwd=ROOT,
+                check=True,
+                stdout=output,
+            )
+        rendered = generated.read_text(encoding="utf-8")
+        generated.write_text(
+            "\n".join(line.rstrip() for line in rendered.splitlines()) + "\n",
+            encoding="utf-8",
+        )
+        generated.replace(ROOT / "THIRD_PARTY_LICENSES.html")
+    (ROOT / "THIRD_PARTY_LICENSES_INPUT.sha256").write_text(
+        input_digest() + "\n",
+        encoding="ascii",
+    )
+    print("regenerated THIRD_PARTY_LICENSES.html")
+
+
+if __name__ == "__main__":
+    main()
