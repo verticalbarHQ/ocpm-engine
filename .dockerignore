@@ -7,6 +7,8 @@ __pycache__
 build
 dist
 target
+**/target
+**/__pycache__
 *.egg-info
 *.pyc
 *.so

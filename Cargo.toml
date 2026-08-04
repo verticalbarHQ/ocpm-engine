@@ -4,6 +4,7 @@ members = [
     "crates/ocpm-io",
     "crates/ocpm-provider",
     "crates/ocpm-local",
+    "crates/ocpm-duckdb",
     "crates/ocpm-query",
     "crates/ocpm-discovery",
     "crates/ocpm-conformance",
@@ -16,24 +17,29 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "1.0.0"
+version = "1.1.0"
 edition = "2024"
 rust-version = "1.85"
 authors = ["ocpm-engine contributors"]
 
 [workspace.dependencies]
-ocpm-core = { path = "crates/ocpm-core", version = "1.0.0" }
-ocpm-provider = { path = "crates/ocpm-provider", version = "1.0.0" }
-ocpm-local = { path = "crates/ocpm-local", version = "1.0.0" }
-ocpm-query = { path = "crates/ocpm-query", version = "1.0.0" }
-ocpm-discovery = { path = "crates/ocpm-discovery", version = "1.0.0" }
-ocpm-conformance = { path = "crates/ocpm-conformance", version = "1.0.0" }
-ocpm-enhancement = { path = "crates/ocpm-enhancement", version = "1.0.0" }
-ocpm-prediction = { path = "crates/ocpm-prediction", version = "1.0.0" }
-ocpm-engine = { path = "crates/ocpm-engine", version = "1.0.0" }
-ocpm-postgres = { path = "crates/ocpm-postgres", version = "1.0.0" }
+ocpm-core = { path = "crates/ocpm-core", version = "1.1.0" }
+ocpm-provider = { path = "crates/ocpm-provider", version = "1.1.0" }
+ocpm-local = { path = "crates/ocpm-local", version = "1.1.0" }
+ocpm-duckdb = { path = "crates/ocpm-duckdb", version = "1.1.0" }
+ocpm-query = { path = "crates/ocpm-query", version = "1.1.0" }
+ocpm-discovery = { path = "crates/ocpm-discovery", version = "1.1.0" }
+ocpm-conformance = { path = "crates/ocpm-conformance", version = "1.1.0" }
+ocpm-enhancement = { path = "crates/ocpm-enhancement", version = "1.1.0" }
+ocpm-prediction = { path = "crates/ocpm-prediction", version = "1.1.0" }
+ocpm-engine = { path = "crates/ocpm-engine", version = "1.1.0" }
+ocpm-postgres = { path = "crates/ocpm-postgres", version = "1.1.0" }
 chrono = { version = "0.4.42", default-features = false, features = ["clock", "std"] }
+chrono-tz = "0.10.4"
 csv = "1.4.0"
+# Dynamically linked against a caller-supplied DuckDB 1.5.5 client library.
+# ocpm-engine must not compile or embed DuckDB.
+duckdb = { version = "~1.10505.0" }
 quick-xml = "0.41.0"
 rusqlite = { version = "0.37.0", features = ["bundled"] }
 serde = { version = "1.0.228", features = ["derive"] }

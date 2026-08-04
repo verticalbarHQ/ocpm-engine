@@ -77,6 +77,14 @@ class StandaloneEngine:
         instance._native = _extension().from_sqlite(str(path))
         return instance
 
+    @classmethod
+    def from_duckdb_parquet(cls, source: JsonObject) -> StandaloneEngine:
+        """Open local or S3 Parquet through a supplied DuckDB installation."""
+
+        instance = cls.__new__(cls)
+        instance._native = _extension().from_duckdb_parquet(_encode(source))
+        return instance
+
     @property
     def provider_name(self) -> str:
         return self._native.provider_name()
@@ -110,6 +118,25 @@ class StandaloneEngine:
 
     def write_sqlite(self, path: str | Path, view: JsonObject | None = None) -> None:
         self._native.write_sqlite(_encode(view or {}), str(path))
+
+    def write_parquet_snapshot(
+        self,
+        root: str | Path,
+        version: str,
+        view: JsonObject | None = None,
+    ) -> dict[str, Any]:
+        """Write a new immutable canonical Parquet snapshot and CURRENT pointer."""
+
+        return self._result(
+            self._native.write_parquet_snapshot(
+                _encode(view or {}), str(root), version
+            )
+        )
+
+    def execution_summary(self, request: JsonObject) -> dict[str, Any]:
+        """Return exact compact lifecycle, variant, DFG, and activity statistics."""
+
+        return self._result(self._native.execution_summary_json(_encode(request)))
 
     def discover(self, request: JsonObject) -> dict[str, Any]:
         return self._result(self._native.discover_json(_encode(request)))

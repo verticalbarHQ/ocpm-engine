@@ -13,7 +13,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 ocpm-core.workspace = true
-ocpm-engine.workspace = true
+ocpm-engine = { workspace = true, features = ["duckdb-s3"] }
 ocpm-provider.workspace = true
 pyo3 = { version = "0.29.0", features = ["extension-module", "abi3-py311"] }
 serde.workspace = true

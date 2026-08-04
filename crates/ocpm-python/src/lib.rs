@@ -9,7 +9,7 @@ use ocpm_core::{
     variant_frequency_conformance,
 };
 use ocpm_engine::Engine;
-use ocpm_provider::ProviderCapability;
+use ocpm_provider::{ExecutionSummaryRequest, ProviderCapability};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
@@ -57,30 +57,52 @@ struct PyStandaloneEngine {
 #[pymethods]
 impl PyStandaloneEngine {
     #[new]
-    fn new(canonical_json: &str) -> PyResult<Self> {
+    fn new(py: Python<'_>, canonical_json: &str) -> PyResult<Self> {
+        let canonical_json = canonical_json.as_bytes().to_vec();
         Ok(Self {
-            engine: Engine::from_canonical_json(canonical_json.as_bytes()).map_err(json_error)?,
+            engine: py
+                .detach(move || Engine::from_canonical_json(std::io::Cursor::new(canonical_json)))
+                .map_err(json_error)?,
         })
     }
 
     #[staticmethod]
-    fn from_ocel2_json(ocel2_json: &str) -> PyResult<Self> {
+    fn from_ocel2_json(py: Python<'_>, ocel2_json: &str) -> PyResult<Self> {
+        let ocel2_json = ocel2_json.as_bytes().to_vec();
         Ok(Self {
-            engine: Engine::from_ocel2_json(ocel2_json.as_bytes()).map_err(json_error)?,
+            engine: py
+                .detach(move || Engine::from_ocel2_json(std::io::Cursor::new(ocel2_json)))
+                .map_err(json_error)?,
         })
     }
 
     #[staticmethod]
-    fn from_xes(xes: &str) -> PyResult<Self> {
+    fn from_xes(py: Python<'_>, xes: &str) -> PyResult<Self> {
+        let xes = xes.as_bytes().to_vec();
         Ok(Self {
-            engine: Engine::from_xes(std::io::Cursor::new(xes.as_bytes())).map_err(json_error)?,
+            engine: py
+                .detach(move || Engine::from_xes(std::io::Cursor::new(xes)))
+                .map_err(json_error)?,
         })
     }
 
     #[staticmethod]
-    fn from_sqlite(path: &str) -> PyResult<Self> {
+    fn from_sqlite(py: Python<'_>, path: &str) -> PyResult<Self> {
+        let path = path.to_owned();
         Ok(Self {
-            engine: Engine::from_sqlite(path).map_err(json_error)?,
+            engine: py
+                .detach(move || Engine::from_sqlite(path))
+                .map_err(json_error)?,
+        })
+    }
+
+    #[staticmethod]
+    fn from_duckdb_parquet(py: Python<'_>, source_json: &str) -> PyResult<Self> {
+        let source: ocpm_engine::DuckDbParquetSource = parse_json(source_json)?;
+        Ok(Self {
+            engine: py
+                .detach(move || Engine::from_duckdb_parquet(source))
+                .map_err(json_error)?,
         })
     }
 
@@ -98,75 +120,129 @@ impl PyStandaloneEngine {
         encode_json(&self.engine.capabilities())
     }
 
-    fn profile_json(&self, view_json: &str) -> PyResult<String> {
+    fn profile_json(&self, py: Python<'_>, view_json: &str) -> PyResult<String> {
         let view: DatasetView = parse_json(view_json)?;
-        encode_json(&self.engine.profile(&view).map_err(json_error)?)
+        let result = py
+            .detach(|| self.engine.profile(&view))
+            .map_err(json_error)?;
+        encode_json(&result)
     }
 
-    fn query_json(&self, request_json: &str) -> PyResult<String> {
+    fn query_json(&self, py: Python<'_>, request_json: &str) -> PyResult<String> {
         let request: QueryRequest = parse_json(request_json)?;
-        encode_json(&self.engine.query(&request).map_err(json_error)?)
+        let result = py
+            .detach(|| self.engine.query(&request))
+            .map_err(json_error)?;
+        encode_json(&result)
     }
 
-    fn canonical_json(&self, view_json: &str) -> PyResult<String> {
+    fn canonical_json(&self, py: Python<'_>, view_json: &str) -> PyResult<String> {
         let view: DatasetView = parse_json(view_json)?;
-        let mut output = Vec::new();
-        self.engine
-            .write_canonical_json(&mut output, &view)
+        let output = py
+            .detach(|| {
+                let mut output = Vec::new();
+                self.engine.write_canonical_json(&mut output, &view)?;
+                Ok::<_, ocpm_core::OcpmError>(output)
+            })
             .map_err(json_error)?;
         String::from_utf8(output).map_err(json_error)
     }
 
-    fn ocel2_json(&self, view_json: &str) -> PyResult<String> {
+    fn ocel2_json(&self, py: Python<'_>, view_json: &str) -> PyResult<String> {
         let view: DatasetView = parse_json(view_json)?;
-        let mut output = Vec::new();
-        self.engine
-            .write_ocel2_json(&mut output, &view)
+        let output = py
+            .detach(|| {
+                let mut output = Vec::new();
+                self.engine.write_ocel2_json(&mut output, &view)?;
+                Ok::<_, ocpm_core::OcpmError>(output)
+            })
             .map_err(json_error)?;
         String::from_utf8(output).map_err(json_error)
     }
 
-    fn xes(&self, view_json: &str, object_type: &str) -> PyResult<String> {
+    fn xes(&self, py: Python<'_>, view_json: &str, object_type: &str) -> PyResult<String> {
         let view: DatasetView = parse_json(view_json)?;
-        let mut output = Vec::new();
-        self.engine
-            .write_xes(&mut output, &view, object_type)
+        let output = py
+            .detach(|| {
+                let mut output = Vec::new();
+                self.engine.write_xes(&mut output, &view, object_type)?;
+                Ok::<_, ocpm_core::OcpmError>(output)
+            })
             .map_err(json_error)?;
         String::from_utf8(output).map_err(json_error)
     }
 
-    fn write_sqlite(&self, view_json: &str, path: &str) -> PyResult<()> {
+    fn write_sqlite(&self, py: Python<'_>, view_json: &str, path: &str) -> PyResult<()> {
         let view: DatasetView = parse_json(view_json)?;
-        self.engine.write_sqlite(path, &view).map_err(json_error)
+        py.detach(|| self.engine.write_sqlite(path, &view))
+            .map_err(json_error)
     }
 
-    fn discover_json(&self, request_json: &str) -> PyResult<String> {
+    fn write_parquet_snapshot(
+        &self,
+        py: Python<'_>,
+        view_json: &str,
+        root: &str,
+        version: &str,
+    ) -> PyResult<String> {
+        let view: DatasetView = parse_json(view_json)?;
+        let result = py
+            .detach(|| self.engine.write_parquet_snapshot(root, version, &view))
+            .map_err(json_error)?;
+        encode_json(&result)
+    }
+
+    fn execution_summary_json(&self, py: Python<'_>, request_json: &str) -> PyResult<String> {
+        let request: ExecutionSummaryRequest = parse_json(request_json)?;
+        let result = py
+            .detach(|| self.engine.execution_summary(&request))
+            .map_err(json_error)?;
+        encode_json(&result)
+    }
+
+    fn discover_json(&self, py: Python<'_>, request_json: &str) -> PyResult<String> {
         let request: DiscoveryRequest = parse_json(request_json)?;
-        encode_json(&self.engine.discover(&request).map_err(json_error)?)
+        let result = py
+            .detach(|| self.engine.discover(&request))
+            .map_err(json_error)?;
+        encode_json(&result)
     }
 
-    fn conformance_json(&self, request_json: &str) -> PyResult<String> {
+    fn conformance_json(&self, py: Python<'_>, request_json: &str) -> PyResult<String> {
         let request: ConformanceRequest = parse_json(request_json)?;
-        encode_json(&self.engine.conformance(&request).map_err(json_error)?)
+        let result = py
+            .detach(|| self.engine.conformance(&request))
+            .map_err(json_error)?;
+        encode_json(&result)
     }
 
-    fn enhance_json(&self, request_json: &str) -> PyResult<String> {
+    fn enhance_json(&self, py: Python<'_>, request_json: &str) -> PyResult<String> {
         let request: EnhancementRequest = parse_json(request_json)?;
-        encode_json(&self.engine.enhance(&request).map_err(json_error)?)
+        let result = py
+            .detach(|| self.engine.enhance(&request))
+            .map_err(json_error)?;
+        encode_json(&result)
     }
 
-    fn fit_prediction_json(&self, request_json: &str) -> PyResult<String> {
+    fn fit_prediction_json(&self, py: Python<'_>, request_json: &str) -> PyResult<String> {
         let request: FitPredictionRequest = parse_json(request_json)?;
-        encode_json(&self.engine.fit_prediction(&request).map_err(json_error)?)
+        let result = py
+            .detach(|| self.engine.fit_prediction(&request))
+            .map_err(json_error)?;
+        encode_json(&result)
     }
 
-    fn predict_json(&self, request_json: &str) -> PyResult<String> {
+    fn predict_json(&self, py: Python<'_>, request_json: &str) -> PyResult<String> {
         let request: PredictionRequest = parse_json(request_json)?;
-        encode_json(&self.engine.predict(&request).map_err(json_error)?)
+        let result = py
+            .detach(|| self.engine.predict(&request))
+            .map_err(json_error)?;
+        encode_json(&result)
     }
 
     fn evaluate_prediction_json(
         &self,
+        py: Python<'_>,
         view_json: &str,
         target_json: &str,
         holdout_fraction: f64,
@@ -176,12 +252,13 @@ impl PyStandaloneEngine {
         let target: PredictionTarget = parse_json(target_json)?;
         let parameters: std::collections::BTreeMap<String, serde_json::Value> =
             parse_json(parameters_json)?;
-        encode_json(
-            &self
-                .engine
-                .evaluate_prediction(&view, target, holdout_fraction, parameters)
-                .map_err(json_error)?,
-        )
+        let result = py
+            .detach(|| {
+                self.engine
+                    .evaluate_prediction(&view, target, holdout_fraction, parameters)
+            })
+            .map_err(json_error)?;
+        encode_json(&result)
     }
 
     fn explain_json(&self, view_json: &str, capability_json: &str) -> PyResult<String> {

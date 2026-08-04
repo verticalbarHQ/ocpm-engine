@@ -1,0 +1,27 @@
+[package]
+name = "ocpm-duckdb"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+description = "DuckDB provider for local and S3-backed object-centric Parquet snapshots"
+publish = false
+
+[features]
+default = []
+s3 = []
+
+[dependencies]
+chrono.workspace = true
+chrono-tz.workspace = true
+duckdb.workspace = true
+ocpm-core.workspace = true
+ocpm-local.workspace = true
+ocpm-provider.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile = "3.23.0"

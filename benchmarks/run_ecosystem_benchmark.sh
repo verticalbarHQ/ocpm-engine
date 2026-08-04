@@ -7,6 +7,7 @@ pg_ocpm_root="${PG_OCPM_SOURCE:-$(cd "$root/../pg_ocpm" && pwd)}"
 pair="all"
 smoke=false
 keep=false
+sap=false
 
 while (( $# > 0 )); do
     case "$1" in
@@ -16,6 +17,7 @@ while (( $# > 0 )); do
             ;;
         --smoke) smoke=true ;;
         --keep) keep=true ;;
+        --sap) sap=true ;;
         *)
             echo "unknown argument: $1" >&2
             exit 2
@@ -123,7 +125,7 @@ else
     )
 fi
 
-suffix="1.0.0"
+suffix="1.1.0"
 if [[ "$smoke" == true ]]; then
     suffix="smoke"
 fi
@@ -134,6 +136,7 @@ run_pair() {
     local prepare_result="/results/ecosystem-prepare-${dataset}.json"
     local manifest="/results/ecosystem-manifest-${dataset}.json"
     local engine_output="/results/ecosystem-engine-${dataset}.json"
+    local duckdb_output="/results/ecosystem-duckdb-${dataset}.json"
     local competitor_output="/results/ecosystem-${competitor}-${dataset}.json"
 
     engine_exec python -m benchmarks.ecosystem.fixture \
@@ -151,6 +154,14 @@ run_pair() {
         --manifest "$manifest" \
         --datasets "$dataset" \
         --output "$engine_output" \
+        "${benchmark_args[@]}"
+
+    engine_exec python -m benchmarks.ecosystem.duckdb_arm \
+        --manifest "$manifest" \
+        --data-dir /data \
+        --datasets "$dataset" \
+        --rebuild-snapshot \
+        --output "$duckdb_output" \
         "${benchmark_args[@]}"
 
     if [[ "$competitor" == "ocpa" ]]; then
@@ -176,6 +187,15 @@ run_pair() {
         --competitor-name "$competitor" \
         --output "/results/ecosystem-${competitor}-vs-pg-ocpm-engine-${suffix}.json" \
         --report "/results/ecosystem-${competitor}-vs-pg-ocpm-engine-${suffix}.md"
+
+    engine_exec python -m benchmarks.ecosystem.merge_three_way \
+        --manifest "$manifest" \
+        --postgres "$engine_output" \
+        --duckdb "$duckdb_output" \
+        --competitor "$competitor_output" \
+        --competitor-name "$competitor" \
+        --output "/results/ecosystem-${competitor}-pg-duckdb-${suffix}.json" \
+        --report "/results/ecosystem-${competitor}-pg-duckdb-${suffix}.md"
 }
 
 if [[ "$pair" == "all" || "$pair" == "rust4pm" ]]; then
@@ -183,6 +203,23 @@ if [[ "$pair" == "all" || "$pair" == "rust4pm" ]]; then
 fi
 if [[ "$pair" == "all" || "$pair" == "ocpa" ]]; then
     run_pair ocpa ocpa_running_example
+fi
+
+if [[ "$sap" == true ]]; then
+    sap_duckdb_output="/results/ecosystem-duckdb-sap-${suffix}.json"
+    engine_exec python -m benchmarks.ecosystem.duckdb_arm \
+        --manifest /results/ecosystem-manifest.json \
+        --data-dir /sap-data \
+        --snapshot-dir /results/duckdb-sap-snapshots \
+        --datasets sap_o2c,sap_p2p \
+        --rebuild-snapshot \
+        --output "$sap_duckdb_output" \
+        "${benchmark_args[@]}"
+    engine_exec python -m benchmarks.ecosystem.merge_sap_four_way \
+        --baseline /results/sap-pm4py-three-way-1.0.0.json \
+        --duckdb "$sap_duckdb_output" \
+        --output "/results/sap-pm4py-duckdb-four-way-${suffix}.json" \
+        --report "/results/sap-pm4py-duckdb-four-way-${suffix}.md"
 fi
 
 echo "ecosystem benchmark completed; artifacts are under $root/.benchmarks"
