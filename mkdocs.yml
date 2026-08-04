@@ -41,6 +41,8 @@ exclude_docs: |
   open-source-patent-icpm-assessment.md
   prior-art-and-icpm-roadmap.md
   ocpm-mcp-feasibility.md
+  open-source-release.md
+  process-mining-capability-map.md
   sap-pm4py-three-way-performance.md
   rust4pm-vs-pg-ocpm-engine.md
   ocpa-vs-pg-ocpm-engine.md
@@ -72,7 +74,6 @@ nav:
   - Design:
       - 1.0.0 specification: ocpm-engine-1.0.0-spec.md
       - DuckDB Parquet provider spec: duckdb-parquet-provider-spec.md
-      - Process-mining capability map: process-mining-capability-map.md
       - pg_ocpm 0.10 general aggregation: pg-ocpm-0.10-general-aggregation.md
       - Application query performance: technical-performance-improvements.md
   - Releases:
@@ -81,4 +82,3 @@ nav:
       - Academic implementation provenance: academic-implementation-provenance.md
       - Production dependency boundary: dependency-boundary.md
       - Private wheel distribution: private-distribution.md
-      - Open-source release strategy: open-source-release.md
