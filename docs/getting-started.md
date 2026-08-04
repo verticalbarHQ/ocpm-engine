@@ -37,8 +37,9 @@ model = engine.discover(
 )
 ```
 
-CSV, XES, and SQLite loaders follow the same pattern
-(`from_csv`, `from_xes`, `from_sqlite`).
+XES and SQLite loaders follow the same pattern (`from_xes`, `from_sqlite`);
+the full constructor and method surface is in the
+[API reference](api-reference.md).
 
 ## 3. Score conformance from compact aggregates
 

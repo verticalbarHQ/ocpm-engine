@@ -41,24 +41,25 @@ exclude_docs: |
   open-source-patent-icpm-assessment.md
   prior-art-and-icpm-roadmap.md
   ocpm-mcp-feasibility.md
+  sap-pm4py-three-way-performance.md
+  rust4pm-vs-pg-ocpm-engine.md
+  ocpa-vs-pg-ocpm-engine.md
+  public-common-pm-performance.md
+  ocpm-engine-0.9-full-benchmark.md
+  ocpm-engine-0.9-performance.md
+  ocpq-0.9-four-way-comparison.md
 
 nav:
   - Home: index.md
   - Installation: https://github.com/verticalbarHQ/ocpm-engine/blob/main/INSTALL.md
   - Getting started: getting-started.md
+  - API reference: api-reference.md
   - Benchmarks:
       - OCPQ strict result (1.0): ocpq-performance.md
       - OCPQ four-way comparison (1.0): ocpq-1.0-four-way-comparison.md
-      - SAP O2C/P2P three-way (1.0): sap-pm4py-three-way-performance.md
       - SAP O2C/P2P four-way with DuckDB (1.1): duckdb-sap-pm4py-four-way-performance.md
       - Rust4PM comparison (1.1): duckdb-vs-rust4pm-performance.md
       - OCPA comparison (1.1): duckdb-vs-ocpa-performance.md
-      - Rust4PM vs pg_ocpm + engine (1.0): rust4pm-vs-pg-ocpm-engine.md
-      - OCPA vs pg_ocpm + engine (1.0): ocpa-vs-pg-ocpm-engine.md
-      - Common public workloads (0.8): public-common-pm-performance.md
-      - 0.9 full benchmark: ocpm-engine-0.9-full-benchmark.md
-      - 0.9 performance: ocpm-engine-0.9-performance.md
-      - OCPQ 0.9 four-way: ocpq-0.9-four-way-comparison.md
   - Design:
       - 1.0.0 specification: ocpm-engine-1.0.0-spec.md
       - DuckDB Parquet provider spec: duckdb-parquet-provider-spec.md
