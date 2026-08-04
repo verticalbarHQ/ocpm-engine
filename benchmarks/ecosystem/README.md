@@ -1,8 +1,7 @@
 # Ecosystem common-PM benchmark
 
-This suite is deliberately separate from the strict OCPQ Q1-Q7 benchmark. It
-compares the same fixed analytical workloads in two independent pairs, using
-the dataset native to each upstream project:
+This suite compares the same fixed analytical workloads in two independent
+pairs, using the dataset native to each upstream project:
 
 - Rust4PM versus pg_ocpm + ocpm-engine on Rust4PM's OCEL 2.0 P2P test corpus
 - OCPA versus pg_ocpm + ocpm-engine on the OCEL 2.0 running example named in

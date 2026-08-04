@@ -1,0 +1,184 @@
+name: Private wheel distribution
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish wheels to the configured private CodeArtifact repository
+        required: true
+        default: false
+        type: boolean
+      release_tag:
+        description: Existing signed tag, for example v1.1.0
+        required: false
+        type: string
+      confirmation:
+        description: Enter publish-private-ocpm-engine when publish is enabled
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  wheels:
+    name: ${{ matrix.id }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: linux-x86_64
+            runner: ubuntu-latest
+            duckdb_asset: libduckdb-linux-amd64.zip
+            duckdb_sha256: 1fb8ce388157d84a25abe685a8a2520bf00c00321821968e4bb398fd766e7abb
+          - id: linux-aarch64
+            runner: ubuntu-24.04-arm
+            duckdb_asset: libduckdb-linux-arm64.zip
+            duckdb_sha256: abe4f6f005ee0b448a058322f4263584b4bd1b6faf7ab4637b79eeaf978f8e9c
+          - id: macos-arm64
+            runner: macos-14
+            duckdb_asset: libduckdb-osx-universal.zip
+            duckdb_sha256: 7b5b8915cc382d0708636fe6385c0cdad5a61c9ff8ba2638b3e2141640783155
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Check production dependency boundary
+        run: python3 scripts/check-core-dependency-boundary.py
+      - name: Install Rust MSRV
+        run: rustup toolchain install 1.85.1 --profile minimal --no-self-update
+      - name: Provision external DuckDB client
+        shell: bash
+        env:
+          DUCKDB_ASSET: ${{ matrix.duckdb_asset }}
+          DUCKDB_SHA256: ${{ matrix.duckdb_sha256 }}
+          DUCKDB_VERSION: 1.5.5
+        run: |
+          curl -fsSL -o "/tmp/${DUCKDB_ASSET}" \
+            "https://github.com/duckdb/duckdb/releases/download/v${DUCKDB_VERSION}/${DUCKDB_ASSET}"
+          echo "${DUCKDB_SHA256}  /tmp/${DUCKDB_ASSET}" | shasum -a 256 --check
+          mkdir -p /tmp/libduckdb
+          unzip -q "/tmp/${DUCKDB_ASSET}" -d /tmp/libduckdb
+          sudo install -m 0644 /tmp/libduckdb/duckdb.h /usr/local/include/duckdb.h
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            sudo install -m 0644 /tmp/libduckdb/libduckdb.so /usr/local/lib/libduckdb.so
+            sudo ldconfig
+          else
+            sudo install -m 0644 /tmp/libduckdb/libduckdb.dylib /usr/local/lib/libduckdb.dylib
+          fi
+          {
+            echo "DUCKDB_INCLUDE_DIR=/usr/local/include"
+            echo "DUCKDB_LIB_DIR=/usr/local/lib"
+            echo "LD_LIBRARY_PATH=/usr/local/lib"
+            echo "DYLD_LIBRARY_PATH=/usr/local/lib"
+          } >> "$GITHUB_ENV"
+      - name: Install private distribution tooling
+        run: python -m pip install 'maturin==1.14.1'
+      - name: Build and audit wheel
+        env:
+          RUSTUP_TOOLCHAIN: 1.85.1
+        run: PYTHON=python DIST_DIR="$PWD/dist" ./scripts/build-private-wheel.sh
+      - name: Install wheel smoke test
+        shell: bash
+        run: |
+          python -m pip install --force-reinstall --only-binary=:all: dist/*.whl
+          python -c 'import ocpm_engine; print(ocpm_engine.__version__)'
+      - name: Create checksum
+        shell: bash
+        run: |
+          cd dist
+          shasum -a 256 ./*.whl ./*.manifest.json \
+            > "SHA256SUMS-${{ matrix.id }}"
+      - uses: anchore/sbom-action@v0
+        with:
+          path: dist
+          format: spdx-json
+          output-file: dist/sbom-${{ matrix.id }}.spdx.json
+          upload-artifact: false
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ocpm-engine-${{ matrix.id }}
+          path: dist
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    if: >-
+      inputs.publish && inputs.confirmation == 'publish-private-ocpm-engine' &&
+      inputs.release_tag != ''
+    needs: wheels
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ocpm-engine-*
+          path: release
+          merge-multiple: true
+      - name: Verify signed tag, version, and commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          object_type=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" \
+            --jq .object.type)
+          test "$object_type" = tag
+          tag_object=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" \
+            --jq .object.sha)
+          verified=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/git/tags/${tag_object}" \
+            --jq .verification.verified)
+          test "$verified" = true
+          tag_sha=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${RELEASE_TAG}" --jq .sha)
+          test "$tag_sha" = "$GITHUB_SHA"
+          package_version=$(python -c \
+            'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+          test "$RELEASE_TAG" = "v${package_version}"
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: release/*.whl
+      - uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.AWS_CODEARTIFACT_PUBLISH_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Resolve short-lived CodeArtifact credentials
+        id: codeartifact
+        shell: bash
+        env:
+          DOMAIN: ${{ vars.AWS_CODEARTIFACT_DOMAIN }}
+          DOMAIN_OWNER: ${{ vars.AWS_CODEARTIFACT_DOMAIN_OWNER }}
+          REPOSITORY: ${{ vars.AWS_CODEARTIFACT_REPOSITORY }}
+        run: |
+          owner_args=()
+          if [[ -n "$DOMAIN_OWNER" ]]; then owner_args+=(--domain-owner "$DOMAIN_OWNER"); fi
+          endpoint=$(aws codeartifact get-repository-endpoint \
+            --domain "$DOMAIN" "${owner_args[@]}" \
+            --repository "$REPOSITORY" --format pypi \
+            --query repositoryEndpoint --output text)
+          token=$(aws codeartifact get-authorization-token \
+            --domain "$DOMAIN" "${owner_args[@]}" \
+            --query authorizationToken --output text)
+          echo "::add-mask::$token"
+          echo "endpoint=$endpoint" >> "$GITHUB_OUTPUT"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+      - name: Upload wheel-only release
+        env:
+          TWINE_USERNAME: aws
+          TWINE_PASSWORD: ${{ steps.codeartifact.outputs.token }}
+        run: |
+          python -m pip install 'twine==6.2.0'
+          python scripts/publish-private-wheel.py \
+            --repository-url '${{ steps.codeartifact.outputs.endpoint }}' \
+            release

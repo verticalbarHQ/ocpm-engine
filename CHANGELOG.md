@@ -2,6 +2,27 @@
 
 All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
 
+## Unreleased
+
+- Licensed the core workspace and Python wheel under Apache-2.0 with an
+  owner-specific NOTICE, inherited Cargo metadata, package-carried dependency
+  license bundle, and a CI licensing contract. Added individual and corporate
+  CLAs granting Vertical Bar, Inc. the rights required for public and
+  proprietary licensing while contributors retain ownership.
+- Enforced a production dependency boundary that excludes OCPQ, OCPA,
+  Rust4PM, and PM4Py from package metadata, root lockfiles, production imports,
+  and vendored paths. Removed the complete OCPQ benchmark implementation and
+  retained only its previously published result evidence; OCPA, Rust4PM, and
+  PM4Py remain in minimal, pinned benchmark environments.
+- Added a wheel-only private distribution path with platform-native artifact
+  audits, public-PyPI refusal, short-lived CodeArtifact publishing, SBOMs,
+  checksums, build provenance, and installed-wheel smoke tests.
+- Exposed the native release version as the conventional package-level
+  `ocpm_engine.__version__` attribute for installation verification.
+- Made the confidentiality boundary explicit: Rust/Cargo sources and DuckDB
+  binaries are excluded, while the required Python compatibility façade remains
+  visible until sensitive planner and fallback logic is migrated into Rust.
+
 ## 1.1.0 - 2026-08-03
 
 - Added the optional `ocpm-duckdb` provider for immutable canonical or mapped

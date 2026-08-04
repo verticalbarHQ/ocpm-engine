@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>ocpm-engine third-party licenses</title>
+  <style>
+    body { font-family: sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+    pre { border: 1px solid #ccc; padding: 1rem; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Third-Party Licenses</h1>
+  <p>Generated from the locked runtime Rust dependency graph.</p>
+  <ul>
+  {{#each overview}}
+    <li><a href="#{{id}}">{{name}}</a> ({{count}})</li>
+  {{/each}}
+  </ul>
+  {{#each licenses}}
+    {{#if first_of_kind}}<h2 id="{{id}}">{{name}}</h2>{{/if}}
+    <h3>Used by</h3>
+    <ul>
+    {{#each used_by}}
+      <li>{{crate.name}} {{crate.version}}</li>
+    {{/each}}
+    </ul>
+    <pre>{{text}}</pre>
+  {{/each}}
+</body>
+</html>

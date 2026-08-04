@@ -1,6 +1,6 @@
 # pg_ocpm and ocpm-engine: open-source, patent, and ICPM assessment
 
-Assessment date: 2026-08-02.
+Assessment date: 2026-08-04.
 
 This is a technical and commercial assessment, not a legal opinion, patentability
 opinion, freedom-to-operate opinion, or valuation. Patent counsel should review
@@ -11,7 +11,7 @@ the claims, ownership, inventorship, and disclosure history before publication.
 | Question | Assessment | Decision |
 |---|---|---|
 | Do the projects add community value? | Yes. A source-neutral PostgreSQL serving layer for exact object-centric filtering and compact analytics, paired with a small Rust model layer, fills a real infrastructure gap. | Continue both projects. |
-| Are they ready to call open source today? | No. Both repositories expressly reserve all rights and contain no `LICENSE` file. | File or decline patent protection first, then add a license and release process. |
+| Are they licensed as open source? | The working trees now use Apache-2.0, identify Vertical Bar, Inc. as owner, include NOTICE and third-party notices, and require a CLA for outside contributions. | Treat the conversion as implemented but do not publish until the patent, chain-of-title, clean-history, and counsel gates below pass. |
 | Should the company pursue a patent? | A broad claim to object-centric storage, process graphs, Rust, SQL pushdown, compression, or pre-aggregation is unlikely to be defensible as novel. A narrow co-designed execution claim may be worth preserving. | Commission a claims-chart search and file a detailed provisional only if counsel finds a claim covering the combined capsule and multi-window execution method. Do not fund broad international prosecution based only on the current benchmark. |
 | Is an ICPM 2027 paper justified? | Yes, if it is an execution-model and systems paper with causal ablations, exact semantics, scale, cold-cache, concurrent ingest, and independent reproduction. Benchmark headlines alone are insufficient. | Target the research track and a demonstrator, but freeze claims and evaluation before drafting. |
 
@@ -93,7 +93,8 @@ construction.
 
 Preserve the option, but use a strict go/no-go gate.
 
-File a provisional before an open-source release, paper, public benchmark,
+File the prepared provisional draft, after counsel and inventorship review,
+before an open-source release, paper, public benchmark,
 conference talk, customer disclosure without an NDA, or offer for sale if all
 of these conditions hold:
 
@@ -116,9 +117,11 @@ support for later claims.
 
 Do not proceed beyond the provisional if the best claim reduces to “use a
 PostgreSQL extension for faster process mining,” if infringement cannot be
-detected, or if the company intends to grant every user an unrestricted patent
-license with no proprietary commercial layer. In that case, a defensive
-publication may create more ecosystem value at lower cost.
+detected, or if the expected commercial and defensive value does not justify
+prosecution. Apache-2.0 grants compliant recipients a patent license for claims
+necessarily infringed by contributed code, so counsel must claim and license
+with that public grant in view. A defensive publication may otherwise create
+more ecosystem value at lower cost.
 
 [USPTO guidance](https://www.uspto.gov/patents/basics/apply/provisional-application)
 states that a provisional must provide a sufficient written description and
@@ -146,24 +149,31 @@ The best commercial structure is likely:
 - a patent used defensively and against non-compliant proprietary copying, not
   as a threat to compliant community users.
 
-Before choosing Apache-2.0, counsel must reconcile the intended patent strategy
-with the license's patent grant. If dual licensing is planned, contributor
-ownership and inbound rights must support it.
+Apache-2.0 has now been selected for both cores. The accompanying individual and
+corporate CLA drafts give Vertical Bar, Inc. non-exclusive copyright and patent
+licenses broad enough to sublicense accepted contributions under public or
+proprietary terms while contributors retain ownership. Counsel must approve the
+CLA language and reconcile the patent strategy with Apache-2.0's public patent
+grant before the first outside contribution or public release.
 
 ## Open-source release gates
 
-The code is promising but is not open source merely because it is hosted in a
-Git repository. Before a public release:
+The license conversion is implemented in the working trees, but a public
+release still requires these gates:
 
 1. Complete the patent go/no-go and first filing.
 2. Confirm company ownership, all inventors, employee/contractor assignments,
    generated-code provenance, and third-party dataset/software rights.
-3. Add `LICENSE`, `NOTICE`, consistent project copyright notices, and SPDX
-   identifiers. Resolve contributor versus company ownership wording.
-4. Adopt a DCO or CLA aligned with any dual-license plan.
-5. Publish a private security address, supported versions, response targets,
+3. Obtain counsel approval of the Apache-2.0 application, NOTICE content,
+   Vertical Bar, Inc. ownership statement, and CLA.
+4. Create clean public repository roots from the reviewed source trees. Do not
+   expose the private repository histories, removed benchmark harnesses,
+   credentials, legal drafts, or customer artifacts by changing repository
+   visibility in place.
+5. Configure a private security and conduct-reporting route, supported versions, response targets,
    and tenant-isolation threat model.
-6. Produce signed source and binary releases, checksums, SBOMs, upgrade tests,
+6. Produce signed Apache source and binary releases, checksums, SBOMs, complete
+   dependency license bundles, upgrade tests,
    and PostgreSQL 13-18 packages.
 7. Make a one-command OCEL 2.0 tutorial and a compatibility matrix for
    `pg_ocpm` and `ocpm-engine` versions.

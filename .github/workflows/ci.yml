@@ -42,6 +42,10 @@ jobs:
           sudo ldconfig
       - name: Check release notes
         run: python scripts/check-release-notes.py
+      - name: Check production dependency boundary
+        run: python scripts/check-core-dependency-boundary.py
+      - name: Check licensing contract
+        run: python scripts/check-licensing.py
       - name: Test Rust workspace
         run: cargo +1.85.1 test --workspace --all-targets --locked
       - name: Check Rust formatting
