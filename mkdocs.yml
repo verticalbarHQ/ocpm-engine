@@ -45,6 +45,7 @@ exclude_docs: |
 nav:
   - Home: index.md
   - Installation: https://github.com/verticalbarHQ/ocpm-engine/blob/main/INSTALL.md
+  - Getting started: getting-started.md
   - Benchmarks:
       - OCPQ strict result (1.0): ocpq-performance.md
       - OCPQ four-way comparison (1.0): ocpq-1.0-four-way-comparison.md
