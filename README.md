@@ -1,6 +1,6 @@
 # ocpm-engine
 
-`ocpm-engine` 1.0 is a standalone, Rust-first object-centric process-mining
+`ocpm-engine` 1.1 is a standalone, Rust-first object-centric process-mining
 engine. It can load canonical or OCEL JSON, XES, CSV, and SQLite data directly,
 then query, discover, check, enhance, predict, and serialize models without a
 database or Python dataframe runtime.
@@ -12,7 +12,7 @@ PostgreSQL planner remains available for `pg_ocpm >= 0.8.0` during the 1.x
 compatibility window.
 Legacy PostgreSQL planner compatibility: Required extension version: `pg_ocpm >= 0.8.0`.
 
-Current engine version: **1.0.0**. See the [release notes](CHANGELOG.md) and
+Current engine version: **1.1.0**. See the [release notes](CHANGELOG.md) and
 [academic implementation provenance](docs/academic-implementation-provenance.md).
 
 ## Native capabilities
@@ -131,6 +131,16 @@ database-versus-engine placement decisions, see
 [Process-mining capability map](docs/process-mining-capability-map.md).
 The preliminary release, patent, and ICPM evidence assessment is in
 [Open-source, patent, and ICPM assessment](docs/open-source-patent-icpm-assessment.md).
+The implementation-ready strategy for a provider-independent DuckDB module
+over local and S3 Parquet is in the
+[DuckDB Parquet provider specification](docs/duckdb-parquet-provider-spec.md).
+The clean 1.1 measurements are split into the
+[Rust4PM comparison](docs/duckdb-vs-rust4pm-performance.md),
+[OCPA comparison](docs/duckdb-vs-ocpa-performance.md), and
+[SAP O2C/P2P four-way comparison](docs/duckdb-sap-pm4py-four-way-performance.md).
+Each report publishes cached and cache-disabled latency separately and includes
+exactness, concurrency, process RSS, storage, conversion, and connection-open
+boundaries.
 
 ## Install
 
@@ -168,6 +178,38 @@ model = engine.discover(
     }
 )
 ```
+
+DuckDB Parquet is an optional provider. It dynamically links to a compatible
+deployment-supplied DuckDB 1.5 client and opens an existing caller-selected
+catalog; the wheel does not bundle DuckDB and the provider does not create or
+operate a database service. The `existing` path must already exist; the engine
+never creates that catalog implicitly:
+
+```python
+engine = StandaloneEngine.from_duckdb_parquet(
+    {
+        "database": {
+            "kind": "existing",
+            "path": "/catalog/analytics.duckdb",
+            "read_only": True,
+        },
+        "location": {"kind": "local", "root": "/data/ocel-parquet"},
+        "snapshot": {"kind": "current", "pointer": "CURRENT"},
+        "layout": {"kind": "canonical_v1"},
+        "cache": {"kind": "direct"},
+        "options": {
+            "memory_budget_bytes": 536_870_912,
+            "result_cache_bytes": 67_108_864,
+            "materialize_execution_relation": True,
+        },
+    }
+)
+```
+
+Set `result_cache_bytes` to zero for cache-disabled operation and set
+`materialize_execution_relation` to false to minimize connection-open work and
+DuckDB-managed resident memory. S3 uses the same API with a structured `s3://`
+location and deployment credential-chain references.
 
 `append()` validates a bounded columnar batch and advances the source watermark
 only after the complete batch succeeds. `explain()` reports the selected

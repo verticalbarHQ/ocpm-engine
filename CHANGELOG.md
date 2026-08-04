@@ -2,6 +2,55 @@
 
 All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
 
+## 1.1.0 - 2026-08-03
+
+- Added the optional `ocpm-duckdb` provider for immutable canonical or mapped
+  Parquet snapshots on local filesystems and S3-compatible object stores.
+- Kept DuckDB at the deployment boundary: release wheels dynamically link to
+  a compatible caller-supplied DuckDB 1.5 client and never compile or package a
+  bundled DuckDB library; existing-catalog mode also refuses to create a
+  missing catalog implicitly.
+- Added a required existing-catalog mode, bounded independent connection pools,
+  memory/temporary-storage/parallelism limits,
+  pinned immutable snapshot selection, and strict manifest hashing.
+- Added secure S3 credential-chain references and checksum-pinned core `httpfs`
+  and `aws` extension packaging without accepting raw credentials or arbitrary
+  SQL through the public API.
+- Added exact DuckDB aggregate pushdown for lifecycle variants, DFG frequency
+  and duration, activity counts, conformance statistics, and next-activity
+  sufficient statistics, with exact source-neutral fallbacks for the remaining
+  1.0 operations.
+- Added an optional connection-local execution relation and a generation-scoped
+  byte-bounded exact-result LRU. Both are general request optimizations,
+  disableable, and benchmarked separately from cache-disabled execution and
+  connection-open cost.
+- Added immutable canonical Parquet snapshot export with staging, atomic local
+  publication, ZSTD compression, and streaming SHA-256 calculation.
+- Extended OCEL 2.0 relational SQLite import to the standard typed-table schema,
+  including typed event/object attributes, histories, E2O/O2O relations,
+  deterministic identities, source event sequence for equal-time ordering, and
+  timestamp normalization.
+- Released the Python GIL around native imports, exports, queries, aggregation,
+  discovery, conformance, enhancement, and prediction work.
+- Added Docker-isolated exact-answer benchmarks for DuckDB against the fixed
+  Rust4PM and OCPA common workloads, plus SAP O2C/P2P bridge reporting and
+  explicit cached, cache-disabled, latency, concurrency, memory, storage,
+  snapshot-conversion, and connection-open evidence.
+- Published a clean Rust4PM comparison with exact parity on four workloads:
+  the bounded repeated-result cache produced a 12.164x p50 geometric-mean
+  speedup, while cache-disabled DuckDB was slower at 0.056x. The clean OCPA
+  comparison also matched all answers but remains descriptive because OCPA's
+  documented importer failed on its unchanged upstream example.
+- Published clean SAP O2C/P2P four-way evidence against the accepted unchanged
+  PostgreSQL/PM4Py baseline. Cached DuckDB was 37.413x and 1832.710x faster
+  than vanilla PostgreSQL plus PM4Py on O2C and P2P respectively; cache-off
+  ratios were 1.852x and 1.132x. DuckDB's 5.11 MiB combined Parquet footprint
+  came with 213.05-225.26 MiB process RSS and 4.22-7.72 second conversion cost.
+- Kept strict OCPQ Q1-Q7 separate because it requires duplicate-preserving
+  parity for every intermediate evaluation-tree node through the PostgreSQL
+  binding-capsule contract. The provider-neutral API does not expose that tree,
+  so no root-only DuckDB number is mislabeled as an OCPQ-equivalent result.
+
 ## 1.0.0 - 2026-08-03
 
 - Made `ocpm-engine` standalone through a source-neutral provider contract and

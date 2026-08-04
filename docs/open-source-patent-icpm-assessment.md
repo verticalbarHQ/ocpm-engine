@@ -158,9 +158,8 @@ Git repository. Before a public release:
 1. Complete the patent go/no-go and first filing.
 2. Confirm company ownership, all inventors, employee/contractor assignments,
    generated-code provenance, and third-party dataset/software rights.
-3. Add `LICENSE`, `NOTICE`, consistent Vertical Bar copyright notices, and
-   SPDX identifiers. Resolve the current `ocpm-engine contributors` versus
-   Vertical Bar ownership wording.
+3. Add `LICENSE`, `NOTICE`, consistent project copyright notices, and SPDX
+   identifiers. Resolve contributor versus company ownership wording.
 4. Adopt a DCO or CLA aligned with any dual-license plan.
 5. Publish a private security address, supported versions, response targets,
    and tenant-isolation threat model.

@@ -13,7 +13,7 @@ use ocpm_core::{
 };
 use quick_xml::events::{BytesStart, Event as XmlEvent};
 use quick_xml::{Reader, XmlVersion};
-use rusqlite::Connection;
+use rusqlite::{Connection, types::ValueRef};
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
 use std::io::{BufRead, Read, Write};
@@ -816,6 +816,20 @@ pub fn write_sqlite(path: impl AsRef<Path>, log: &CanonicalLog) -> OcpmResult<()
 }
 
 pub fn read_sqlite_connection(connection: &Connection) -> OcpmResult<CanonicalLog> {
+    let standard_columns: u64 = connection
+        .query_row(
+            "SELECT count(*) FROM pragma_table_info('object') WHERE name='ocel_id'",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)?;
+    if standard_columns != 0 {
+        return read_ocel2_sqlite_connection(connection);
+    }
+    read_compact_sqlite_connection(connection)
+}
+
+fn read_compact_sqlite_connection(connection: &Connection) -> OcpmResult<CanonicalLog> {
     let mut objects = Vec::new();
     let mut object_ids = BTreeMap::new();
     {
@@ -909,6 +923,393 @@ pub fn read_sqlite_connection(connection: &Connection) -> OcpmResult<CanonicalLo
     log.validate()?;
     log.sort_canonical();
     Ok(log)
+}
+
+fn read_ocel2_sqlite_connection(connection: &Connection) -> OcpmResult<CanonicalLog> {
+    let mut objects = Vec::new();
+    let mut object_ids = BTreeMap::new();
+    {
+        let mut statement = connection
+            .prepare(
+                "SELECT CAST(ocel_id AS TEXT), ocel_type \
+                 FROM object ORDER BY CAST(ocel_id AS TEXT)",
+            )
+            .map_err(sqlite_error)?;
+        let rows = statement
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })
+            .map_err(sqlite_error)?;
+        for row in rows {
+            let (external_id, object_type) = row.map_err(sqlite_error)?;
+            if object_ids.contains_key(&external_id) {
+                return Err(OcpmError::invalid_data(format!(
+                    "duplicate OCEL SQLite object {external_id}"
+                )));
+            }
+            let id = objects.len() as u64 + 1;
+            object_ids.insert(external_id.clone(), id);
+            objects.push(Object {
+                id,
+                external_id,
+                object_type,
+            });
+        }
+    }
+
+    let event_types = sqlite_type_mappings(connection, "event_map_type")?;
+    let declared_events = sqlite_declared_events(connection)?;
+    let mut events = Vec::new();
+    let mut event_ids = BTreeMap::new();
+    for (activity, mapped_name) in &event_types {
+        let table = sqlite_identifier(&format!("event_{mapped_name}"));
+        let mut statement = connection
+            .prepare(&format!(
+                "SELECT * FROM {table} ORDER BY ocel_time, CAST(ocel_id AS TEXT)"
+            ))
+            .map_err(sqlite_error)?;
+        let names = statement
+            .column_names()
+            .into_iter()
+            .map(str::to_owned)
+            .collect::<Vec<_>>();
+        let id_index = sqlite_column_index(&names, "ocel_id")?;
+        let time_index = sqlite_column_index(&names, "ocel_time")?;
+        let lifecycle_index = names.iter().position(|name| name == "lifecycle");
+        let mut rows = statement.query([]).map_err(sqlite_error)?;
+        while let Some(row) = rows.next().map_err(sqlite_error)? {
+            let external_id = sqlite_text(row.get_ref(id_index).map_err(sqlite_error)?)?;
+            let Some((declared_activity, source_sequence)) = declared_events.get(&external_id)
+            else {
+                return Err(OcpmError::invalid_data(format!(
+                    "OCEL SQLite event {external_id} has no base-table declaration"
+                )));
+            };
+            if declared_activity != activity {
+                return Err(OcpmError::invalid_data(format!(
+                    "OCEL SQLite event {external_id} has inconsistent type mapping"
+                )));
+            }
+            if event_ids.contains_key(&external_id) {
+                return Err(OcpmError::invalid_data(format!(
+                    "duplicate OCEL SQLite event {external_id}"
+                )));
+            }
+            let timestamp_text = sqlite_text(row.get_ref(time_index).map_err(sqlite_error)?)?;
+            let timestamp = parse_sqlite_timestamp(&timestamp_text)?;
+            let lifecycle = lifecycle_index
+                .map(|index| row.get_ref(index).map_err(sqlite_error))
+                .transpose()?
+                .and_then(sqlite_optional_text)
+                .transpose()?;
+            let mut attributes = BTreeMap::new();
+            for (index, name) in names.iter().enumerate() {
+                if index == id_index || index == time_index || Some(index) == lifecycle_index {
+                    continue;
+                }
+                if let Some(value) = sqlite_attribute(row.get_ref(index).map_err(sqlite_error)?)? {
+                    attributes.insert(name.clone(), value);
+                }
+            }
+            let id = events.len() as u64 + 1;
+            event_ids.insert(external_id.clone(), id);
+            events.push(Event {
+                id,
+                external_id,
+                activity: activity.clone(),
+                timestamp,
+                sequence: *source_sequence,
+                lifecycle,
+                attributes,
+            });
+        }
+    }
+    if event_ids.len() != declared_events.len() {
+        let missing = declared_events
+            .keys()
+            .find(|external_id| !event_ids.contains_key(*external_id))
+            .cloned()
+            .unwrap_or_default();
+        return Err(OcpmError::invalid_data(format!(
+            "OCEL SQLite event has no typed detail row: {missing}"
+        )));
+    }
+
+    let mut event_object_relations = Vec::new();
+    {
+        let mut statement = connection
+            .prepare(
+                "SELECT CAST(ocel_event_id AS TEXT), CAST(ocel_object_id AS TEXT), \
+                 COALESCE(ocel_qualifier, '') FROM event_object \
+                 ORDER BY CAST(ocel_event_id AS TEXT),CAST(ocel_object_id AS TEXT),ocel_qualifier",
+            )
+            .map_err(sqlite_error)?;
+        let rows = statement
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                ))
+            })
+            .map_err(sqlite_error)?;
+        for row in rows {
+            let (event, object, qualifier) = row.map_err(sqlite_error)?;
+            event_object_relations.push(EventObjectRelation {
+                relation_id: event_object_relations.len() as u64 + 1,
+                event_id: *event_ids.get(&event).ok_or_else(|| {
+                    OcpmError::invalid_data(format!("unknown OCEL SQLite event {event}"))
+                })?,
+                object_id: *object_ids.get(&object).ok_or_else(|| {
+                    OcpmError::invalid_data(format!("unknown OCEL SQLite object {object}"))
+                })?,
+                qualifier,
+            });
+        }
+    }
+
+    let mut object_object_relations = Vec::new();
+    {
+        let mut statement = connection
+            .prepare(
+                "SELECT CAST(ocel_source_id AS TEXT), CAST(ocel_target_id AS TEXT), \
+                 COALESCE(CAST(ocel_qualifier AS TEXT), '') FROM object_object \
+                 ORDER BY CAST(ocel_source_id AS TEXT),CAST(ocel_target_id AS TEXT),ocel_qualifier",
+            )
+            .map_err(sqlite_error)?;
+        let rows = statement
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                ))
+            })
+            .map_err(sqlite_error)?;
+        for row in rows {
+            let (source, target, qualifier) = row.map_err(sqlite_error)?;
+            let Some(&source_object_id) = object_ids.get(&source) else {
+                continue;
+            };
+            let Some(&target_object_id) = object_ids.get(&target) else {
+                continue;
+            };
+            object_object_relations.push(ObjectObjectRelation {
+                relation_id: object_object_relations.len() as u64 + 1,
+                source_object_id,
+                target_object_id,
+                qualifier,
+                valid_from: None,
+                valid_to: None,
+            });
+        }
+    }
+
+    let mut object_attributes = BTreeMap::<(u64, String, i128), ObjectAttributeChange>::new();
+    for (_object_type, mapped_name) in sqlite_type_mappings(connection, "object_map_type")? {
+        let table = sqlite_identifier(&format!("object_{mapped_name}"));
+        let mut statement = connection
+            .prepare(&format!(
+                "SELECT * FROM {table} ORDER BY CAST(ocel_id AS TEXT),ocel_time"
+            ))
+            .map_err(sqlite_error)?;
+        let names = statement
+            .column_names()
+            .into_iter()
+            .map(str::to_owned)
+            .collect::<Vec<_>>();
+        let id_index = sqlite_column_index(&names, "ocel_id")?;
+        let time_index = sqlite_column_index(&names, "ocel_time")?;
+        let changed_index = names.iter().position(|name| name == "ocel_changed_field");
+        let mut rows = statement.query([]).map_err(sqlite_error)?;
+        while let Some(row) = rows.next().map_err(sqlite_error)? {
+            let external_id = sqlite_text(row.get_ref(id_index).map_err(sqlite_error)?)?;
+            let object_id = *object_ids.get(&external_id).ok_or_else(|| {
+                OcpmError::invalid_data(format!(
+                    "unknown OCEL SQLite object attribute owner {external_id}"
+                ))
+            })?;
+            let timestamp_text = sqlite_text(row.get_ref(time_index).map_err(sqlite_error)?)?;
+            let valid_from = parse_sqlite_timestamp(&timestamp_text)?;
+            let changed_field = changed_index
+                .map(|index| row.get_ref(index).map_err(sqlite_error))
+                .transpose()?
+                .and_then(sqlite_optional_text)
+                .transpose()?;
+            for (index, name) in names.iter().enumerate() {
+                if index == id_index || index == time_index || Some(index) == changed_index {
+                    continue;
+                }
+                if changed_field
+                    .as_ref()
+                    .is_some_and(|changed| !changed.is_empty() && changed != name)
+                {
+                    continue;
+                }
+                if let Some(value) = sqlite_attribute(row.get_ref(index).map_err(sqlite_error)?)? {
+                    let key = (object_id, name.clone(), valid_from.epoch_nanos_utc);
+                    let change = ObjectAttributeChange {
+                        object_id,
+                        name: name.clone(),
+                        valid_from: valid_from.clone(),
+                        value,
+                    };
+                    if let Some(existing) = object_attributes.get(&key) {
+                        if existing.value != change.value {
+                            return Err(OcpmError::invalid_data(format!(
+                                "conflicting OCEL SQLite object attribute values for {external_id}/{name}"
+                            )));
+                        }
+                    } else {
+                        object_attributes.insert(key, change);
+                    }
+                }
+            }
+        }
+    }
+
+    let mut log = CanonicalLog {
+        dataset_id: "sqlite".to_owned(),
+        tenant_id: "default".to_owned(),
+        events,
+        objects,
+        event_object_relations,
+        object_object_relations,
+        object_attribute_history: object_attributes.into_values().collect(),
+        metadata: BTreeMap::from([(
+            "source_format".to_owned(),
+            serde_json::json!("ocel2_relational_sqlite"),
+        )]),
+        ..CanonicalLog::default()
+    };
+    log.validate()?;
+    log.sort_canonical();
+    Ok(log)
+}
+
+fn sqlite_type_mappings(connection: &Connection, table: &str) -> OcpmResult<Vec<(String, String)>> {
+    let table = sqlite_identifier(table);
+    let mut statement = connection
+        .prepare(&format!(
+            "SELECT ocel_type,ocel_type_map FROM {table} ORDER BY ocel_type"
+        ))
+        .map_err(sqlite_error)?;
+    let rows = statement
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+        .map_err(sqlite_error)?;
+    rows.collect::<Result<Vec<(String, String)>, _>>()
+        .map_err(sqlite_error)
+}
+
+/// Preserve the source event-table order as the deterministic tie-break for
+/// events with equal timestamps. OCEL timestamps need not be unique, and
+/// replacing the source sequence with an activity-table or identifier order
+/// can change variants, DFG edges, performance statistics, and predictions.
+fn sqlite_declared_events(connection: &Connection) -> OcpmResult<BTreeMap<String, (String, u64)>> {
+    let mut statement = connection
+        .prepare(
+            "SELECT CAST(ocel_id AS TEXT),ocel_type,rowid \
+             FROM event ORDER BY rowid",
+        )
+        .map_err(sqlite_error)?;
+    let rows = statement
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, i64>(2)?,
+            ))
+        })
+        .map_err(sqlite_error)?;
+    let mut declared = BTreeMap::new();
+    for row in rows {
+        let (external_id, activity, rowid) = row.map_err(sqlite_error)?;
+        let sequence = u64::try_from(rowid).map_err(|_| {
+            OcpmError::invalid_data(format!(
+                "OCEL SQLite event {external_id} has a negative source rowid"
+            ))
+        })?;
+        if declared
+            .insert(external_id.clone(), (activity, sequence))
+            .is_some()
+        {
+            return Err(OcpmError::invalid_data(format!(
+                "duplicate OCEL SQLite event {external_id}"
+            )));
+        }
+    }
+    Ok(declared)
+}
+
+fn sqlite_identifier(value: &str) -> String {
+    format!("\"{}\"", value.replace('"', "\"\""))
+}
+
+fn sqlite_column_index(names: &[String], expected: &str) -> OcpmResult<usize> {
+    names
+        .iter()
+        .position(|name| name == expected)
+        .ok_or_else(|| OcpmError::invalid_data(format!("OCEL SQLite table lacks {expected}")))
+}
+
+fn sqlite_text(value: ValueRef<'_>) -> OcpmResult<String> {
+    match value {
+        ValueRef::Text(value) => std::str::from_utf8(value)
+            .map(str::to_owned)
+            .map_err(|error| OcpmError::invalid_data(format!("invalid SQLite UTF-8: {error}"))),
+        ValueRef::Integer(value) => Ok(value.to_string()),
+        ValueRef::Real(value) => Ok(value.to_string()),
+        ValueRef::Null => Err(OcpmError::invalid_data(
+            "required OCEL SQLite text value is null",
+        )),
+        ValueRef::Blob(_) => Err(OcpmError::invalid_data(
+            "required OCEL SQLite text value is a blob",
+        )),
+    }
+}
+
+fn sqlite_optional_text(value: ValueRef<'_>) -> Option<OcpmResult<String>> {
+    (!matches!(value, ValueRef::Null)).then(|| sqlite_text(value))
+}
+
+fn sqlite_attribute(value: ValueRef<'_>) -> OcpmResult<Option<AttributeValue>> {
+    Ok(match value {
+        ValueRef::Null => None,
+        ValueRef::Integer(value) => Some(AttributeValue::Integer(value)),
+        ValueRef::Real(value) => Some(AttributeValue::Float(value)),
+        ValueRef::Text(value) => Some(AttributeValue::String(
+            std::str::from_utf8(value)
+                .map_err(|error| OcpmError::invalid_data(format!("invalid SQLite UTF-8: {error}")))?
+                .to_owned(),
+        )),
+        ValueRef::Blob(value) => Some(AttributeValue::String(
+            value
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<Vec<_>>()
+                .join(""),
+        )),
+    })
+}
+
+fn parse_sqlite_timestamp(value: &str) -> OcpmResult<Timestamp> {
+    if let Ok(timestamp) = parse_timestamp(&Value::String(value.to_owned()), None) {
+        return Ok(timestamp);
+    }
+    for format in ["%Y-%m-%d %H:%M:%S%.f", "%Y-%m-%dT%H:%M:%S%.f"] {
+        if let Ok(value) = chrono::NaiveDateTime::parse_from_str(value, format) {
+            let value = value.and_utc();
+            let nanos =
+                value.timestamp() as i128 * 1_000_000_000 + value.timestamp_subsec_nanos() as i128;
+            return Ok(Timestamp {
+                epoch_nanos_utc: nanos,
+                source: Some(value.to_rfc3339()),
+            });
+        }
+    }
+    Err(OcpmError::invalid_data(format!(
+        "invalid OCEL SQLite timestamp {value:?}"
+    )))
 }
 
 fn sqlite_error(error: rusqlite::Error) -> OcpmError {
@@ -1064,5 +1465,100 @@ mod tests {
         let log = read_xes(&input[..]).unwrap();
         assert_eq!(log.events[0].activity, "Create & approve");
         assert_eq!(log.events[0].external_id, "event-1");
+    }
+
+    #[test]
+    fn imports_standard_ocel2_relational_sqlite() {
+        let connection = Connection::open_in_memory().unwrap();
+        connection
+            .execute_batch(
+                r#"
+                CREATE TABLE event(ocel_id TEXT, ocel_type TEXT);
+                CREATE TABLE event_map_type(ocel_type TEXT, ocel_type_map TEXT);
+                CREATE TABLE event_CreateOrder(
+                    ocel_id TEXT, ocel_time TEXT, lifecycle TEXT, resource TEXT
+                );
+                CREATE TABLE object(ocel_id TEXT, ocel_type TEXT);
+                CREATE TABLE object_map_type(ocel_type TEXT, ocel_type_map TEXT);
+                CREATE TABLE object_Order(
+                    ocel_id TEXT, ocel_time TEXT, ocel_changed_field TEXT, status TEXT
+                );
+                CREATE TABLE event_object(
+                    ocel_event_id TEXT, ocel_object_id TEXT, ocel_qualifier TEXT
+                );
+                CREATE TABLE object_object(
+                    ocel_source_id TEXT, ocel_target_id TEXT, ocel_qualifier TEXT
+                );
+                INSERT INTO event_map_type VALUES ('Create Order','CreateOrder');
+                INSERT INTO object_map_type VALUES ('Order','Order');
+                INSERT INTO event VALUES ('e1','Create Order');
+                INSERT INTO event_CreateOrder VALUES (
+                    'e1','2024-01-01 01:02:03','complete','worker-1'
+                );
+                INSERT INTO object VALUES ('o1','Order');
+                INSERT INTO object_Order VALUES (
+                    'o1','2024-01-01T00:00:00Z','status','open'
+                );
+                INSERT INTO event_object VALUES ('e1','o1','order');
+                "#,
+            )
+            .unwrap();
+
+        let log = read_sqlite_connection(&connection).unwrap();
+        assert_eq!(log.events.len(), 1);
+        assert_eq!(log.events[0].activity, "Create Order");
+        assert_eq!(log.events[0].lifecycle.as_deref(), Some("complete"));
+        assert_eq!(
+            log.events[0].attributes["resource"],
+            AttributeValue::String("worker-1".to_owned())
+        );
+        assert_eq!(log.objects.len(), 1);
+        assert_eq!(log.event_object_relations.len(), 1);
+        assert_eq!(log.object_attribute_history.len(), 1);
+    }
+
+    #[test]
+    fn sqlite_event_source_order_breaks_equal_timestamp_ties() {
+        let connection = Connection::open_in_memory().unwrap();
+        connection
+            .execute_batch(
+                r#"
+                CREATE TABLE event(ocel_id TEXT, ocel_type TEXT);
+                CREATE TABLE event_map_type(ocel_type TEXT, ocel_type_map TEXT);
+                CREATE TABLE event_Activity(ocel_id TEXT, ocel_time TEXT);
+                CREATE TABLE object(ocel_id TEXT, ocel_type TEXT);
+                CREATE TABLE object_map_type(ocel_type TEXT, ocel_type_map TEXT);
+                CREATE TABLE object_Order(
+                    ocel_id TEXT, ocel_time TEXT, ocel_changed_field TEXT
+                );
+                CREATE TABLE event_object(
+                    ocel_event_id TEXT, ocel_object_id TEXT, ocel_qualifier TEXT
+                );
+                CREATE TABLE object_object(
+                    ocel_source_id TEXT, ocel_target_id TEXT, ocel_qualifier TEXT
+                );
+                INSERT INTO event_map_type VALUES ('Activity','Activity');
+                INSERT INTO object_map_type VALUES ('Order','Order');
+                INSERT INTO event VALUES ('z-event','Activity'),('a-event','Activity');
+                INSERT INTO event_Activity VALUES
+                    ('a-event','2024-01-01T00:00:00Z'),
+                    ('z-event','2024-01-01T00:00:00Z');
+                INSERT INTO object VALUES ('order-1','Order');
+                INSERT INTO event_object VALUES
+                    ('z-event','order-1','order'),
+                    ('a-event','order-1','order');
+                "#,
+            )
+            .unwrap();
+
+        let log = read_sqlite_connection(&connection).unwrap();
+        assert_eq!(
+            log.events
+                .iter()
+                .map(|event| event.external_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["z-event", "a-event"]
+        );
+        assert!(log.events[0].sequence < log.events[1].sequence);
     }
 }

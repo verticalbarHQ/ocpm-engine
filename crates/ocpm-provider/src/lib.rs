@@ -6,7 +6,7 @@
 
 use ocpm_core::{
     CanonicalLog, DatasetProfile, DatasetView, Event, ObjectId, OcpmError, OcpmErrorCode,
-    OcpmResult, QueryRequest, QueryResult,
+    OcpmResult, QueryRequest, QueryResult, event_batch::EventLogSummary,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -59,6 +59,15 @@ pub struct ProviderEstimate {
     pub confidence: f64,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ExecutionSummaryRequest {
+    pub view: DatasetView,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub leading_object_type: Option<String>,
+    #[serde(default)]
+    pub complete_lifecycle: bool,
+}
+
 pub trait OcpmProvider: Send + Sync {
     fn name(&self) -> &'static str;
     fn semantic_version(&self) -> &'static str {
@@ -73,6 +82,12 @@ pub trait OcpmProvider: Send + Sync {
         leading_object_type: Option<&str>,
     ) -> OcpmResult<Vec<ProcessExecution>>;
     fn query(&self, request: &QueryRequest) -> OcpmResult<QueryResult>;
+    fn execution_summary(
+        &self,
+        _request: &ExecutionSummaryRequest,
+    ) -> OcpmResult<Option<EventLogSummary>> {
+        Ok(None)
+    }
     fn snapshot(&self, _view: &DatasetView) -> OcpmResult<CanonicalLog> {
         Err(OcpmError::new(
             OcpmErrorCode::ProviderUnavailable,

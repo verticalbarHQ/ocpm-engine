@@ -10,13 +10,20 @@ use ocpm_core::{
     DatasetView, DiscoveryRequest, EnhancementRequest, EnhancementResult, ExecutionPlan,
     ExecutionStep, FitPredictionRequest, ModelArtifact, OcpmResult, PredictionRequest,
     PredictionResult, QueryRequest, QueryResult,
+    event_batch::{EventLogSummary, EventSummaryBuilder},
 };
 use ocpm_local::LocalProvider;
 use ocpm_prediction::PredictionArtifact;
-use ocpm_provider::{OcpmProvider, ProviderCapability};
+use ocpm_provider::{ExecutionSummaryRequest, OcpmProvider, ProviderCapability};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+#[cfg(feature = "duckdb")]
+pub use ocpm_duckdb::{
+    DuckDbOptions, DuckDbParquetSource, DuckDbProvider, EntityLinkSnapshotV1, ExtensionPolicy,
+    ParquetCachePolicy, ParquetLayout, ParquetLocation, S3CredentialReference, SnapshotSelection,
+    SnapshotWriteResult, SourceTimestampPolicy, SourceValidationPolicy,
+};
 pub use ocpm_io::CsvMapping;
 pub use ocpm_provider::{ExecutionMode, ProcessExecution};
 
@@ -51,6 +58,11 @@ impl Engine {
 
     pub fn from_sqlite(path: impl AsRef<std::path::Path>) -> OcpmResult<Self> {
         Self::from_log(ocpm_io::read_sqlite(path)?)
+    }
+
+    #[cfg(feature = "duckdb")]
+    pub fn from_duckdb_parquet(source: DuckDbParquetSource) -> OcpmResult<Self> {
+        Ok(Self::from_provider(Arc::new(DuckDbProvider::open(source)?)))
     }
 
     #[cfg(feature = "postgres")]
@@ -261,6 +273,77 @@ impl Engine {
         view: &DatasetView,
     ) -> OcpmResult<()> {
         ocpm_io::write_sqlite(path, &self.snapshot(view)?)
+    }
+
+    #[cfg(feature = "duckdb")]
+    pub fn write_parquet_snapshot(
+        &self,
+        root: impl AsRef<std::path::Path>,
+        version: &str,
+        view: &DatasetView,
+    ) -> OcpmResult<SnapshotWriteResult> {
+        Ok(ocpm_duckdb::write_canonical_snapshot(
+            &self.snapshot(view)?,
+            root,
+            version,
+        )?)
+    }
+
+    pub fn execution_summary(
+        &self,
+        request: &ExecutionSummaryRequest,
+    ) -> OcpmResult<EventLogSummary> {
+        if let Some(summary) = self.provider.execution_summary(request)? {
+            return Ok(summary);
+        }
+        let mut scan_view = request.view.clone();
+        if request.complete_lifecycle {
+            scan_view.start = None;
+            scan_view.end = None;
+        }
+        let executions = self.provider.process_executions(
+            &scan_view,
+            ExecutionMode::LeadingObject,
+            request.leading_object_type.as_deref(),
+        )?;
+        let mut builder = EventSummaryBuilder::new();
+        for execution in executions {
+            if request.complete_lifecycle
+                && (execution.events.first().is_none_or(|event| {
+                    request
+                        .view
+                        .start
+                        .as_ref()
+                        .is_none_or(|start| &event.timestamp < start)
+                }) || execution.events.last().is_none_or(|event| {
+                    request
+                        .view
+                        .end
+                        .as_ref()
+                        .is_none_or(|end| &event.timestamp >= end)
+                }))
+            {
+                continue;
+            }
+            let activity_path = execution.activity_path();
+            let timestamps = execution
+                .events
+                .iter()
+                .map(|event| {
+                    i64::try_from(event.timestamp.epoch_nanos_utc / 1_000).map_err(|_| {
+                        ocpm_core::OcpmError::invalid_request(
+                            "event timestamp is outside microsecond summary range",
+                        )
+                    })
+                })
+                .collect::<OcpmResult<Vec<_>>>()?;
+            builder
+                .push_case(&activity_path, &timestamps)
+                .map_err(|error| {
+                    ocpm_core::OcpmError::resource_limit(error.to_string(), u64::MAX, u64::MAX)
+                })?;
+        }
+        Ok(builder.finish())
     }
 
     pub fn query(&self, request: &QueryRequest) -> OcpmResult<QueryResult> {
