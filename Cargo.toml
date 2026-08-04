@@ -19,7 +19,7 @@ resolver = "2"
 [workspace.package]
 version = "1.1.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.85.1"
 authors = ["ocpm-engine contributors"]
 
 [workspace.dependencies]
