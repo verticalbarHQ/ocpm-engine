@@ -46,6 +46,7 @@ jobs:
         run: cargo +1.85.1 clippy --workspace --all-targets --locked -- -D warnings
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
+          rust-version: "1.85.1"
           command: check
           arguments: --all-features
       - run: python -m pip install --upgrade pip
