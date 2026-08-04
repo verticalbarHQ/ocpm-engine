@@ -42,6 +42,7 @@ exclude_docs: |
   prior-art-and-icpm-roadmap.md
   ocpm-mcp-feasibility.md
   open-source-release.md
+  private-distribution.md
   process-mining-capability-map.md
   sap-pm4py-three-way-performance.md
   rust4pm-vs-pg-ocpm-engine.md
@@ -81,4 +82,3 @@ nav:
   - Project:
       - Academic implementation provenance: academic-implementation-provenance.md
       - Production dependency boundary: dependency-boundary.md
-      - Private wheel distribution: private-distribution.md
