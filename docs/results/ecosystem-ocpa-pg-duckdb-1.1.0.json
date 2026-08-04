@@ -1,0 +1,4661 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-04T02:30:45.533082+00:00",
+  "suite": "ecosystem-common-pm-three-way",
+  "dataset": "ocpa_running_example",
+  "competitor": "ocpa",
+  "publication_ready": false,
+  "exactness": [
+    {
+      "workload": "dfg_conformance_95pct",
+      "exact": true,
+      "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+      "arm_sha256": {
+        "ocpa": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+        "pg_ocpm_ocpm_engine": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+        "duckdb_parquet_ocpm_engine": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+        "duckdb_parquet_ocpm_engine_cache_off": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118"
+      }
+    },
+    {
+      "workload": "variant_conformance_95pct",
+      "exact": true,
+      "answer_sha256": "80cd775e0a756938d2ce7f6c48bed2fb26d3c4a933b64ba1723e9612bac740bd",
+      "arm_sha256": {
+        "ocpa": "80cd775e0a756938d2ce7f6c48bed2fb26d3c4a933b64ba1723e9612bac740bd",
+        "pg_ocpm_ocpm_engine": "80cd775e0a756938d2ce7f6c48bed2fb26d3c4a933b64ba1723e9612bac740bd",
+        "duckdb_parquet_ocpm_engine": "80cd775e0a756938d2ce7f6c48bed2fb26d3c4a933b64ba1723e9612bac740bd",
+        "duckdb_parquet_ocpm_engine_cache_off": "80cd775e0a756938d2ce7f6c48bed2fb26d3c4a933b64ba1723e9612bac740bd"
+      }
+    },
+    {
+      "workload": "next_activity_prediction",
+      "exact": true,
+      "answer_sha256": "0d11e08bea5189f4b9bd8d8b63a71840edef2dc8b0a3d120c9a08d1d20e5739d",
+      "arm_sha256": {
+        "ocpa": "0d11e08bea5189f4b9bd8d8b63a71840edef2dc8b0a3d120c9a08d1d20e5739d",
+        "pg_ocpm_ocpm_engine": "0d11e08bea5189f4b9bd8d8b63a71840edef2dc8b0a3d120c9a08d1d20e5739d",
+        "duckdb_parquet_ocpm_engine": "0d11e08bea5189f4b9bd8d8b63a71840edef2dc8b0a3d120c9a08d1d20e5739d",
+        "duckdb_parquet_ocpm_engine_cache_off": "0d11e08bea5189f4b9bd8d8b63a71840edef2dc8b0a3d120c9a08d1d20e5739d"
+      }
+    },
+    {
+      "workload": "edge_bottleneck_ranking",
+      "exact": true,
+      "answer_sha256": "34ecb123e6a6270bca1ed9f302917df1347966c0562f4998a71c7740e3dc1528",
+      "arm_sha256": {
+        "ocpa": "34ecb123e6a6270bca1ed9f302917df1347966c0562f4998a71c7740e3dc1528",
+        "pg_ocpm_ocpm_engine": "34ecb123e6a6270bca1ed9f302917df1347966c0562f4998a71c7740e3dc1528",
+        "duckdb_parquet_ocpm_engine": "34ecb123e6a6270bca1ed9f302917df1347966c0562f4998a71c7740e3dc1528",
+        "duckdb_parquet_ocpm_engine_cache_off": "34ecb123e6a6270bca1ed9f302917df1347966c0562f4998a71c7740e3dc1528"
+      }
+    }
+  ],
+  "latency": [
+    {
+      "workload": "dfg_conformance_95pct",
+      "arms": {
+        "ocpa": {
+          "p50_ms": 14.937,
+          "p95_ms": 92.127
+        },
+        "pg_ocpm_ocpm_engine": {
+          "p50_ms": 0.166,
+          "p95_ms": 0.351
+        },
+        "duckdb_parquet_ocpm_engine": {
+          "p50_ms": 0.05,
+          "p95_ms": 0.14
+        }
+      },
+      "duckdb_without_result_cache": {
+        "p50_ms": 51.287,
+        "p95_ms": 74.388
+      }
+    },
+    {
+      "workload": "variant_conformance_95pct",
+      "arms": {
+        "ocpa": {
+          "p50_ms": 16.298,
+          "p95_ms": 103.303
+        },
+        "pg_ocpm_ocpm_engine": {
+          "p50_ms": 0.254,
+          "p95_ms": 0.494
+        },
+        "duckdb_parquet_ocpm_engine": {
+          "p50_ms": 0.09,
+          "p95_ms": 0.377
+        }
+      },
+      "duckdb_without_result_cache": {
+        "p50_ms": 52.533,
+        "p95_ms": 79.737
+      }
+    },
+    {
+      "workload": "next_activity_prediction",
+      "arms": {
+        "ocpa": {
+          "p50_ms": 14.478,
+          "p95_ms": 103.887
+        },
+        "pg_ocpm_ocpm_engine": {
+          "p50_ms": 0.159,
+          "p95_ms": 0.31
+        },
+        "duckdb_parquet_ocpm_engine": {
+          "p50_ms": 0.047,
+          "p95_ms": 0.218
+        }
+      },
+      "duckdb_without_result_cache": {
+        "p50_ms": 53.129,
+        "p95_ms": 84.533
+      }
+    },
+    {
+      "workload": "edge_bottleneck_ranking",
+      "arms": {
+        "ocpa": {
+          "p50_ms": 19.062,
+          "p95_ms": 109.58
+        },
+        "pg_ocpm_ocpm_engine": {
+          "p50_ms": 0.407,
+          "p95_ms": 0.773
+        },
+        "duckdb_parquet_ocpm_engine": {
+          "p50_ms": 0.024,
+          "p95_ms": 0.062
+        }
+      },
+      "duckdb_without_result_cache": {
+        "p50_ms": 28.062,
+        "p95_ms": 51.395
+      }
+    }
+  ],
+  "concurrency": [
+    {
+      "workers": 1,
+      "arms": {
+        "ocpa": {
+          "throughput_qps": 42.767,
+          "p95_ms": 106.393
+        },
+        "pg_ocpm_ocpm_engine": {
+          "throughput_qps": 4094.64,
+          "p95_ms": 0.507
+        },
+        "duckdb_parquet_ocpm_engine": {
+          "throughput_qps": 21801.952817567322,
+          "p95_ms": 0.052
+        }
+      }
+    },
+    {
+      "workers": 2,
+      "arms": {
+        "ocpa": {
+          "throughput_qps": 76.834,
+          "p95_ms": 125.108
+        },
+        "pg_ocpm_ocpm_engine": {
+          "throughput_qps": 7524.812,
+          "p95_ms": 0.495
+        },
+        "duckdb_parquet_ocpm_engine": {
+          "throughput_qps": 31974.71595646071,
+          "p95_ms": 0.115
+        }
+      }
+    },
+    {
+      "workers": 4,
+      "arms": {
+        "ocpa": {
+          "throughput_qps": 126.086,
+          "p95_ms": 137.536
+        },
+        "pg_ocpm_ocpm_engine": {
+          "throughput_qps": 11389.756,
+          "p95_ms": 0.674
+        },
+        "duckdb_parquet_ocpm_engine": {
+          "throughput_qps": 56095.59790511234,
+          "p95_ms": 0.126
+        }
+      }
+    },
+    {
+      "workers": 8,
+      "arms": {
+        "ocpa": {
+          "throughput_qps": 181.418,
+          "p95_ms": 165.188
+        },
+        "pg_ocpm_ocpm_engine": {
+          "throughput_qps": 14585.516,
+          "p95_ms": 1.156
+        },
+        "duckdb_parquet_ocpm_engine": {
+          "throughput_qps": 93149.41297589257,
+          "p95_ms": 0.184
+        }
+      }
+    }
+  ],
+  "memory": {
+    "ocpa": {
+      "maximum_incremental_peak_bytes": 16384,
+      "maximum_peak_rss_bytes": 193769472
+    },
+    "pg_ocpm_ocpm_engine": {
+      "maximum_incremental_peak_bytes": 4096,
+      "maximum_peak_rss_bytes": 57344000
+    },
+    "duckdb_parquet_ocpm_engine": {
+      "maximum_incremental_peak_bytes": 4096,
+      "maximum_peak_rss_bytes": 170057728
+    }
+  },
+  "storage": {
+    "ocpa": {
+      "source_sqlite_bytes": 3743744
+    },
+    "pg_ocpm_ocpm_engine": {},
+    "duckdb_parquet_ocpm_engine": {
+      "source_sqlite_bytes": 3743744,
+      "snapshot_bytes": 605965
+    }
+  },
+  "duckdb_setup": {
+    "snapshot_conversion_ms": 440.602741,
+    "connection_open_ms": 85.644638
+  },
+  "summary": {
+    "exact_answer_cells": 4,
+    "p50_geometric_mean_speedup_over_competitor": {
+      "pg_ocpm_ocpm_engine": 70.443,
+      "duckdb_parquet_ocpm_engine": 339.186
+    },
+    "duckdb_without_result_cache_p50_geometric_mean_speedup_over_competitor": 0.36
+  },
+  "manifest": {
+    "schema_version": 1,
+    "generated_at": "2026-08-04T02:15:07.517342+00:00",
+    "contract": {
+      "suite": "ecosystem-common-pm",
+      "train_fraction": 0.8,
+      "workloads": [
+        "dfg_conformance_95pct",
+        "variant_conformance_95pct",
+        "next_activity_prediction",
+        "edge_bottleneck_ranking"
+      ],
+      "timing_boundary": "steady-state request only; OCEL import, PostgreSQL fixture load, process startup, connection startup, and worker startup excluded",
+      "correctness": "exact canonical answer equality on every measured request",
+      "object_type_selection": {
+        "rule": "maximum count of object lifecycles containing at least two events; then maximum event-object link count; then lexical object-type name",
+        "selected": "orders",
+        "candidates": [
+          {
+            "object_type": "orders",
+            "multi_event_lifecycles": 2000,
+            "event_object_links": 6484,
+            "linked_objects": 2000
+          },
+          {
+            "object_type": "items",
+            "multi_event_lifecycles": 1508,
+            "event_object_links": 10686,
+            "linked_objects": 7670
+          },
+          {
+            "object_type": "packages",
+            "multi_event_lifecycles": 320,
+            "event_object_links": 1041,
+            "linked_objects": 320
+          },
+          {
+            "object_type": "employees",
+            "multi_event_lifecycles": 18,
+            "event_object_links": 13646,
+            "linked_objects": 18
+          },
+          {
+            "object_type": "customers",
+            "multi_event_lifecycles": 3,
+            "event_object_links": 4000,
+            "linked_objects": 3
+          }
+        ]
+      },
+      "event_order": "event timestamp, then external event ID",
+      "latency": "10 warmups; 3 epochs x 30 samples; monotonic nanosecond clock",
+      "concurrency": "DFG conformance; 3 epochs; at least 5 seconds and 32 requests per worker at 1/2/4/8 workers"
+    },
+    "source": {
+      "title": "OCPA OCEL 2.0 running example",
+      "identifier": "ocpm/ocpa@de056e0203a3fa4a9bbc19a95e001eada323074a:sample_logs/ocel2/sqlite/running-example.sqlite",
+      "upstream_project": "OCPA documented OCEL 2.0 import example",
+      "upstream_revision": "de056e0203a3fa4a9bbc19a95e001eada323074a",
+      "license": "OCPA 1.3.4 wheel contains GPL-3.0; dataset-specific terms are not stated separately"
+    },
+    "datasets": [
+      {
+        "name": "ocpa_running_example",
+        "filename": "ocpa-running-example.sqlite",
+        "sqlite_sha256": "019202ee793cbd71c80636ca10d78f9701e83f3696ca818c52cc76f38d2bd38d",
+        "source_url": "https://raw.githubusercontent.com/ocpm/ocpa/de056e0203a3fa4a9bbc19a95e001eada323074a/sample_logs/ocel2/sqlite/running-example.sqlite",
+        "source_sqlite_bytes": 3743744,
+        "source_counts": {
+          "events": 18211,
+          "objects": 10031,
+          "event_object_links": 35857,
+          "object_object_links": 25336,
+          "ignored_orphan_object_relations": 0
+        },
+        "object_type_selection": {
+          "rule": "maximum count of object lifecycles containing at least two events; then maximum event-object link count; then lexical object-type name",
+          "selected": "orders",
+          "candidates": [
+            {
+              "object_type": "orders",
+              "multi_event_lifecycles": 2000,
+              "event_object_links": 6484,
+              "linked_objects": 2000
+            },
+            {
+              "object_type": "items",
+              "multi_event_lifecycles": 1508,
+              "event_object_links": 10686,
+              "linked_objects": 7670
+            },
+            {
+              "object_type": "packages",
+              "multi_event_lifecycles": 320,
+              "event_object_links": 1041,
+              "linked_objects": 320
+            },
+            {
+              "object_type": "employees",
+              "multi_event_lifecycles": 18,
+              "event_object_links": 13646,
+              "linked_objects": 18
+            },
+            {
+              "object_type": "customers",
+              "multi_event_lifecycles": 3,
+              "event_object_links": 4000,
+              "linked_objects": 3
+            }
+          ]
+        },
+        "fixture": {
+          "dataset_name": "ocpa_running_example",
+          "baseline_dataset_id": 1,
+          "ocpm_dataset_id": 1,
+          "tenant_id": 1,
+          "object_type": "orders",
+          "from_time": "2023-04-03T12:08:17.999999+00:00",
+          "train_to": "2024-01-26T12:23:47+00:00",
+          "test_from": "2024-01-26T12:23:47.000001+00:00",
+          "to_time": "2024-05-10T10:15:11.000001+00:00",
+          "cases": 2000,
+          "train_cases": 1600,
+          "test_cases": 338
+        }
+      }
+    ],
+    "fixture_prepare": {
+      "schema_version": 1,
+      "generated_at": "2026-08-04T02:15:02.247825+00:00",
+      "source": {
+        "title": "OCPA OCEL 2.0 running example",
+        "identifier": "ocpm/ocpa@de056e0203a3fa4a9bbc19a95e001eada323074a:sample_logs/ocel2/sqlite/running-example.sqlite",
+        "upstream_project": "OCPA documented OCEL 2.0 import example",
+        "upstream_revision": "de056e0203a3fa4a9bbc19a95e001eada323074a",
+        "license": "OCPA 1.3.4 wheel contains GPL-3.0; dataset-specific terms are not stated separately"
+      },
+      "datasets": [
+        {
+          "dataset_id": 1,
+          "name": "ocpa_running_example",
+          "filename": "ocpa-running-example.sqlite",
+          "source_url": "https://raw.githubusercontent.com/ocpm/ocpa/de056e0203a3fa4a9bbc19a95e001eada323074a/sample_logs/ocel2/sqlite/running-example.sqlite",
+          "sqlite_sha256": "019202ee793cbd71c80636ca10d78f9701e83f3696ca818c52cc76f38d2bd38d",
+          "source_sqlite_bytes": 3743744,
+          "counts": {
+            "events": 18211,
+            "objects": 10031,
+            "event_object_links": 35857,
+            "object_object_links": 25336,
+            "ignored_orphan_object_relations": 0
+          },
+          "raw_load_s": {
+            "baseline": 0.909,
+            "extension_staging": 0.849
+          },
+          "object_type_selection": {
+            "rule": "maximum count of object lifecycles containing at least two events; then maximum event-object link count; then lexical object-type name",
+            "selected": "orders",
+            "candidates": [
+              {
+                "object_type": "orders",
+                "multi_event_lifecycles": 2000,
+                "event_object_links": 6484,
+                "linked_objects": 2000
+              },
+              {
+                "object_type": "items",
+                "multi_event_lifecycles": 1508,
+                "event_object_links": 10686,
+                "linked_objects": 7670
+              },
+              {
+                "object_type": "packages",
+                "multi_event_lifecycles": 320,
+                "event_object_links": 1041,
+                "linked_objects": 320
+              },
+              {
+                "object_type": "employees",
+                "multi_event_lifecycles": 18,
+                "event_object_links": 13646,
+                "linked_objects": 18
+              },
+              {
+                "object_type": "customers",
+                "multi_event_lifecycles": 3,
+                "event_object_links": 4000,
+                "linked_objects": 3
+              }
+            ]
+          },
+          "event_order": "event timestamp, then external event ID",
+          "normalized_counts": {
+            "cases": 10011,
+            "edges": 25846,
+            "events": 35857,
+            "dataset_id": 1,
+            "binding_index": "not prepared",
+            "adjacency_rows": 90484,
+            "provenance_rows": 0,
+            "source_watermark": "2024-05-10T10:15:11+00:00",
+            "event_identity_complete": true
+          },
+          "ocpm_dataset_id": 1,
+          "phases": {
+            "event_facts": {
+              "rows": 35857,
+              "elapsed_s": 0.181
+            },
+            "directly_follows_edges": {
+              "rows": 25846,
+              "elapsed_s": 0.157
+            },
+            "object_adjacency": {
+              "rows": 90484,
+              "elapsed_s": 0.329
+            },
+            "case_summaries": {
+              "rows": 10011,
+              "elapsed_s": 0.126
+            }
+          },
+          "finalization_s": 1.796
+        }
+      ],
+      "baseline_index_build_s": 0.3,
+      "extension_index_build_s": 0.359,
+      "pg_ocpm_version": "1.0.0",
+      "postgres_version": "16.14 (Debian 16.14-1.pgdg13+1)",
+      "storage": {
+        "vanilla_postgres": {
+          "total_bytes": 24608768,
+          "index_bytes": 17154048
+        },
+        "pg_ocpm": {
+          "total_bytes": 9355264,
+          "index_bytes": 1605632
+        }
+      }
+    }
+  },
+  "arms": {
+    "ocpa": {
+      "schema_version": 1,
+      "generated_at": "2026-08-04T02:18:52.181737+00:00",
+      "arm": "ocpa",
+      "implementation": {
+        "ocpa_version": "1.3.4",
+        "ocpa_wheel_sha256": "52e8208d5ef8633060b905441498aa8b53e0322bf7a310c5a5deb49500da2934",
+        "python": "3.11.15",
+        "platform": "Linux-7.0.11-orbstack-00360-gc9bc4d96ac70-aarch64-with-glibc2.36",
+        "runtime_versions": {
+          "pm4py": "2.2.32",
+          "pandas": "3.0.5",
+          "numpy": "2.4.6",
+          "networkx": "3.6.1",
+          "scipy": "1.17.1",
+          "psutil": "7.0.0"
+        },
+        "image_id": "sha256:51efd98514833ddfd1dd1179fa5ebd272476372f9f53798083c1a0b62c2b9852",
+        "controller_source_tree_clean": true
+      },
+      "method": {
+        "data_model": "ocpa.objects.log.variants.obj.ObjectCentricEventLog",
+        "adapter": "documented importer when functional; otherwise a disclosed benchmark-owned OCEL2-to-public-OCPA-model setup adapter",
+        "process_model": "preloaded read-only OCPA model with forked process workers",
+        "native_importer": "probed on the unmodified upstream source and reported separately"
+      },
+      "process_baseline_rss_bytes": 25419776,
+      "storage": {
+        "ocpa_package_bytes": 1685696,
+        "pandas_package_bytes": 74918488,
+        "networkx_package_bytes": 16573549
+      },
+      "datasets": [
+        {
+          "dataset": "ocpa_running_example",
+          "fixture": {
+            "dataset_name": "ocpa_running_example",
+            "baseline_dataset_id": 1,
+            "ocpm_dataset_id": 1,
+            "tenant_id": 1,
+            "object_type": "orders",
+            "from_time": "2023-04-03T12:08:17.999999+00:00",
+            "train_to": "2024-01-26T12:23:47+00:00",
+            "test_from": "2024-01-26T12:23:47.000001+00:00",
+            "to_time": "2024-05-10T10:15:11.000001+00:00",
+            "cases": 2000,
+            "train_cases": 1600,
+            "test_cases": 338
+          },
+          "source_sqlite_bytes": 3743744,
+          "source_sqlite_sha256": "019202ee793cbd71c80636ca10d78f9701e83f3696ca818c52cc76f38d2bd38d",
+          "native_import_probe": {
+            "documented_importer": true,
+            "success": false,
+            "elapsed_s": 2.557057,
+            "error_type": "ValueError",
+            "error": "ValueError: Sample larger than population or is negative"
+          },
+          "adapter": {
+            "adapter": "benchmark_ocel2_sqlite_to_ocpa_public_model",
+            "reason": "OCPA 1.3.4 documented importer fails on its upstream example before constructing a model",
+            "events": 18211,
+            "objects": 10011,
+            "object_types": 6,
+            "event_object_links": 35857
+          },
+          "load": {
+            "seconds": 1.978767,
+            "rss_before_bytes": 25272320,
+            "rss_after_bytes": 193490944,
+            "baseline_rss_bytes": 25272320,
+            "peak_rss_bytes": 213823488,
+            "incremental_peak_bytes": 188551168,
+            "resident_pss_bytes": 193483776
+          },
+          "serial": {
+            "dfg_conformance_95pct": {
+              "correct_within_arm": true,
+              "answer": {
+                "fitness": 1.0,
+                "conforming": 759,
+                "deviations": 0,
+                "test_total": 759,
+                "model": [
+                  [
+                    "confirm order",
+                    "payment reminder",
+                    "directly_follows"
+                  ],
+                  [
+                    "payment reminder",
+                    "payment reminder",
+                    "directly_follows"
+                  ],
+                  [
+                    "place order",
+                    "confirm order",
+                    "directly_follows"
+                  ]
+                ]
+              },
+              "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+              "input": {
+                "selected_cases": 1938,
+                "event_rows": 6250,
+                "aggregate_rows": 3,
+                "source": "ocpa.ObjectCentricEventLog",
+                "native_object_type_cases": 2000
+              },
+              "p50_ms": 14.937,
+              "p95_ms": 92.127,
+              "minimum_ms": 11.925,
+              "maximum_ms": 130.279,
+              "runs": 90,
+              "epoch_count": 3,
+              "epoch_p95_median_ms": 103.984,
+              "epoch_p95_range_ms": [
+                15.086,
+                111.606
+              ],
+              "epochs": [
+                {
+                  "epoch": 1,
+                  "p50_ms": 15.215,
+                  "p95_ms": 111.606,
+                  "minimum_ms": 12.958,
+                  "maximum_ms": 130.279,
+                  "runs": 30,
+                  "samples_ns": [
+                    14688494,
+                    16131222,
+                    17201446,
+                    18570089,
+                    19429518,
+                    18209084,
+                    18620382,
+                    18987220,
+                    20018318,
+                    20740369,
+                    24368878,
+                    130278837,
+                    13500645,
+                    12957720,
+                    13303975,
+                    14298738,
+                    14664327,
+                    13735731,
+                    13744439,
+                    15458297,
+                    15208127,
+                    15243793,
+                    14784495,
+                    15084124,
+                    15164042,
+                    15221168,
+                    15068166,
+                    111605830,
+                    14551117,
+                    13299225
+                  ]
+                },
+                {
+                  "epoch": 2,
+                  "p50_ms": 16.19,
+                  "p95_ms": 103.984,
+                  "minimum_ms": 13.821,
+                  "maximum_ms": 110.494,
+                  "runs": 30,
+                  "samples_ns": [
+                    14605576,
+                    14232529,
+                    14805538,
+                    14137737,
+                    15255044,
+                    16213057,
+                    14507617,
+                    13820857,
+                    15495880,
+                    16116723,
+                    16165972,
+                    15610090,
+                    110494356,
+                    17250237,
+                    15963553,
+                    16629855,
+                    16272683,
+                    18036707,
+                    17454741,
+                    16834232,
+                    18555881,
+                    19115097,
+                    18591839,
+                    18415546,
+                    19709272,
+                    17263155,
+                    16078555,
+                    15413421,
+                    16063804,
+                    103983933
+                  ]
+                },
+                {
+                  "epoch": 3,
+                  "p50_ms": 13.186,
+                  "p95_ms": 15.086,
+                  "minimum_ms": 11.925,
+                  "maximum_ms": 92.127,
+                  "runs": 30,
+                  "samples_ns": [
+                    12271294,
+                    13320934,
+                    12390713,
+                    12593298,
+                    11986373,
+                    12193793,
+                    13013055,
+                    12247127,
+                    12457589,
+                    13051180,
+                    13429727,
+                    15086124,
+                    13809107,
+                    12618841,
+                    12381254,
+                    92127228,
+                    12210377,
+                    11924998,
+                    12717259,
+                    12761634,
+                    13474228,
+                    13586103,
+                    13998235,
+                    13795315,
+                    13399851,
+                    13653021,
+                    14183820,
+                    14280156,
+                    13527645,
+                    13705897
+                  ]
+                }
+              ]
+            },
+            "variant_conformance_95pct": {
+              "correct_within_arm": true,
+              "answer": {
+                "fitness": 0.958579881657,
+                "conforming": 324,
+                "deviations": 14,
+                "test_total": 338,
+                "model": [
+                  "[\"place order\",\"confirm order\",\"payment reminder\",\"payment reminder\"]",
+                  "[\"place order\",\"confirm order\",\"payment reminder\"]"
+                ]
+              },
+              "answer_sha256": "80cd775e0a756938d2ce7f6c48bed2fb26d3c4a933b64ba1723e9612bac740bd",
+              "input": {
+                "selected_cases": 1938,
+                "event_rows": 6250,
+                "aggregate_rows": 6,
+                "source": "ocpa.ObjectCentricEventLog",
+                "native_object_type_cases": 2000
+              },
+              "p50_ms": 16.298,
+              "p95_ms": 103.303,
+              "minimum_ms": 14.117,
+              "maximum_ms": 129.852,
+              "runs": 90,
+              "epoch_count": 3,
+              "epoch_p95_median_ms": 103.303,
+              "epoch_p95_range_ms": [
+                98.412,
+                109.215
+              ],
+              "epochs": [
+                {
+                  "epoch": 1,
+                  "p50_ms": 16.925,
+                  "p95_ms": 103.303,
+                  "minimum_ms": 14.556,
+                  "maximum_ms": 127.479,
+                  "runs": 30,
+                  "samples_ns": [
+                    18522006,
+                    16772440,
+                    15807426,
+                    15997471,
+                    15957970,
+                    16186848,
+                    15595923,
+                    15736467,
+                    103302716,
+                    15683717,
+                    15485880,
+                    14555534,
+                    15691841,
+                    14562701,
+                    15816759,
+                    16482352,
+                    17300196,
+                    17077027,
+                    16568186,
+                    17764370,
+                    19976067,
+                    19850440,
+                    20499908,
+                    20428906,
+                    127478549,
+                    19756398,
+                    20308738,
+                    21528422,
+                    21707341,
+                    22941692
+                  ]
+                },
+                {
+                  "epoch": 2,
+                  "p50_ms": 17.355,
+                  "p95_ms": 109.215,
+                  "minimum_ms": 14.722,
+                  "maximum_ms": 129.852,
+                  "runs": 30,
+                  "samples_ns": [
+                    21900177,
+                    23460865,
+                    23233904,
+                    23274529,
+                    20658118,
+                    22849065,
+                    23010775,
+                    22022720,
+                    23327363,
+                    129852040,
+                    17899164,
+                    16759481,
+                    16657605,
+                    17085819,
+                    16875941,
+                    14721787,
+                    14861871,
+                    16300058,
+                    17601201,
+                    17416449,
+                    17544200,
+                    15766093,
+                    17294280,
+                    16728439,
+                    15539172,
+                    17130236,
+                    109215005,
+                    16397767,
+                    15993471,
+                    16065805
+                  ]
+                },
+                {
+                  "epoch": 3,
+                  "p50_ms": 15.827,
+                  "p95_ms": 98.412,
+                  "minimum_ms": 14.117,
+                  "maximum_ms": 104.726,
+                  "runs": 30,
+                  "samples_ns": [
+                    16094472,
+                    15650216,
+                    15765717,
+                    15810009,
+                    16076305,
+                    15676258,
+                    14400074,
+                    15226460,
+                    15374420,
+                    15726509,
+                    15856094,
+                    15194543,
+                    98411524,
+                    14116944,
+                    15316086,
+                    16296933,
+                    16181348,
+                    15783676,
+                    16090180,
+                    15906552,
+                    16311517,
+                    15798551,
+                    16034763,
+                    16155098,
+                    14815329,
+                    14559575,
+                    15928011,
+                    104725569,
+                    16017554,
+                    15844427
+                  ]
+                }
+              ]
+            },
+            "next_activity_prediction": {
+              "correct_within_arm": true,
+              "answer": {
+                "accuracy": 1.0,
+                "correct": 759,
+                "test_total": 759,
+                "predictions": [
+                  [
+                    "confirm order",
+                    "directly_follows",
+                    "payment reminder"
+                  ],
+                  [
+                    "payment reminder",
+                    "directly_follows",
+                    "payment reminder"
+                  ],
+                  [
+                    "place order",
+                    "directly_follows",
+                    "confirm order"
+                  ]
+                ]
+              },
+              "answer_sha256": "0d11e08bea5189f4b9bd8d8b63a71840edef2dc8b0a3d120c9a08d1d20e5739d",
+              "input": {
+                "selected_cases": 1938,
+                "event_rows": 6250,
+                "aggregate_rows": 3,
+                "source": "ocpa.ObjectCentricEventLog",
+                "native_object_type_cases": 2000
+              },
+              "p50_ms": 14.478,
+              "p95_ms": 103.887,
+              "minimum_ms": 12.399,
+              "maximum_ms": 127.878,
+              "runs": 90,
+              "epoch_count": 3,
+              "epoch_p95_median_ms": 106.16,
+              "epoch_p95_range_ms": [
+                99.569,
+                120.007
+              ],
+              "epochs": [
+                {
+                  "epoch": 1,
+                  "p50_ms": 15.266,
+                  "p95_ms": 106.16,
+                  "minimum_ms": 12.469,
+                  "maximum_ms": 118.986,
+                  "runs": 30,
+                  "samples_ns": [
+                    13004762,
+                    12746593,
+                    13771148,
+                    12544506,
+                    12469297,
+                    106160463,
+                    15020790,
+                    14051985,
+                    15511547,
+                    15905636,
+                    16825566,
+                    16104056,
+                    17697702,
+                    17552117,
+                    18759675,
+                    18236168,
+                    18193793,
+                    17839746,
+                    17707827,
+                    17788870,
+                    19284391,
+                    118986474,
+                    14365407,
+                    13839316,
+                    14306614,
+                    14725287,
+                    14410241,
+                    13660605,
+                    14085736,
+                    14193821
+                  ]
+                },
+                {
+                  "epoch": 2,
+                  "p50_ms": 13.893,
+                  "p95_ms": 99.569,
+                  "minimum_ms": 12.399,
+                  "maximum_ms": 103.887,
+                  "runs": 30,
+                  "samples_ns": [
+                    14114194,
+                    13323184,
+                    13935901,
+                    13930317,
+                    14184112,
+                    13329725,
+                    99568997,
+                    12660758,
+                    12398880,
+                    12754009,
+                    14099653,
+                    14544784,
+                    13840357,
+                    13679980,
+                    14384281,
+                    13940734,
+                    13471644,
+                    13649438,
+                    13849358,
+                    14068569,
+                    15558840,
+                    15576298,
+                    14345948,
+                    103886558,
+                    13554187,
+                    13656938,
+                    13854858,
+                    14164195,
+                    13344142,
+                    13780357
+                  ]
+                },
+                {
+                  "epoch": 3,
+                  "p50_ms": 14.958,
+                  "p95_ms": 120.007,
+                  "minimum_ms": 13.154,
+                  "maximum_ms": 127.878,
+                  "runs": 30,
+                  "samples_ns": [
+                    14893164,
+                    15705467,
+                    15022124,
+                    15706466,
+                    15435921,
+                    15330628,
+                    14305572,
+                    17390364,
+                    18484421,
+                    127878263,
+                    14611910,
+                    14514992,
+                    15155751,
+                    15240752,
+                    14760162,
+                    14480991,
+                    14850579,
+                    14159321,
+                    13153598,
+                    14024818,
+                    14672952,
+                    15668257,
+                    15086042,
+                    15049541,
+                    120007112,
+                    15023540,
+                    14474116,
+                    14764787,
+                    14436157,
+                    14311531
+                  ]
+                }
+              ]
+            },
+            "edge_bottleneck_ranking": {
+              "correct_within_arm": true,
+              "answer": [
+                [
+                  "confirm order",
+                  "payment reminder",
+                  2000,
+                  747513.717
+                ],
+                [
+                  "payment reminder",
+                  "payment reminder",
+                  484,
+                  735859.634298
+                ],
+                [
+                  "place order",
+                  "confirm order",
+                  2000,
+                  106005.8605
+                ]
+              ],
+              "answer_sha256": "34ecb123e6a6270bca1ed9f302917df1347966c0562f4998a71c7740e3dc1528",
+              "input": {
+                "selected_cases": 2000,
+                "event_rows": 6484,
+                "aggregate_rows": 3,
+                "source": "ocpa.ObjectCentricEventLog",
+                "native_object_type_cases": 2000
+              },
+              "p50_ms": 19.062,
+              "p95_ms": 109.58,
+              "minimum_ms": 16.535,
+              "maximum_ms": 133.572,
+              "runs": 90,
+              "epoch_count": 3,
+              "epoch_p95_median_ms": 112.101,
+              "epoch_p95_range_ms": [
+                101.682,
+                120.423
+              ],
+              "epochs": [
+                {
+                  "epoch": 1,
+                  "p50_ms": 19.639,
+                  "p95_ms": 120.423,
+                  "minimum_ms": 16.535,
+                  "maximum_ms": 133.572,
+                  "runs": 30,
+                  "samples_ns": [
+                    23460782,
+                    24299960,
+                    120423243,
+                    20828995,
+                    18866343,
+                    18858968,
+                    18817301,
+                    17245113,
+                    16535436,
+                    18833801,
+                    19164681,
+                    17241988,
+                    18461796,
+                    19180723,
+                    17651744,
+                    19233223,
+                    21158750,
+                    22800772,
+                    133571633,
+                    34089970,
+                    30177041,
+                    28651145,
+                    24777050,
+                    20637201,
+                    20043901,
+                    21061582,
+                    21012081,
+                    18915678,
+                    18391045,
+                    17811162
+                  ]
+                },
+                {
+                  "epoch": 2,
+                  "p50_ms": 18.854,
+                  "p95_ms": 101.682,
+                  "minimum_ms": 16.539,
+                  "maximum_ms": 109.58,
+                  "runs": 30,
+                  "samples_ns": [
+                    18135459,
+                    18556089,
+                    17721369,
+                    109579594,
+                    18263126,
+                    18633799,
+                    19333017,
+                    18952720,
+                    19365225,
+                    18748009,
+                    18932595,
+                    18907303,
+                    19257140,
+                    18544631,
+                    18498297,
+                    19121847,
+                    19471018,
+                    18517006,
+                    18831342,
+                    18877052,
+                    101682069,
+                    16538978,
+                    17117194,
+                    16893025,
+                    17927580,
+                    18880677,
+                    19260974,
+                    18886968,
+                    19160473,
+                    18721883
+                  ]
+                },
+                {
+                  "epoch": 3,
+                  "p50_ms": 20.419,
+                  "p95_ms": 112.101,
+                  "minimum_ms": 16.773,
+                  "maximum_ms": 117.735,
+                  "runs": 30,
+                  "samples_ns": [
+                    17630576,
+                    17440241,
+                    21358295,
+                    21204667,
+                    20117277,
+                    20720661,
+                    117735373,
+                    18032790,
+                    19001553,
+                    21244709,
+                    19831024,
+                    19196390,
+                    25052637,
+                    28211472,
+                    55180510,
+                    50623906,
+                    59042439,
+                    65241775,
+                    49373930,
+                    38401780,
+                    26106860,
+                    112101421,
+                    16773231,
+                    16841857,
+                    17073318,
+                    17307531,
+                    16785065,
+                    16883816,
+                    17226321,
+                    17236071
+                  ]
+                }
+              ]
+            }
+          },
+          "concurrency": {
+            "1": {
+              "workers": 1,
+              "epoch_count": 3,
+              "requests": 656,
+              "throughput_qps": 42.767,
+              "p50_ms": 15.959,
+              "p95_ms": 106.393,
+              "minimum_worker_pss_bytes_sum": 107149312,
+              "maximum_worker_rss_bytes_sum": 150065152,
+              "correct": true,
+              "epochs": [
+                {
+                  "p50_ms": 14.117,
+                  "p95_ms": 99.552,
+                  "minimum_ms": 12.094,
+                  "maximum_ms": 136.284,
+                  "runs": 240,
+                  "requests": 240,
+                  "wall_ms": 5010.231,
+                  "throughput_qps": 47.902,
+                  "worker_request_counts": [
+                    240
+                  ],
+                  "worker_rss_bytes_sum": 150040576,
+                  "worker_pss_bytes_sum": 107186176,
+                  "worker_pids": [
+                    87
+                  ],
+                  "correct": true,
+                  "epoch": 1
+                },
+                {
+                  "p50_ms": 15.959,
+                  "p95_ms": 106.393,
+                  "minimum_ms": 11.841,
+                  "maximum_ms": 216.931,
+                  "runs": 214,
+                  "requests": 214,
+                  "wall_ms": 5003.807,
+                  "throughput_qps": 42.767,
+                  "worker_request_counts": [
+                    214
+                  ],
+                  "worker_rss_bytes_sum": 150065152,
+                  "worker_pss_bytes_sum": 107159552,
+                  "worker_pids": [
+                    90
+                  ],
+                  "correct": true,
+                  "epoch": 2
+                },
+                {
+                  "p50_ms": 16.749,
+                  "p95_ms": 111.492,
+                  "minimum_ms": 11.364,
+                  "maximum_ms": 273.769,
+                  "runs": 202,
+                  "requests": 202,
+                  "wall_ms": 5099.317,
+                  "throughput_qps": 39.613,
+                  "worker_request_counts": [
+                    202
+                  ],
+                  "worker_rss_bytes_sum": 150065152,
+                  "worker_pss_bytes_sum": 107149312,
+                  "worker_pids": [
+                    93
+                  ],
+                  "correct": true,
+                  "epoch": 3
+                }
+              ]
+            },
+            "2": {
+              "workers": 2,
+              "epoch_count": 3,
+              "requests": 1127,
+              "throughput_qps": 76.834,
+              "p50_ms": 18.085,
+              "p95_ms": 125.108,
+              "minimum_worker_pss_bytes_sum": 185350144,
+              "maximum_worker_rss_bytes_sum": 300118016,
+              "correct": true,
+              "epochs": [
+                {
+                  "p50_ms": 17.91,
+                  "p95_ms": 115.709,
+                  "minimum_ms": 12.507,
+                  "maximum_ms": 170.679,
+                  "runs": 399,
+                  "requests": 399,
+                  "wall_ms": 5008.417,
+                  "throughput_qps": 79.666,
+                  "worker_request_counts": [
+                    199,
+                    200
+                  ],
+                  "worker_rss_bytes_sum": 299937792,
+                  "worker_pss_bytes_sum": 185350144,
+                  "worker_pids": [
+                    96,
+                    97
+                  ],
+                  "correct": true,
+                  "epoch": 1
+                },
+                {
+                  "p50_ms": 20.092,
+                  "p95_ms": 128.248,
+                  "minimum_ms": 15.244,
+                  "maximum_ms": 189.151,
+                  "runs": 342,
+                  "requests": 342,
+                  "wall_ms": 5075.298,
+                  "throughput_qps": 67.385,
+                  "worker_request_counts": [
+                    171,
+                    171
+                  ],
+                  "worker_rss_bytes_sum": 299954176,
+                  "worker_pss_bytes_sum": 185368576,
+                  "worker_pids": [
+                    100,
+                    101
+                  ],
+                  "correct": true,
+                  "epoch": 2
+                },
+                {
+                  "p50_ms": 18.085,
+                  "p95_ms": 125.108,
+                  "minimum_ms": 13.643,
+                  "maximum_ms": 171.156,
+                  "runs": 386,
+                  "requests": 386,
+                  "wall_ms": 5023.823,
+                  "throughput_qps": 76.834,
+                  "worker_request_counts": [
+                    192,
+                    194
+                  ],
+                  "worker_rss_bytes_sum": 300118016,
+                  "worker_pss_bytes_sum": 185492480,
+                  "worker_pids": [
+                    104,
+                    105
+                  ],
+                  "correct": true,
+                  "epoch": 3
+                }
+              ]
+            },
+            "4": {
+              "workers": 4,
+              "epoch_count": 3,
+              "requests": 1886,
+              "throughput_qps": 126.086,
+              "p50_ms": 23.503,
+              "p95_ms": 137.536,
+              "minimum_worker_pss_bytes_sum": 324541440,
+              "maximum_worker_rss_bytes_sum": 600322048,
+              "correct": true,
+              "epochs": [
+                {
+                  "p50_ms": 23.503,
+                  "p95_ms": 130.953,
+                  "minimum_ms": 17.098,
+                  "maximum_ms": 171.574,
+                  "runs": 633,
+                  "requests": 633,
+                  "wall_ms": 5020.369,
+                  "throughput_qps": 126.086,
+                  "worker_request_counts": [
+                    158,
+                    158,
+                    158,
+                    159
+                  ],
+                  "worker_rss_bytes_sum": 600322048,
+                  "worker_pss_bytes_sum": 324725760,
+                  "worker_pids": [
+                    108,
+                    109,
+                    110,
+                    111
+                  ],
+                  "correct": true,
+                  "epoch": 1
+                },
+                {
+                  "p50_ms": 21.744,
+                  "p95_ms": 137.536,
+                  "minimum_ms": 15.522,
+                  "maximum_ms": 156.384,
+                  "runs": 637,
+                  "requests": 637,
+                  "wall_ms": 5031.984,
+                  "throughput_qps": 126.59,
+                  "worker_request_counts": [
+                    159,
+                    159,
+                    159,
+                    160
+                  ],
+                  "worker_rss_bytes_sum": 600154112,
+                  "worker_pss_bytes_sum": 324757504,
+                  "worker_pids": [
+                    114,
+                    115,
+                    116,
+                    117
+                  ],
+                  "correct": true,
+                  "epoch": 2
+                },
+                {
+                  "p50_ms": 24.21,
+                  "p95_ms": 138.721,
+                  "minimum_ms": 17.045,
+                  "maximum_ms": 193.996,
+                  "runs": 616,
+                  "requests": 616,
+                  "wall_ms": 5036.707,
+                  "throughput_qps": 122.302,
+                  "worker_request_counts": [
+                    154,
+                    154,
+                    154,
+                    154
+                  ],
+                  "worker_rss_bytes_sum": 600313856,
+                  "worker_pss_bytes_sum": 324541440,
+                  "worker_pids": [
+                    120,
+                    121,
+                    122,
+                    123
+                  ],
+                  "correct": true,
+                  "epoch": 3
+                }
+              ]
+            },
+            "8": {
+              "workers": 8,
+              "epoch_count": 3,
+              "requests": 2739,
+              "throughput_qps": 181.418,
+              "p50_ms": 33.463,
+              "p95_ms": 165.188,
+              "minimum_worker_pss_bytes_sum": 587923456,
+              "maximum_worker_rss_bytes_sum": 1200640000,
+              "correct": true,
+              "epochs": [
+                {
+                  "p50_ms": 33.496,
+                  "p95_ms": 165.188,
+                  "minimum_ms": 19.08,
+                  "maximum_ms": 323.932,
+                  "runs": 912,
+                  "requests": 912,
+                  "wall_ms": 5027.051,
+                  "throughput_qps": 181.418,
+                  "worker_request_counts": [
+                    113,
+                    114,
+                    114,
+                    114,
+                    114,
+                    114,
+                    114,
+                    115
+                  ],
+                  "worker_rss_bytes_sum": 1200640000,
+                  "worker_pss_bytes_sum": 588066816,
+                  "worker_pids": [
+                    126,
+                    127,
+                    128,
+                    129,
+                    130,
+                    131,
+                    132,
+                    133
+                  ],
+                  "correct": true,
+                  "epoch": 1
+                },
+                {
+                  "p50_ms": 33.463,
+                  "p95_ms": 180.803,
+                  "minimum_ms": 16.568,
+                  "maximum_ms": 220.148,
+                  "runs": 859,
+                  "requests": 859,
+                  "wall_ms": 5035.642,
+                  "throughput_qps": 170.584,
+                  "worker_request_counts": [
+                    106,
+                    107,
+                    107,
+                    107,
+                    108,
+                    108,
+                    108,
+                    108
+                  ],
+                  "worker_rss_bytes_sum": 1200373760,
+                  "worker_pss_bytes_sum": 587923456,
+                  "worker_pids": [
+                    136,
+                    137,
+                    138,
+                    139,
+                    140,
+                    141,
+                    142,
+                    143
+                  ],
+                  "correct": true,
+                  "epoch": 2
+                },
+                {
+                  "p50_ms": 31.872,
+                  "p95_ms": 147.938,
+                  "minimum_ms": 16.258,
+                  "maximum_ms": 264.063,
+                  "runs": 968,
+                  "requests": 968,
+                  "wall_ms": 5149.045,
+                  "throughput_qps": 187.996,
+                  "worker_request_counts": [
+                    121,
+                    121,
+                    121,
+                    121,
+                    121,
+                    121,
+                    121,
+                    121
+                  ],
+                  "worker_rss_bytes_sum": 1200504832,
+                  "worker_pss_bytes_sum": 587988992,
+                  "worker_pids": [
+                    146,
+                    147,
+                    148,
+                    149,
+                    150,
+                    151,
+                    152,
+                    153
+                  ],
+                  "correct": true,
+                  "epoch": 3
+                }
+              ]
+            }
+          },
+          "memory": {
+            "dfg_conformance_95pct": {
+              "baseline_rss_bytes": 193753088,
+              "peak_rss_bytes": 193769472,
+              "incremental_peak_bytes": 16384,
+              "resident_pss_bytes": 193745920,
+              "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+              "input": {
+                "selected_cases": 1938,
+                "event_rows": 6250,
+                "aggregate_rows": 3,
+                "source": "ocpa.ObjectCentricEventLog",
+                "native_object_type_cases": 2000
+              }
+            },
+            "variant_conformance_95pct": {
+              "baseline_rss_bytes": 193753088,
+              "peak_rss_bytes": 193769472,
+              "incremental_peak_bytes": 16384,
+              "resident_pss_bytes": 193745920,
+              "answer_sha256": "80cd775e0a756938d2ce7f6c48bed2fb26d3c4a933b64ba1723e9612bac740bd",
+              "input": {
+                "selected_cases": 1938,
+                "event_rows": 6250,
+                "aggregate_rows": 6,
+                "source": "ocpa.ObjectCentricEventLog",
+                "native_object_type_cases": 2000
+              }
+            },
+            "next_activity_prediction": {
+              "baseline_rss_bytes": 193753088,
+              "peak_rss_bytes": 193769472,
+              "incremental_peak_bytes": 16384,
+              "resident_pss_bytes": 193745920,
+              "answer_sha256": "0d11e08bea5189f4b9bd8d8b63a71840edef2dc8b0a3d120c9a08d1d20e5739d",
+              "input": {
+                "selected_cases": 1938,
+                "event_rows": 6250,
+                "aggregate_rows": 3,
+                "source": "ocpa.ObjectCentricEventLog",
+                "native_object_type_cases": 2000
+              }
+            },
+            "edge_bottleneck_ranking": {
+              "baseline_rss_bytes": 193753088,
+              "peak_rss_bytes": 193769472,
+              "incremental_peak_bytes": 16384,
+              "resident_pss_bytes": 193745920,
+              "answer_sha256": "34ecb123e6a6270bca1ed9f302917df1347966c0562f4998a71c7740e3dc1528",
+              "input": {
+                "selected_cases": 2000,
+                "event_rows": 6484,
+                "aggregate_rows": 3,
+                "source": "ocpa.ObjectCentricEventLog",
+                "native_object_type_cases": 2000
+              }
+            }
+          }
+        }
+      ]
+    },
+    "pg_ocpm_ocpm_engine": {
+      "schema_version": 1,
+      "generated_at": "2026-08-04T02:16:10.649324+00:00",
+      "arm": "pg_ocpm_ocpm_engine",
+      "implementation": {
+        "pg_ocpm_version": "1.0.0",
+        "ocpm_engine_version": "1.1.0",
+        "python": "3.11.15",
+        "platform": "Linux-7.0.11-orbstack-00360-gc9bc4d96ac70-aarch64-with-glibc2.36",
+        "source_revision": "254a07e060cb799dc4360bca0b4db08d5923b1f1",
+        "source_tree_clean": true,
+        "pg_ocpm_source_revision": "df508ca62a77f4427a6fee80e3f1822c6b45db5d",
+        "pg_ocpm_source_tree_clean": true,
+        "image_id": "sha256:f943aa28a27b8ec55ca1ac36d1842ebedfc171229d53f742c3043722022c6f54"
+      },
+      "method": {
+        "read_path": "capability-aware sufficient-statistic pushdown for DFG workloads; factorized event batches for event-level workloads",
+        "process_model": "one persistent PostgreSQL connection per process worker",
+        "data_import": "PostgreSQL fixture preparation reported separately"
+      },
+      "client_memory_after_connection_bytes": 57339904,
+      "client_memory_baseline_bytes": 35049472,
+      "storage": {
+        "pg_ocpm_schema": {
+          "heap_bytes": 3211264,
+          "index_bytes": 1548288,
+          "toast_bytes": 4341760,
+          "total_bytes": 9289728,
+          "indexes": [
+            {
+              "table": "binding_activity",
+              "name": "binding_activity_pkey",
+              "definition": "CREATE UNIQUE INDEX binding_activity_pkey ON ocpm.binding_activity USING btree (dataset_id, tenant_id, object_type, activity)",
+              "bytes": 8192
+            },
+            {
+              "table": "binding_event",
+              "name": "binding_event_pkey",
+              "definition": "CREATE UNIQUE INDEX binding_event_pkey ON ocpm.binding_event USING btree (dataset_id, tenant_id, activity)",
+              "bytes": 8192
+            },
+            {
+              "table": "binding_neighbor_activity",
+              "name": "binding_neighbor_activity_pkey",
+              "definition": "CREATE UNIQUE INDEX binding_neighbor_activity_pkey ON ocpm.binding_neighbor_activity USING btree (dataset_id, tenant_id, source_object_type, target_object_type, activity)",
+              "bytes": 8192
+            },
+            {
+              "table": "binding_object",
+              "name": "binding_object_pkey",
+              "definition": "CREATE UNIQUE INDEX binding_object_pkey ON ocpm.binding_object USING btree (dataset_id, tenant_id, object_type)",
+              "bytes": 8192
+            },
+            {
+              "table": "binding_relation_summary",
+              "name": "binding_relation_summary_pkey",
+              "definition": "CREATE UNIQUE INDEX binding_relation_summary_pkey ON ocpm.binding_relation_summary USING btree (dataset_id, tenant_id, source_object_type, source_activity, target_object_type, target_activity, related_object_type)",
+              "bytes": 8192
+            },
+            {
+              "table": "case_bucket",
+              "name": "case_bucket_pkey",
+              "definition": "CREATE UNIQUE INDEX case_bucket_pkey ON ocpm.case_bucket USING btree (dataset_id, tenant_id, object_type, path_hash, segment_id)",
+              "bytes": 16384
+            },
+            {
+              "table": "case_bucket",
+              "name": "ocpm_case_bucket_time",
+              "definition": "CREATE INDEX ocpm_case_bucket_time ON ocpm.case_bucket USING btree (dataset_id, tenant_id, object_type, min_start_time, max_start_time)",
+              "bytes": 16384
+            },
+            {
+              "table": "case_start_day_rollup",
+              "name": "case_start_day_rollup_pkey",
+              "definition": "CREATE UNIQUE INDEX case_start_day_rollup_pkey ON ocpm.case_start_day_rollup USING btree (dataset_id, tenant_id, start_day)",
+              "bytes": 32768
+            },
+            {
+              "table": "dataset",
+              "name": "dataset_dataset_name_key",
+              "definition": "CREATE UNIQUE INDEX dataset_dataset_name_key ON ocpm.dataset USING btree (dataset_name)",
+              "bytes": 16384
+            },
+            {
+              "table": "dataset",
+              "name": "dataset_pkey",
+              "definition": "CREATE UNIQUE INDEX dataset_pkey ON ocpm.dataset USING btree (dataset_id)",
+              "bytes": 16384
+            },
+            {
+              "table": "dataset",
+              "name": "dataset_tenant_id_key",
+              "definition": "CREATE UNIQUE INDEX dataset_tenant_id_key ON ocpm.dataset USING btree (tenant_id, dataset_id)",
+              "bytes": 16384
+            },
+            {
+              "table": "dataset_generation",
+              "name": "dataset_generation_pkey",
+              "definition": "CREATE UNIQUE INDEX dataset_generation_pkey ON ocpm.dataset_generation USING btree (tenant_id, dataset_id, generation_id)",
+              "bytes": 8192
+            },
+            {
+              "table": "edge_bucket",
+              "name": "edge_bucket_pkey",
+              "definition": "CREATE UNIQUE INDEX edge_bucket_pkey ON ocpm.edge_bucket USING btree (dataset_id, tenant_id, source_object_type, source_activity, target_activity, target_object_type, edge_type, context, segment_id)",
+              "bytes": 16384
+            },
+            {
+              "table": "edge_bucket",
+              "name": "ocpm_edge_bucket_time",
+              "definition": "CREATE INDEX ocpm_edge_bucket_time ON ocpm.edge_bucket USING btree (dataset_id, tenant_id, source_object_type, min_source_timestamp, max_source_timestamp)",
+              "bytes": 16384
+            },
+            {
+              "table": "edge_summary",
+              "name": "edge_summary_pkey",
+              "definition": "CREATE UNIQUE INDEX edge_summary_pkey ON ocpm.edge_summary USING btree (dataset_id, tenant_id, source_activity, source_object_type, target_activity, target_object_type)",
+              "bytes": 16384
+            },
+            {
+              "table": "event_activity_rollup",
+              "name": "event_activity_rollup_pkey",
+              "definition": "CREATE UNIQUE INDEX event_activity_rollup_pkey ON ocpm.event_activity_rollup USING btree (dataset_id, tenant_id, object_type, activity, segment_id)",
+              "bytes": 16384
+            },
+            {
+              "table": "event_activity_rollup",
+              "name": "ocpm_event_activity_time",
+              "definition": "CREATE INDEX ocpm_event_activity_time ON ocpm.event_activity_rollup USING btree (dataset_id, tenant_id, object_type, min_timestamp, max_timestamp)",
+              "bytes": 16384
+            },
+            {
+              "table": "event_chunk",
+              "name": "event_chunk_pkey",
+              "definition": "CREATE UNIQUE INDEX event_chunk_pkey ON ocpm.event_chunk USING btree (dataset_id, tenant_id, object_type, chunk_id)",
+              "bytes": 16384
+            },
+            {
+              "table": "event_entity",
+              "name": "event_entity_pkey",
+              "definition": "CREATE UNIQUE INDEX event_entity_pkey ON ocpm.event_entity USING btree (tenant_id, dataset_id, event_id)",
+              "bytes": 8192
+            },
+            {
+              "table": "event_entity",
+              "name": "event_entity_tenant_id_dataset_id_external_event_id_key",
+              "definition": "CREATE UNIQUE INDEX event_entity_tenant_id_dataset_id_external_event_id_key ON ocpm.event_entity USING btree (tenant_id, dataset_id, external_event_id)",
+              "bytes": 8192
+            },
+            {
+              "table": "event_entity",
+              "name": "ocpm_event_entity_activity_time",
+              "definition": "CREATE INDEX ocpm_event_entity_activity_time ON ocpm.event_entity USING btree (tenant_id, dataset_id, activity, event_timestamp) INCLUDE (event_id, event_submicro_nanos, event_sequence)",
+              "bytes": 8192
+            },
+            {
+              "table": "event_entity",
+              "name": "ocpm_event_entity_order",
+              "definition": "CREATE INDEX ocpm_event_entity_order ON ocpm.event_entity USING btree (tenant_id, dataset_id, event_timestamp, event_submicro_nanos, event_sequence, external_event_id) INCLUDE (activity, lifecycle)",
+              "bytes": 8192
+            },
+            {
+              "table": "event_locator",
+              "name": "event_locator_pkey",
+              "definition": "CREATE UNIQUE INDEX event_locator_pkey ON ocpm.event_locator USING btree (dataset_id, tenant_id, object_id, object_type, chunk_id)",
+              "bytes": 606208
+            },
+            {
+              "table": "event_object_relation",
+              "name": "event_object_relation_pkey",
+              "definition": "CREATE UNIQUE INDEX event_object_relation_pkey ON ocpm.event_object_relation USING btree (tenant_id, dataset_id, relation_id)",
+              "bytes": 8192
+            },
+            {
+              "table": "event_object_relation",
+              "name": "ocpm_e2o_event",
+              "definition": "CREATE INDEX ocpm_e2o_event ON ocpm.event_object_relation USING btree (tenant_id, dataset_id, event_id, qualifier, object_id)",
+              "bytes": 8192
+            },
+            {
+              "table": "event_object_relation",
+              "name": "ocpm_e2o_object",
+              "definition": "CREATE INDEX ocpm_e2o_object ON ocpm.event_object_relation USING btree (tenant_id, dataset_id, object_id, qualifier, event_id)",
+              "bytes": 8192
+            },
+            {
+              "table": "link_adjacency_bucket",
+              "name": "link_adjacency_bucket_pkey",
+              "definition": "CREATE UNIQUE INDEX link_adjacency_bucket_pkey ON ocpm.link_adjacency_bucket USING btree (dataset_id, tenant_id, from_object_id, from_object_type)",
+              "bytes": 516096
+            },
+            {
+              "table": "link_adjacency_rollup",
+              "name": "link_adjacency_rollup_pkey",
+              "definition": "CREATE UNIQUE INDEX link_adjacency_rollup_pkey ON ocpm.link_adjacency_rollup USING btree (dataset_id, tenant_id, from_object_type, to_object_type, segment_id)",
+              "bytes": 16384
+            },
+            {
+              "table": "link_adjacency_rollup",
+              "name": "ocpm_link_adjacency_rollup_time",
+              "definition": "CREATE INDEX ocpm_link_adjacency_rollup_time ON ocpm.link_adjacency_rollup USING btree (dataset_id, tenant_id, min_source_timestamp, max_source_timestamp)",
+              "bytes": 16384
+            },
+            {
+              "table": "migration_checkpoint",
+              "name": "migration_checkpoint_pkey",
+              "definition": "CREATE UNIQUE INDEX migration_checkpoint_pkey ON ocpm.migration_checkpoint USING btree (tenant_id, dataset_id, generation_id, phase)",
+              "bytes": 8192
+            },
+            {
+              "table": "object_attribute_history",
+              "name": "object_attribute_history_pkey",
+              "definition": "CREATE UNIQUE INDEX object_attribute_history_pkey ON ocpm.object_attribute_history USING btree (tenant_id, dataset_id, object_id, attribute_name, valid_from)",
+              "bytes": 8192
+            },
+            {
+              "table": "object_attribute_history",
+              "name": "ocpm_object_attribute_value",
+              "definition": "CREATE INDEX ocpm_object_attribute_value ON ocpm.object_attribute_history USING btree (tenant_id, dataset_id, attribute_name, valid_from, object_id) INCLUDE (value)",
+              "bytes": 8192
+            },
+            {
+              "table": "object_entity",
+              "name": "object_entity_pkey",
+              "definition": "CREATE UNIQUE INDEX object_entity_pkey ON ocpm.object_entity USING btree (tenant_id, dataset_id, object_id)",
+              "bytes": 8192
+            },
+            {
+              "table": "object_entity",
+              "name": "object_entity_tenant_id_dataset_id_external_object_id_key",
+              "definition": "CREATE UNIQUE INDEX object_entity_tenant_id_dataset_id_external_object_id_key ON ocpm.object_entity USING btree (tenant_id, dataset_id, external_object_id)",
+              "bytes": 8192
+            },
+            {
+              "table": "object_entity",
+              "name": "ocpm_object_entity_type",
+              "definition": "CREATE INDEX ocpm_object_entity_type ON ocpm.object_entity USING btree (tenant_id, dataset_id, object_type, object_id) INCLUDE (external_object_id)",
+              "bytes": 8192
+            },
+            {
+              "table": "object_object_relation",
+              "name": "object_object_relation_pkey",
+              "definition": "CREATE UNIQUE INDEX object_object_relation_pkey ON ocpm.object_object_relation USING btree (tenant_id, dataset_id, relation_id)",
+              "bytes": 8192
+            },
+            {
+              "table": "object_object_relation",
+              "name": "ocpm_o2o_source",
+              "definition": "CREATE INDEX ocpm_o2o_source ON ocpm.object_object_relation USING btree (tenant_id, dataset_id, source_object_id, qualifier, target_object_id) INCLUDE (valid_from, valid_to)",
+              "bytes": 8192
+            },
+            {
+              "table": "object_object_relation",
+              "name": "ocpm_o2o_target",
+              "definition": "CREATE INDEX ocpm_o2o_target ON ocpm.object_object_relation USING btree (tenant_id, dataset_id, target_object_id, qualifier, source_object_id) INCLUDE (valid_from, valid_to)",
+              "bytes": 8192
+            },
+            {
+              "table": "provenance_fact",
+              "name": "ocpm_provenance_actor_context_time",
+              "definition": "CREATE INDEX ocpm_provenance_actor_context_time ON ocpm.provenance_fact USING btree (dataset_id, tenant_id, actor, context, valid_from)",
+              "bytes": 8192
+            },
+            {
+              "table": "provenance_fact",
+              "name": "ocpm_provenance_object_time",
+              "definition": "CREATE INDEX ocpm_provenance_object_time ON ocpm.provenance_fact USING btree (dataset_id, tenant_id, object_id, valid_from)",
+              "bytes": 8192
+            },
+            {
+              "table": "provenance_fact",
+              "name": "ocpm_provenance_record_time",
+              "definition": "CREATE INDEX ocpm_provenance_record_time ON ocpm.provenance_fact USING btree (dataset_id, tenant_id, record_type, valid_from)",
+              "bytes": 8192
+            },
+            {
+              "table": "provenance_rollup",
+              "name": "ocpm_provenance_rollup_filter_time",
+              "definition": "CREATE INDEX ocpm_provenance_rollup_filter_time ON ocpm.provenance_rollup USING btree (dataset_id, tenant_id, record_type, min_timestamp, max_timestamp)",
+              "bytes": 8192
+            },
+            {
+              "table": "provider_schema",
+              "name": "provider_schema_pkey",
+              "definition": "CREATE UNIQUE INDEX provider_schema_pkey ON ocpm.provider_schema USING btree (operation, semantic_version)",
+              "bytes": 16384
+            },
+            {
+              "table": "result_cache",
+              "name": "result_cache_pkey",
+              "definition": "CREATE UNIQUE INDEX result_cache_pkey ON ocpm.result_cache USING btree (dataset_id, tenant_id, backbone_type, filter_hash, facet)",
+              "bytes": 8192
+            }
+          ]
+        },
+        "packages": {
+          "distribution": "ocpm-engine",
+          "version": "1.1.0",
+          "license_expression": null,
+          "package_bytes": 7015920,
+          "dependency_closure_bytes": 7015920,
+          "dependency_distributions": [
+            "ocpm-engine"
+          ],
+          "additional_database_bytes": 0
+        }
+      },
+      "database_environment": {
+        "pg_ocpm_version": "1.0.0",
+        "postgres_version": "16.14 (Debian 16.14-1.pgdg13+1)",
+        "shared_buffers": "1GB",
+        "effective_cache_size": "4GB",
+        "work_mem": "16MB",
+        "max_parallel_workers_per_gather": "4",
+        "jit": "off"
+      },
+      "datasets": [
+        {
+          "dataset": "ocpa_running_example",
+          "fixture": {
+            "dataset_name": "ocpa_running_example",
+            "baseline_dataset_id": 1,
+            "ocpm_dataset_id": 1,
+            "tenant_id": 1,
+            "object_type": "orders",
+            "from_time": "2023-04-03T12:08:17.999999+00:00",
+            "train_to": "2024-01-26T12:23:47+00:00",
+            "test_from": "2024-01-26T12:23:47.000001+00:00",
+            "to_time": "2024-05-10T10:15:11.000001+00:00",
+            "cases": 2000,
+            "train_cases": 1600,
+            "test_cases": 338
+          },
+          "serial": {
+            "dfg_conformance_95pct": {
+              "correct_within_arm": true,
+              "answer": {
+                "fitness": 1.0,
+                "conforming": 759,
+                "deviations": 0,
+                "test_total": 759,
+                "model": [
+                  [
+                    "confirm order",
+                    "payment reminder",
+                    "directly_follows"
+                  ],
+                  [
+                    "payment reminder",
+                    "payment reminder",
+                    "directly_follows"
+                  ],
+                  [
+                    "place order",
+                    "confirm order",
+                    "directly_follows"
+                  ]
+                ]
+              },
+              "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+              "input": {
+                "source": "pg_ocpm_lifecycle_dfg_window_counts",
+                "strategy": "native lifecycle DFG window aggregate",
+                "database_rows": 3,
+                "expanded_event_rows": 0,
+                "aggregate_rows": 3
+              },
+              "p50_ms": 0.166,
+              "p95_ms": 0.351,
+              "minimum_ms": 0.136,
+              "maximum_ms": 0.452,
+              "runs": 90,
+              "epoch_count": 3,
+              "epoch_p95_median_ms": 0.27,
+              "epoch_p95_range_ms": [
+                0.173,
+                0.376
+              ],
+              "epochs": [
+                {
+                  "epoch": 1,
+                  "p50_ms": 0.147,
+                  "p95_ms": 0.173,
+                  "minimum_ms": 0.136,
+                  "maximum_ms": 0.181,
+                  "runs": 30,
+                  "samples_ns": [
+                    181252,
+                    165835,
+                    153544,
+                    158127,
+                    150669,
+                    173419,
+                    151335,
+                    155127,
+                    145627,
+                    160794,
+                    141585,
+                    162878,
+                    146668,
+                    143002,
+                    141835,
+                    143502,
+                    144502,
+                    150294,
+                    156961,
+                    138918,
+                    142793,
+                    159210,
+                    147293,
+                    146752,
+                    159585,
+                    140627,
+                    143168,
+                    140502,
+                    140961,
+                    136002
+                  ]
+                },
+                {
+                  "epoch": 2,
+                  "p50_ms": 0.175,
+                  "p95_ms": 0.376,
+                  "minimum_ms": 0.147,
+                  "maximum_ms": 0.405,
+                  "runs": 30,
+                  "samples_ns": [
+                    150003,
+                    351172,
+                    188169,
+                    177961,
+                    168544,
+                    170961,
+                    211170,
+                    405214,
+                    356005,
+                    376338,
+                    215711,
+                    177669,
+                    177585,
+                    160793,
+                    160169,
+                    151211,
+                    146711,
+                    146877,
+                    159086,
+                    147794,
+                    148085,
+                    151960,
+                    150418,
+                    281837,
+                    197169,
+                    167460,
+                    225212,
+                    203752,
+                    171503,
+                    180002
+                  ]
+                },
+                {
+                  "epoch": 3,
+                  "p50_ms": 0.174,
+                  "p95_ms": 0.27,
+                  "minimum_ms": 0.158,
+                  "maximum_ms": 0.452,
+                  "runs": 30,
+                  "samples_ns": [
+                    174003,
+                    170044,
+                    167294,
+                    166419,
+                    188711,
+                    175794,
+                    167294,
+                    160877,
+                    163377,
+                    167627,
+                    189419,
+                    163586,
+                    157585,
+                    160627,
+                    161378,
+                    170502,
+                    174378,
+                    170003,
+                    452131,
+                    239545,
+                    269796,
+                    236795,
+                    195920,
+                    187836,
+                    195545,
+                    184544,
+                    174294,
+                    174169,
+                    175794,
+                    182002
+                  ]
+                }
+              ]
+            },
+            "variant_conformance_95pct": {
+              "correct_within_arm": true,
+              "answer": {
+                "fitness": 0.958579881657,
+                "conforming": 324,
+                "deviations": 14,
+                "test_total": 338,
+                "model": [
+                  "[\"place order\",\"confirm order\",\"payment reminder\",\"payment reminder\"]",
+                  "[\"place order\",\"confirm order\",\"payment reminder\"]"
+                ]
+              },
+              "answer_sha256": "80cd775e0a756938d2ce7f6c48bed2fb26d3c4a933b64ba1723e9612bac740bd",
+              "input": {
+                "source": "pg_ocpm_lifecycle_variant_window_counts",
+                "strategy": "native lifecycle variant window aggregate",
+                "database_rows": 6,
+                "expanded_event_rows": 0,
+                "aggregate_rows": 6
+              },
+              "p50_ms": 0.254,
+              "p95_ms": 0.494,
+              "minimum_ms": 0.213,
+              "maximum_ms": 0.742,
+              "runs": 90,
+              "epoch_count": 3,
+              "epoch_p95_median_ms": 0.494,
+              "epoch_p95_range_ms": [
+                0.335,
+                0.512
+              ],
+              "epochs": [
+                {
+                  "epoch": 1,
+                  "p50_ms": 0.262,
+                  "p95_ms": 0.512,
+                  "minimum_ms": 0.213,
+                  "maximum_ms": 0.512,
+                  "runs": 30,
+                  "samples_ns": [
+                    261212,
+                    305129,
+                    268545,
+                    246754,
+                    347463,
+                    512215,
+                    324296,
+                    306462,
+                    257920,
+                    219795,
+                    323088,
+                    373089,
+                    262379,
+                    512299,
+                    377297,
+                    264545,
+                    256879,
+                    225670,
+                    217961,
+                    334255,
+                    289129,
+                    229587,
+                    231128,
+                    219295,
+                    240503,
+                    223086,
+                    214127,
+                    212794,
+                    234794,
+                    496381
+                  ]
+                },
+                {
+                  "epoch": 2,
+                  "p50_ms": 0.24,
+                  "p95_ms": 0.335,
+                  "minimum_ms": 0.213,
+                  "maximum_ms": 0.344,
+                  "runs": 30,
+                  "samples_ns": [
+                    334630,
+                    281462,
+                    259129,
+                    225962,
+                    223003,
+                    236879,
+                    215169,
+                    217169,
+                    213295,
+                    244879,
+                    237587,
+                    222795,
+                    261003,
+                    266753,
+                    232253,
+                    215878,
+                    214878,
+                    253254,
+                    252295,
+                    240170,
+                    237420,
+                    256295,
+                    241004,
+                    238879,
+                    236628,
+                    247670,
+                    241670,
+                    240754,
+                    343879,
+                    302504
+                  ]
+                },
+                {
+                  "epoch": 3,
+                  "p50_ms": 0.263,
+                  "p95_ms": 0.494,
+                  "minimum_ms": 0.236,
+                  "maximum_ms": 0.742,
+                  "runs": 30,
+                  "samples_ns": [
+                    468715,
+                    354254,
+                    279087,
+                    266504,
+                    258961,
+                    274296,
+                    255628,
+                    269962,
+                    259670,
+                    269962,
+                    248254,
+                    247795,
+                    241837,
+                    253004,
+                    236128,
+                    493548,
+                    478007,
+                    364089,
+                    306504,
+                    267295,
+                    245379,
+                    241295,
+                    260295,
+                    243586,
+                    251462,
+                    248628,
+                    264795,
+                    245378,
+                    298712,
+                    741761
+                  ]
+                }
+              ]
+            },
+            "next_activity_prediction": {
+              "correct_within_arm": true,
+              "answer": {
+                "accuracy": 1.0,
+                "correct": 759,
+                "test_total": 759,
+                "predictions": [
+                  [
+                    "confirm order",
+                    "directly_follows",
+                    "payment reminder"
+                  ],
+                  [
+                    "payment reminder",
+                    "directly_follows",
+                    "payment reminder"
+                  ],
+                  [
+                    "place order",
+                    "directly_follows",
+                    "confirm order"
+                  ]
+                ]
+              },
+              "answer_sha256": "0d11e08bea5189f4b9bd8d8b63a71840edef2dc8b0a3d120c9a08d1d20e5739d",
+              "input": {
+                "source": "pg_ocpm_lifecycle_dfg_window_counts",
+                "strategy": "native lifecycle DFG window aggregate",
+                "database_rows": 3,
+                "expanded_event_rows": 0,
+                "aggregate_rows": 3
+              },
+              "p50_ms": 0.159,
+              "p95_ms": 0.31,
+              "minimum_ms": 0.138,
+              "maximum_ms": 0.748,
+              "runs": 90,
+              "epoch_count": 3,
+              "epoch_p95_median_ms": 0.256,
+              "epoch_p95_range_ms": [
+                0.248,
+                0.371
+              ],
+              "epochs": [
+                {
+                  "epoch": 1,
+                  "p50_ms": 0.15,
+                  "p95_ms": 0.248,
+                  "minimum_ms": 0.14,
+                  "maximum_ms": 0.317,
+                  "runs": 30,
+                  "samples_ns": [
+                    157835,
+                    147669,
+                    161294,
+                    149752,
+                    157128,
+                    157919,
+                    144669,
+                    145627,
+                    162128,
+                    149793,
+                    148336,
+                    144960,
+                    144210,
+                    144919,
+                    160502,
+                    153419,
+                    143585,
+                    316588,
+                    248254,
+                    195503,
+                    166294,
+                    155586,
+                    150168,
+                    148669,
+                    144794,
+                    162419,
+                    149877,
+                    142794,
+                    140252,
+                    141294
+                  ]
+                },
+                {
+                  "epoch": 2,
+                  "p50_ms": 0.154,
+                  "p95_ms": 0.256,
+                  "minimum_ms": 0.138,
+                  "maximum_ms": 0.324,
+                  "runs": 30,
+                  "samples_ns": [
+                    142086,
+                    323754,
+                    256045,
+                    168585,
+                    159460,
+                    154960,
+                    175295,
+                    152461,
+                    150085,
+                    151086,
+                    153377,
+                    149419,
+                    164544,
+                    153211,
+                    147502,
+                    144877,
+                    144169,
+                    139460,
+                    138044,
+                    159419,
+                    143794,
+                    141711,
+                    153043,
+                    159169,
+                    158419,
+                    177211,
+                    177711,
+                    177544,
+                    168669,
+                    161252
+                  ]
+                },
+                {
+                  "epoch": 3,
+                  "p50_ms": 0.173,
+                  "p95_ms": 0.371,
+                  "minimum_ms": 0.153,
+                  "maximum_ms": 0.748,
+                  "runs": 30,
+                  "samples_ns": [
+                    188669,
+                    176544,
+                    161169,
+                    156461,
+                    169211,
+                    166085,
+                    157169,
+                    173169,
+                    163544,
+                    157502,
+                    159919,
+                    158377,
+                    154335,
+                    164836,
+                    153377,
+                    280212,
+                    310004,
+                    230962,
+                    198836,
+                    747511,
+                    371005,
+                    208836,
+                    188210,
+                    208961,
+                    185502,
+                    170502,
+                    174127,
+                    170211,
+                    191753,
+                    172086
+                  ]
+                }
+              ]
+            },
+            "edge_bottleneck_ranking": {
+              "correct_within_arm": true,
+              "answer": [
+                [
+                  "confirm order",
+                  "payment reminder",
+                  2000,
+                  747513.717
+                ],
+                [
+                  "payment reminder",
+                  "payment reminder",
+                  484,
+                  735859.634298
+                ],
+                [
+                  "place order",
+                  "confirm order",
+                  2000,
+                  106005.8605
+                ]
+              ],
+              "answer_sha256": "34ecb123e6a6270bca1ed9f302917df1347966c0562f4998a71c7740e3dc1528",
+              "input": {
+                "source": "pg_ocpm_edge_feature_aggregates",
+                "strategy": "native filtered edge feature aggregate",
+                "database_rows": 3,
+                "expanded_event_rows": 0,
+                "aggregate_rows": 3
+              },
+              "p50_ms": 0.407,
+              "p95_ms": 0.773,
+              "minimum_ms": 0.325,
+              "maximum_ms": 1.28,
+              "runs": 90,
+              "epoch_count": 3,
+              "epoch_p95_median_ms": 0.803,
+              "epoch_p95_range_ms": [
+                0.699,
+                0.906
+              ],
+              "epochs": [
+                {
+                  "epoch": 1,
+                  "p50_ms": 0.408,
+                  "p95_ms": 0.906,
+                  "minimum_ms": 0.364,
+                  "maximum_ms": 1.28,
+                  "runs": 30,
+                  "samples_ns": [
+                    496965,
+                    473840,
+                    406089,
+                    389505,
+                    372505,
+                    371338,
+                    367255,
+                    478714,
+                    522507,
+                    422547,
+                    403422,
+                    379047,
+                    375922,
+                    377964,
+                    371756,
+                    387172,
+                    364213,
+                    1279559,
+                    906346,
+                    665134,
+                    422297,
+                    413922,
+                    387298,
+                    444256,
+                    591883,
+                    445506,
+                    405464,
+                    421714,
+                    410506,
+                    384464
+                  ]
+                },
+                {
+                  "epoch": 2,
+                  "p50_ms": 0.4,
+                  "p95_ms": 0.803,
+                  "minimum_ms": 0.325,
+                  "maximum_ms": 0.883,
+                  "runs": 30,
+                  "samples_ns": [
+                    394922,
+                    394339,
+                    509841,
+                    882762,
+                    518299,
+                    648926,
+                    519299,
+                    438006,
+                    397547,
+                    403172,
+                    443797,
+                    668926,
+                    407505,
+                    383922,
+                    396422,
+                    371588,
+                    378255,
+                    375755,
+                    366505,
+                    334755,
+                    325338,
+                    803344,
+                    458964,
+                    551341,
+                    412755,
+                    417465,
+                    361339,
+                    378589,
+                    349630,
+                    358172
+                  ]
+                },
+                {
+                  "epoch": 3,
+                  "p50_ms": 0.412,
+                  "p95_ms": 0.699,
+                  "minimum_ms": 0.327,
+                  "maximum_ms": 0.773,
+                  "runs": 30,
+                  "samples_ns": [
+                    578342,
+                    366422,
+                    343047,
+                    411548,
+                    407423,
+                    350880,
+                    330921,
+                    328005,
+                    343921,
+                    335713,
+                    326838,
+                    773094,
+                    512549,
+                    648967,
+                    417089,
+                    481174,
+                    561175,
+                    457048,
+                    429923,
+                    699343,
+                    489798,
+                    413839,
+                    406381,
+                    384255,
+                    391630,
+                    377214,
+                    372422,
+                    589550,
+                    648509,
+                    412756
+                  ]
+                }
+              ]
+            }
+          },
+          "concurrency": {
+            "1": {
+              "workers": 1,
+              "epoch_count": 3,
+              "requests": 63225,
+              "runs": 63225,
+              "throughput_qps": 4094.64,
+              "p50_ms": 0.176,
+              "p95_ms": 0.507,
+              "p99_ms": 0.853,
+              "minimum_ms": 0.119,
+              "maximum_ms": 18.672,
+              "minimum_epoch_wall_ms": 5001.48,
+              "minimum_requests_per_worker": 20012,
+              "correct": true,
+              "epochs": [
+                {
+                  "p50_ms": 0.183,
+                  "p95_ms": 0.507,
+                  "p99_ms": 0.853,
+                  "minimum_ms": 0.119,
+                  "maximum_ms": 3.526,
+                  "requests": 20481,
+                  "wall_ms": 5001.905,
+                  "throughput_qps": 4094.64,
+                  "warmed_worker_count": 1,
+                  "worker_ids": [
+                    454
+                  ],
+                  "worker_request_counts": [
+                    20481
+                  ],
+                  "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+                  "correct": true,
+                  "epoch": 1
+                },
+                {
+                  "p50_ms": 0.176,
+                  "p95_ms": 0.533,
+                  "p99_ms": 0.904,
+                  "minimum_ms": 0.122,
+                  "maximum_ms": 18.672,
+                  "requests": 20012,
+                  "wall_ms": 5001.896,
+                  "throughput_qps": 4000.883,
+                  "warmed_worker_count": 1,
+                  "worker_ids": [
+                    457
+                  ],
+                  "worker_request_counts": [
+                    20012
+                  ],
+                  "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+                  "correct": true,
+                  "epoch": 2
+                },
+                {
+                  "p50_ms": 0.175,
+                  "p95_ms": 0.415,
+                  "p99_ms": 0.639,
+                  "minimum_ms": 0.13,
+                  "maximum_ms": 3.858,
+                  "requests": 22732,
+                  "wall_ms": 5001.48,
+                  "throughput_qps": 4545.055,
+                  "warmed_worker_count": 1,
+                  "worker_ids": [
+                    460
+                  ],
+                  "worker_request_counts": [
+                    22732
+                  ],
+                  "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+                  "correct": true,
+                  "epoch": 3
+                }
+              ]
+            },
+            "2": {
+              "workers": 2,
+              "epoch_count": 3,
+              "requests": 113731,
+              "runs": 113731,
+              "throughput_qps": 7524.812,
+              "p50_ms": 0.207,
+              "p95_ms": 0.495,
+              "p99_ms": 0.794,
+              "minimum_ms": 0.134,
+              "maximum_ms": 6.146,
+              "minimum_epoch_wall_ms": 5002.517,
+              "minimum_requests_per_worker": 15743,
+              "correct": true,
+              "epochs": [
+                {
+                  "p50_ms": 0.207,
+                  "p95_ms": 0.495,
+                  "p99_ms": 0.794,
+                  "minimum_ms": 0.134,
+                  "maximum_ms": 4.24,
+                  "requests": 37643,
+                  "wall_ms": 5002.517,
+                  "throughput_qps": 7524.812,
+                  "warmed_worker_count": 2,
+                  "worker_ids": [
+                    463,
+                    466
+                  ],
+                  "worker_request_counts": [
+                    18760,
+                    18883
+                  ],
+                  "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+                  "correct": true,
+                  "epoch": 1
+                },
+                {
+                  "p50_ms": 0.186,
+                  "p95_ms": 0.383,
+                  "p99_ms": 0.646,
+                  "minimum_ms": 0.134,
+                  "maximum_ms": 3.899,
+                  "requests": 44481,
+                  "wall_ms": 5002.873,
+                  "throughput_qps": 8891.092,
+                  "warmed_worker_count": 2,
+                  "worker_ids": [
+                    467,
+                    470
+                  ],
+                  "worker_request_counts": [
+                    22029,
+                    22452
+                  ],
+                  "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+                  "correct": true,
+                  "epoch": 2
+                },
+                {
+                  "p50_ms": 0.245,
+                  "p95_ms": 0.574,
+                  "p99_ms": 0.927,
+                  "minimum_ms": 0.145,
+                  "maximum_ms": 6.146,
+                  "requests": 31607,
+                  "wall_ms": 5002.624,
+                  "throughput_qps": 6318.084,
+                  "warmed_worker_count": 2,
+                  "worker_ids": [
+                    471,
+                    474
+                  ],
+                  "worker_request_counts": [
+                    15743,
+                    15864
+                  ],
+                  "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+                  "correct": true,
+                  "epoch": 3
+                }
+              ]
+            },
+            "4": {
+              "workers": 4,
+              "epoch_count": 3,
+              "requests": 175799,
+              "runs": 175799,
+              "throughput_qps": 11389.756,
+              "p50_ms": 0.26,
+              "p95_ms": 0.674,
+              "p99_ms": 0.989,
+              "minimum_ms": 0.153,
+              "maximum_ms": 6.478,
+              "minimum_epoch_wall_ms": 5003.186,
+              "minimum_requests_per_worker": 14019,
+              "correct": true,
+              "epochs": [
+                {
+                  "p50_ms": 0.268,
+                  "p95_ms": 0.674,
+                  "p99_ms": 0.989,
+                  "minimum_ms": 0.158,
+                  "maximum_ms": 5.494,
+                  "requests": 56994,
+                  "wall_ms": 5003.97,
+                  "throughput_qps": 11389.756,
+                  "warmed_worker_count": 4,
+                  "worker_ids": [
+                    475,
+                    478,
+                    479,
+                    480
+                  ],
+                  "worker_request_counts": [
+                    14170,
+                    14179,
+                    14227,
+                    14418
+                  ],
+                  "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+                  "correct": true,
+                  "epoch": 1
+                },
+                {
+                  "p50_ms": 0.244,
+                  "p95_ms": 0.597,
+                  "p99_ms": 0.882,
+                  "minimum_ms": 0.153,
+                  "maximum_ms": 6.478,
+                  "requests": 62589,
+                  "wall_ms": 5004.146,
+                  "throughput_qps": 12507.428,
+                  "warmed_worker_count": 4,
+                  "worker_ids": [
+                    481,
+                    484,
+                    485,
+                    486
+                  ],
+                  "worker_request_counts": [
+                    15531,
+                    15644,
+                    15674,
+                    15740
+                  ],
+                  "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+                  "correct": true,
+                  "epoch": 2
+                },
+                {
+                  "p50_ms": 0.26,
+                  "p95_ms": 0.716,
+                  "p99_ms": 1.078,
+                  "minimum_ms": 0.156,
+                  "maximum_ms": 4.052,
+                  "requests": 56216,
+                  "wall_ms": 5003.186,
+                  "throughput_qps": 11236.04,
+                  "warmed_worker_count": 4,
+                  "worker_ids": [
+                    487,
+                    490,
+                    491,
+                    492
+                  ],
+                  "worker_request_counts": [
+                    14019,
+                    14022,
+                    14079,
+                    14096
+                  ],
+                  "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+                  "correct": true,
+                  "epoch": 3
+                }
+              ]
+            },
+            "8": {
+              "workers": 8,
+              "epoch_count": 3,
+              "requests": 231663,
+              "runs": 231663,
+              "throughput_qps": 14585.516,
+              "p50_ms": 0.363,
+              "p95_ms": 1.156,
+              "p99_ms": 2.588,
+              "minimum_ms": 0.183,
+              "maximum_ms": 56.495,
+              "minimum_epoch_wall_ms": 5004.578,
+              "minimum_requests_per_worker": 8992,
+              "correct": true,
+              "epochs": [
+                {
+                  "p50_ms": 0.354,
+                  "p95_ms": 0.883,
+                  "p99_ms": 1.57,
+                  "minimum_ms": 0.183,
+                  "maximum_ms": 5.871,
+                  "requests": 85843,
+                  "wall_ms": 5005.084,
+                  "throughput_qps": 17151.162,
+                  "warmed_worker_count": 8,
+                  "worker_ids": [
+                    493,
+                    496,
+                    497,
+                    498,
+                    499,
+                    500,
+                    501,
+                    502
+                  ],
+                  "worker_request_counts": [
+                    10610,
+                    10686,
+                    10721,
+                    10732,
+                    10737,
+                    10738,
+                    10745,
+                    10874
+                  ],
+                  "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+                  "correct": true,
+                  "epoch": 1
+                },
+                {
+                  "p50_ms": 0.363,
+                  "p95_ms": 1.156,
+                  "p99_ms": 2.887,
+                  "minimum_ms": 0.183,
+                  "maximum_ms": 56.495,
+                  "requests": 72823,
+                  "wall_ms": 5004.578,
+                  "throughput_qps": 14551.277,
+                  "warmed_worker_count": 8,
+                  "worker_ids": [
+                    503,
+                    506,
+                    507,
+                    508,
+                    509,
+                    510,
+                    511,
+                    512
+                  ],
+                  "worker_request_counts": [
+                    8992,
+                    8997,
+                    9035,
+                    9141,
+                    9153,
+                    9166,
+                    9167,
+                    9172
+                  ],
+                  "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+                  "correct": true,
+                  "epoch": 2
+                },
+                {
+                  "p50_ms": 0.389,
+                  "p95_ms": 1.168,
+                  "p99_ms": 2.588,
+                  "minimum_ms": 0.187,
+                  "maximum_ms": 29.457,
+                  "requests": 72997,
+                  "wall_ms": 5004.759,
+                  "throughput_qps": 14585.516,
+                  "warmed_worker_count": 8,
+                  "worker_ids": [
+                    513,
+                    516,
+                    517,
+                    518,
+                    519,
+                    520,
+                    521,
+                    522
+                  ],
+                  "worker_request_counts": [
+                    9047,
+                    9078,
+                    9100,
+                    9111,
+                    9116,
+                    9165,
+                    9179,
+                    9201
+                  ],
+                  "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+                  "correct": true,
+                  "epoch": 3
+                }
+              ]
+            }
+          },
+          "memory": {
+            "dfg_conformance_95pct": {
+              "baseline_rss_bytes": 57339904,
+              "peak_rss_bytes": 57344000,
+              "incremental_peak_bytes": 4096,
+              "resident_pss_bytes": 54671360,
+              "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+              "input": {
+                "source": "pg_ocpm_lifecycle_dfg_window_counts",
+                "strategy": "native lifecycle DFG window aggregate",
+                "database_rows": 3,
+                "expanded_event_rows": 0,
+                "aggregate_rows": 3
+              }
+            },
+            "variant_conformance_95pct": {
+              "baseline_rss_bytes": 57339904,
+              "peak_rss_bytes": 57344000,
+              "incremental_peak_bytes": 4096,
+              "resident_pss_bytes": 54671360,
+              "answer_sha256": "80cd775e0a756938d2ce7f6c48bed2fb26d3c4a933b64ba1723e9612bac740bd",
+              "input": {
+                "source": "pg_ocpm_lifecycle_variant_window_counts",
+                "strategy": "native lifecycle variant window aggregate",
+                "database_rows": 6,
+                "expanded_event_rows": 0,
+                "aggregate_rows": 6
+              }
+            },
+            "next_activity_prediction": {
+              "baseline_rss_bytes": 57339904,
+              "peak_rss_bytes": 57344000,
+              "incremental_peak_bytes": 4096,
+              "resident_pss_bytes": 54671360,
+              "answer_sha256": "0d11e08bea5189f4b9bd8d8b63a71840edef2dc8b0a3d120c9a08d1d20e5739d",
+              "input": {
+                "source": "pg_ocpm_lifecycle_dfg_window_counts",
+                "strategy": "native lifecycle DFG window aggregate",
+                "database_rows": 3,
+                "expanded_event_rows": 0,
+                "aggregate_rows": 3
+              }
+            },
+            "edge_bottleneck_ranking": {
+              "baseline_rss_bytes": 57339904,
+              "peak_rss_bytes": 57344000,
+              "incremental_peak_bytes": 4096,
+              "resident_pss_bytes": 54671360,
+              "answer_sha256": "34ecb123e6a6270bca1ed9f302917df1347966c0562f4998a71c7740e3dc1528",
+              "input": {
+                "source": "pg_ocpm_edge_feature_aggregates",
+                "strategy": "native filtered edge feature aggregate",
+                "database_rows": 3,
+                "expanded_event_rows": 0,
+                "aggregate_rows": 3
+              }
+            }
+          }
+        }
+      ]
+    },
+    "duckdb_parquet_ocpm_engine": {
+      "schema_version": 1,
+      "generated_at": "2026-08-04T02:17:36.510498+00:00",
+      "arm": "duckdb_parquet_ocpm_engine",
+      "implementation": {
+        "ocpm_engine_version": "1.1.0",
+        "python": "3.11.15",
+        "platform": "Linux-7.0.11-orbstack-00360-gc9bc4d96ac70-aarch64-with-glibc2.36",
+        "source_revision": "254a07e060cb799dc4360bca0b4db08d5923b1f1",
+        "source_tree_clean": true,
+        "image_id": "sha256:f943aa28a27b8ec55ca1ac36d1842ebedfc171229d53f742c3043722022c6f54"
+      },
+      "method": {
+        "read_path": "one source-neutral DuckDB aggregate plan over immutable canonical Parquet with bounded aggregate transfer",
+        "process_model": "one deployment-linked DuckDB connection pool per process worker",
+        "data_import": "OCEL SQLite to canonical Parquet conversion outside request timing",
+        "latency_states": {
+          "serial": "warm bounded exact-result cache",
+          "serial_without_result_cache": "warm DuckDB and filesystem state with exact-result cache disabled"
+        }
+      },
+      "client_memory_baseline_bytes": 39931904,
+      "client_memory_after_connection_bytes": 170135552,
+      "datasets": [
+        {
+          "dataset": "ocpa_running_example",
+          "fixture": {
+            "dataset_name": "ocpa_running_example",
+            "baseline_dataset_id": 1,
+            "ocpm_dataset_id": 1,
+            "tenant_id": 1,
+            "object_type": "orders",
+            "from_time": "2023-04-03T12:08:17.999999+00:00",
+            "train_to": "2024-01-26T12:23:47+00:00",
+            "test_from": "2024-01-26T12:23:47.000001+00:00",
+            "to_time": "2024-05-10T10:15:11.000001+00:00",
+            "cases": 2000,
+            "train_cases": 1600,
+            "test_cases": 338
+          },
+          "serial": {
+            "dfg_conformance_95pct": {
+              "correct_within_arm": true,
+              "answer": {
+                "fitness": 1.0,
+                "conforming": 759,
+                "deviations": 0,
+                "test_total": 759,
+                "model": [
+                  [
+                    "confirm order",
+                    "payment reminder",
+                    "directly_follows"
+                  ],
+                  [
+                    "payment reminder",
+                    "payment reminder",
+                    "directly_follows"
+                  ],
+                  [
+                    "place order",
+                    "confirm order",
+                    "directly_follows"
+                  ]
+                ]
+              },
+              "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+              "input": {
+                "source": "duckdb_parquet_execution_summary",
+                "selected_cases": 1938,
+                "event_rows": 6250,
+                "aggregate_rows": 3
+              },
+              "p50_ms": 0.05,
+              "p95_ms": 0.14,
+              "minimum_ms": 0.048,
+              "maximum_ms": 0.333,
+              "runs": 90,
+              "epoch_count": 3,
+              "epoch_p95_median_ms": 0.124,
+              "epoch_p95_range_ms": [
+                0.123,
+                0.293
+              ],
+              "epochs": [
+                {
+                  "epoch": 1,
+                  "p50_ms": 0.055,
+                  "p95_ms": 0.293,
+                  "minimum_ms": 0.048,
+                  "maximum_ms": 0.333,
+                  "runs": 30,
+                  "samples_ns": [
+                    63001,
+                    49376,
+                    48917,
+                    48043,
+                    49251,
+                    48376,
+                    293046,
+                    84376,
+                    56167,
+                    50209,
+                    55542,
+                    50501,
+                    332754,
+                    71376,
+                    162335,
+                    67626,
+                    53792,
+                    52543,
+                    51042,
+                    49876,
+                    123585,
+                    126252,
+                    140002,
+                    72334,
+                    55834,
+                    52584,
+                    49750,
+                    57376,
+                    49625,
+                    49376
+                  ]
+                },
+                {
+                  "epoch": 2,
+                  "p50_ms": 0.05,
+                  "p95_ms": 0.124,
+                  "minimum_ms": 0.048,
+                  "maximum_ms": 0.131,
+                  "runs": 30,
+                  "samples_ns": [
+                    52292,
+                    50167,
+                    77251,
+                    52209,
+                    48542,
+                    48626,
+                    48126,
+                    49667,
+                    123751,
+                    130794,
+                    65376,
+                    53376,
+                    51084,
+                    50251,
+                    49626,
+                    49334,
+                    48834,
+                    59043,
+                    50334,
+                    48959,
+                    48959,
+                    49959,
+                    50417,
+                    60834,
+                    51500,
+                    49875,
+                    49042,
+                    48667,
+                    49084,
+                    48751
+                  ]
+                },
+                {
+                  "epoch": 3,
+                  "p50_ms": 0.049,
+                  "p95_ms": 0.123,
+                  "minimum_ms": 0.048,
+                  "maximum_ms": 0.214,
+                  "runs": 30,
+                  "samples_ns": [
+                    53334,
+                    49375,
+                    48500,
+                    49209,
+                    71001,
+                    50543,
+                    58251,
+                    50959,
+                    48917,
+                    48292,
+                    48626,
+                    48251,
+                    48293,
+                    49084,
+                    48042,
+                    49250,
+                    48792,
+                    48543,
+                    48043,
+                    47876,
+                    48043,
+                    47917,
+                    69334,
+                    214420,
+                    122918,
+                    61167,
+                    52084,
+                    48251,
+                    68960,
+                    50375
+                  ]
+                }
+              ]
+            },
+            "variant_conformance_95pct": {
+              "correct_within_arm": true,
+              "answer": {
+                "fitness": 0.958579881657,
+                "conforming": 324,
+                "deviations": 14,
+                "test_total": 338,
+                "model": [
+                  "[\"place order\",\"confirm order\",\"payment reminder\",\"payment reminder\"]",
+                  "[\"place order\",\"confirm order\",\"payment reminder\"]"
+                ]
+              },
+              "answer_sha256": "80cd775e0a756938d2ce7f6c48bed2fb26d3c4a933b64ba1723e9612bac740bd",
+              "input": {
+                "source": "duckdb_parquet_execution_summary",
+                "selected_cases": 1938,
+                "event_rows": 6250,
+                "aggregate_rows": 6
+              },
+              "p50_ms": 0.09,
+              "p95_ms": 0.377,
+              "minimum_ms": 0.084,
+              "maximum_ms": 2.741,
+              "runs": 90,
+              "epoch_count": 3,
+              "epoch_p95_median_ms": 0.351,
+              "epoch_p95_range_ms": [
+                0.14,
+                0.436
+              ],
+              "epochs": [
+                {
+                  "epoch": 1,
+                  "p50_ms": 0.091,
+                  "p95_ms": 0.436,
+                  "minimum_ms": 0.084,
+                  "maximum_ms": 0.52,
+                  "runs": 30,
+                  "samples_ns": [
+                    110835,
+                    85127,
+                    84835,
+                    88001,
+                    90917,
+                    87418,
+                    86543,
+                    91918,
+                    83710,
+                    84126,
+                    96126,
+                    87626,
+                    84751,
+                    97960,
+                    85918,
+                    88626,
+                    430381,
+                    436297,
+                    134335,
+                    520216,
+                    184128,
+                    116543,
+                    90293,
+                    87293,
+                    183378,
+                    103335,
+                    90835,
+                    119835,
+                    90835,
+                    91168
+                  ]
+                },
+                {
+                  "epoch": 2,
+                  "p50_ms": 0.088,
+                  "p95_ms": 0.14,
+                  "minimum_ms": 0.084,
+                  "maximum_ms": 0.377,
+                  "runs": 30,
+                  "samples_ns": [
+                    92543,
+                    87376,
+                    84793,
+                    87376,
+                    85043,
+                    87001,
+                    91001,
+                    84334,
+                    89584,
+                    85292,
+                    84668,
+                    84710,
+                    84085,
+                    91085,
+                    87418,
+                    85168,
+                    84710,
+                    85460,
+                    376630,
+                    139710,
+                    104752,
+                    91334,
+                    89876,
+                    89376,
+                    90168,
+                    117127,
+                    94460,
+                    88668,
+                    88376,
+                    88251
+                  ]
+                },
+                {
+                  "epoch": 3,
+                  "p50_ms": 0.092,
+                  "p95_ms": 0.351,
+                  "minimum_ms": 0.087,
+                  "maximum_ms": 2.741,
+                  "runs": 30,
+                  "samples_ns": [
+                    95210,
+                    87793,
+                    88418,
+                    2741455,
+                    249128,
+                    116876,
+                    121126,
+                    113835,
+                    351130,
+                    114044,
+                    98168,
+                    97794,
+                    93668,
+                    129168,
+                    100751,
+                    90917,
+                    88918,
+                    88085,
+                    88126,
+                    89043,
+                    88251,
+                    87709,
+                    87376,
+                    103002,
+                    98251,
+                    90126,
+                    88876,
+                    88084,
+                    88209,
+                    88293
+                  ]
+                }
+              ]
+            },
+            "next_activity_prediction": {
+              "correct_within_arm": true,
+              "answer": {
+                "accuracy": 1.0,
+                "correct": 759,
+                "test_total": 759,
+                "predictions": [
+                  [
+                    "confirm order",
+                    "directly_follows",
+                    "payment reminder"
+                  ],
+                  [
+                    "payment reminder",
+                    "directly_follows",
+                    "payment reminder"
+                  ],
+                  [
+                    "place order",
+                    "directly_follows",
+                    "confirm order"
+                  ]
+                ]
+              },
+              "answer_sha256": "0d11e08bea5189f4b9bd8d8b63a71840edef2dc8b0a3d120c9a08d1d20e5739d",
+              "input": {
+                "source": "duckdb_parquet_execution_summary",
+                "selected_cases": 1938,
+                "event_rows": 6250,
+                "aggregate_rows": 3
+              },
+              "p50_ms": 0.047,
+              "p95_ms": 0.218,
+              "minimum_ms": 0.045,
+              "maximum_ms": 0.492,
+              "runs": 90,
+              "epoch_count": 3,
+              "epoch_p95_median_ms": 0.137,
+              "epoch_p95_range_ms": [
+                0.05,
+                0.358
+              ],
+              "epochs": [
+                {
+                  "epoch": 1,
+                  "p50_ms": 0.047,
+                  "p95_ms": 0.137,
+                  "minimum_ms": 0.045,
+                  "maximum_ms": 0.218,
+                  "runs": 30,
+                  "samples_ns": [
+                    49126,
+                    47792,
+                    46792,
+                    46584,
+                    46751,
+                    60709,
+                    54834,
+                    48417,
+                    54626,
+                    47459,
+                    46793,
+                    218086,
+                    136835,
+                    60293,
+                    48334,
+                    46959,
+                    46793,
+                    47126,
+                    46625,
+                    47042,
+                    47084,
+                    46917,
+                    45417,
+                    45292,
+                    45334,
+                    60459,
+                    47625,
+                    46501,
+                    45709,
+                    46167
+                  ]
+                },
+                {
+                  "epoch": 2,
+                  "p50_ms": 0.046,
+                  "p95_ms": 0.05,
+                  "minimum_ms": 0.045,
+                  "maximum_ms": 0.064,
+                  "runs": 30,
+                  "samples_ns": [
+                    49042,
+                    47292,
+                    45501,
+                    45917,
+                    45834,
+                    46334,
+                    46084,
+                    45251,
+                    45167,
+                    50043,
+                    46209,
+                    47292,
+                    46876,
+                    46168,
+                    64251,
+                    48876,
+                    46001,
+                    45876,
+                    45751,
+                    46167,
+                    46251,
+                    46209,
+                    45876,
+                    45834,
+                    45584,
+                    46709,
+                    46376,
+                    47001,
+                    45918,
+                    46584
+                  ]
+                },
+                {
+                  "epoch": 3,
+                  "p50_ms": 0.048,
+                  "p95_ms": 0.358,
+                  "minimum_ms": 0.045,
+                  "maximum_ms": 0.492,
+                  "runs": 30,
+                  "samples_ns": [
+                    50209,
+                    492215,
+                    256545,
+                    71835,
+                    52876,
+                    48834,
+                    337380,
+                    191711,
+                    358047,
+                    78543,
+                    100543,
+                    68251,
+                    47417,
+                    47167,
+                    46667,
+                    46834,
+                    46626,
+                    46459,
+                    46792,
+                    45417,
+                    46042,
+                    45917,
+                    45751,
+                    46750,
+                    62751,
+                    52167,
+                    47584,
+                    46667,
+                    45959,
+                    179960
+                  ]
+                }
+              ]
+            },
+            "edge_bottleneck_ranking": {
+              "correct_within_arm": true,
+              "answer": [
+                [
+                  "confirm order",
+                  "payment reminder",
+                  2000,
+                  747513.717
+                ],
+                [
+                  "payment reminder",
+                  "payment reminder",
+                  484,
+                  735859.634298
+                ],
+                [
+                  "place order",
+                  "confirm order",
+                  2000,
+                  106005.8605
+                ]
+              ],
+              "answer_sha256": "34ecb123e6a6270bca1ed9f302917df1347966c0562f4998a71c7740e3dc1528",
+              "input": {
+                "source": "duckdb_parquet_execution_summary",
+                "selected_cases": 2000,
+                "event_rows": 6484,
+                "aggregate_rows": 3
+              },
+              "p50_ms": 0.024,
+              "p95_ms": 0.062,
+              "minimum_ms": 0.022,
+              "maximum_ms": 0.364,
+              "runs": 90,
+              "epoch_count": 3,
+              "epoch_p95_median_ms": 0.087,
+              "epoch_p95_range_ms": [
+                0.04,
+                0.139
+              ],
+              "epochs": [
+                {
+                  "epoch": 1,
+                  "p50_ms": 0.023,
+                  "p95_ms": 0.04,
+                  "minimum_ms": 0.022,
+                  "maximum_ms": 0.042,
+                  "runs": 30,
+                  "samples_ns": [
+                    24709,
+                    25750,
+                    22667,
+                    22834,
+                    23042,
+                    22667,
+                    22500,
+                    22292,
+                    22750,
+                    22542,
+                    22792,
+                    22459,
+                    22542,
+                    35750,
+                    23417,
+                    22667,
+                    22834,
+                    22959,
+                    24208,
+                    39793,
+                    23334,
+                    22834,
+                    22708,
+                    32750,
+                    23917,
+                    34667,
+                    31418,
+                    42042,
+                    23500,
+                    22875
+                  ]
+                },
+                {
+                  "epoch": 2,
+                  "p50_ms": 0.026,
+                  "p95_ms": 0.139,
+                  "minimum_ms": 0.023,
+                  "maximum_ms": 0.364,
+                  "runs": 30,
+                  "samples_ns": [
+                    139085,
+                    55293,
+                    37709,
+                    27625,
+                    26209,
+                    28959,
+                    23876,
+                    27709,
+                    25334,
+                    23667,
+                    23251,
+                    22959,
+                    22876,
+                    60000,
+                    28208,
+                    24500,
+                    24792,
+                    24750,
+                    24042,
+                    23375,
+                    23083,
+                    363880,
+                    61792,
+                    39125,
+                    26459,
+                    25709,
+                    24667,
+                    24459,
+                    24334,
+                    51834
+                  ]
+                },
+                {
+                  "epoch": 3,
+                  "p50_ms": 0.023,
+                  "p95_ms": 0.087,
+                  "minimum_ms": 0.023,
+                  "maximum_ms": 0.103,
+                  "runs": 30,
+                  "samples_ns": [
+                    27500,
+                    30626,
+                    23750,
+                    23251,
+                    23417,
+                    22958,
+                    22667,
+                    23375,
+                    22917,
+                    23250,
+                    23459,
+                    22959,
+                    22958,
+                    24167,
+                    23501,
+                    23083,
+                    23167,
+                    22917,
+                    23376,
+                    23208,
+                    23084,
+                    23333,
+                    31375,
+                    25459,
+                    23500,
+                    24125,
+                    22750,
+                    23584,
+                    102585,
+                    87418
+                  ]
+                }
+              ]
+            }
+          },
+          "serial_without_result_cache": {
+            "dfg_conformance_95pct": {
+              "correct_within_arm": true,
+              "answer": {
+                "fitness": 1.0,
+                "conforming": 759,
+                "deviations": 0,
+                "test_total": 759,
+                "model": [
+                  [
+                    "confirm order",
+                    "payment reminder",
+                    "directly_follows"
+                  ],
+                  [
+                    "payment reminder",
+                    "payment reminder",
+                    "directly_follows"
+                  ],
+                  [
+                    "place order",
+                    "confirm order",
+                    "directly_follows"
+                  ]
+                ]
+              },
+              "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+              "input": {
+                "source": "duckdb_parquet_execution_summary",
+                "selected_cases": 1938,
+                "event_rows": 6250,
+                "aggregate_rows": 3
+              },
+              "p50_ms": 51.287,
+              "p95_ms": 74.388,
+              "minimum_ms": 37.319,
+              "maximum_ms": 78.844,
+              "runs": 90,
+              "epoch_count": 3,
+              "epoch_p95_median_ms": 72.38,
+              "epoch_p95_range_ms": [
+                69.5,
+                76.626
+              ],
+              "epochs": [
+                {
+                  "epoch": 1,
+                  "p50_ms": 47.197,
+                  "p95_ms": 69.5,
+                  "minimum_ms": 37.319,
+                  "maximum_ms": 76.284,
+                  "runs": 30,
+                  "samples_ns": [
+                    64007049,
+                    66291289,
+                    55226845,
+                    44816909,
+                    47443821,
+                    76283885,
+                    50686782,
+                    41429280,
+                    37913273,
+                    40396932,
+                    41003982,
+                    47861909,
+                    43919105,
+                    46868563,
+                    46795728,
+                    44861827,
+                    51625212,
+                    61924896,
+                    66577043,
+                    64692934,
+                    62181107,
+                    45356709,
+                    37318556,
+                    38727117,
+                    44694658,
+                    46949272,
+                    44897869,
+                    69500167,
+                    62335568,
+                    61469805
+                  ]
+                },
+                {
+                  "epoch": 2,
+                  "p50_ms": 55.678,
+                  "p95_ms": 76.626,
+                  "minimum_ms": 42.968,
+                  "maximum_ms": 78.844,
+                  "runs": 30,
+                  "samples_ns": [
+                    44223693,
+                    47148441,
+                    57037036,
+                    57413000,
+                    63300580,
+                    78844378,
+                    72259246,
+                    48750005,
+                    50765242,
+                    48582003,
+                    74388359,
+                    61410388,
+                    76625889,
+                    49306096,
+                    42967634,
+                    44685991,
+                    51385500,
+                    59850909,
+                    60039160,
+                    73170967,
+                    58902229,
+                    54318499,
+                    53800492,
+                    51188331,
+                    45733005,
+                    58127843,
+                    45315166,
+                    61015883,
+                    67602015,
+                    49823770
+                  ]
+                },
+                {
+                  "epoch": 3,
+                  "p50_ms": 51.38,
+                  "p95_ms": 72.38,
+                  "minimum_ms": 38.822,
+                  "maximum_ms": 77.229,
+                  "runs": 30,
+                  "samples_ns": [
+                    38822160,
+                    40407224,
+                    39596795,
+                    40514683,
+                    44588865,
+                    42706713,
+                    47021648,
+                    42321125,
+                    60801505,
+                    63799004,
+                    57193663,
+                    56161107,
+                    44444488,
+                    48431751,
+                    44542239,
+                    55388139,
+                    51579836,
+                    63802671,
+                    67835435,
+                    59445695,
+                    51180706,
+                    56393735,
+                    52448014,
+                    52386681,
+                    47945661,
+                    47401278,
+                    77229148,
+                    72379539,
+                    58654559,
+                    40866605
+                  ]
+                }
+              ]
+            },
+            "variant_conformance_95pct": {
+              "correct_within_arm": true,
+              "answer": {
+                "fitness": 0.958579881657,
+                "conforming": 324,
+                "deviations": 14,
+                "test_total": 338,
+                "model": [
+                  "[\"place order\",\"confirm order\",\"payment reminder\",\"payment reminder\"]",
+                  "[\"place order\",\"confirm order\",\"payment reminder\"]"
+                ]
+              },
+              "answer_sha256": "80cd775e0a756938d2ce7f6c48bed2fb26d3c4a933b64ba1723e9612bac740bd",
+              "input": {
+                "source": "duckdb_parquet_execution_summary",
+                "selected_cases": 1938,
+                "event_rows": 6250,
+                "aggregate_rows": 6
+              },
+              "p50_ms": 52.533,
+              "p95_ms": 79.737,
+              "minimum_ms": 40.434,
+              "maximum_ms": 91.289,
+              "runs": 90,
+              "epoch_count": 3,
+              "epoch_p95_median_ms": 81.937,
+              "epoch_p95_range_ms": [
+                70.335,
+                90.676
+              ],
+              "epochs": [
+                {
+                  "epoch": 1,
+                  "p50_ms": 55.035,
+                  "p95_ms": 70.335,
+                  "minimum_ms": 40.434,
+                  "maximum_ms": 79.737,
+                  "runs": 30,
+                  "samples_ns": [
+                    66189704,
+                    58626683,
+                    49881021,
+                    46064926,
+                    47489613,
+                    49883521,
+                    51626170,
+                    57013161,
+                    65157898,
+                    58427639,
+                    49727810,
+                    40434058,
+                    44656907,
+                    50122316,
+                    46435098,
+                    55564058,
+                    66091286,
+                    68909033,
+                    54506793,
+                    43903606,
+                    47057274,
+                    53544947,
+                    70334970,
+                    79736682,
+                    61868061,
+                    56513196,
+                    58738018,
+                    56618489,
+                    50540905,
+                    63855005
+                  ]
+                },
+                {
+                  "epoch": 2,
+                  "p50_ms": 51.789,
+                  "p95_ms": 81.937,
+                  "minimum_ms": 42.142,
+                  "maximum_ms": 83.473,
+                  "runs": 30,
+                  "samples_ns": [
+                    70819226,
+                    56963994,
+                    52426639,
+                    49152636,
+                    52933188,
+                    43502517,
+                    50158691,
+                    49727394,
+                    79600722,
+                    52384139,
+                    47093149,
+                    48197623,
+                    42515461,
+                    49420014,
+                    48838798,
+                    51193455,
+                    77584236,
+                    81936838,
+                    60858881,
+                    68520653,
+                    50747408,
+                    50710907,
+                    44111858,
+                    61497889,
+                    76488096,
+                    53703073,
+                    43379014,
+                    42142289,
+                    52871312,
+                    83472859
+                  ]
+                },
+                {
+                  "epoch": 3,
+                  "p50_ms": 52.404,
+                  "p95_ms": 90.676,
+                  "minimum_ms": 43.095,
+                  "maximum_ms": 91.289,
+                  "runs": 30,
+                  "samples_ns": [
+                    91288508,
+                    67747642,
+                    46939689,
+                    43094594,
+                    44904660,
+                    55775852,
+                    52167927,
+                    90676375,
+                    55193844,
+                    47650573,
+                    44587948,
+                    50267984,
+                    44124316,
+                    45623171,
+                    48787589,
+                    78936713,
+                    70436680,
+                    63257789,
+                    52639434,
+                    46779186,
+                    46942772,
+                    58832603,
+                    54494418,
+                    62536362,
+                    59388402,
+                    54157038,
+                    46875021,
+                    46924356,
+                    55595600,
+                    50937244
+                  ]
+                }
+              ]
+            },
+            "next_activity_prediction": {
+              "correct_within_arm": true,
+              "answer": {
+                "accuracy": 1.0,
+                "correct": 759,
+                "test_total": 759,
+                "predictions": [
+                  [
+                    "confirm order",
+                    "directly_follows",
+                    "payment reminder"
+                  ],
+                  [
+                    "payment reminder",
+                    "directly_follows",
+                    "payment reminder"
+                  ],
+                  [
+                    "place order",
+                    "directly_follows",
+                    "confirm order"
+                  ]
+                ]
+              },
+              "answer_sha256": "0d11e08bea5189f4b9bd8d8b63a71840edef2dc8b0a3d120c9a08d1d20e5739d",
+              "input": {
+                "source": "duckdb_parquet_execution_summary",
+                "selected_cases": 1938,
+                "event_rows": 6250,
+                "aggregate_rows": 3
+              },
+              "p50_ms": 53.129,
+              "p95_ms": 84.533,
+              "minimum_ms": 38.28,
+              "maximum_ms": 179.226,
+              "runs": 90,
+              "epoch_count": 3,
+              "epoch_p95_median_ms": 82.142,
+              "epoch_p95_range_ms": [
+                79.977,
+                87.308
+              ],
+              "epochs": [
+                {
+                  "epoch": 1,
+                  "p50_ms": 51.725,
+                  "p95_ms": 82.142,
+                  "minimum_ms": 43.104,
+                  "maximum_ms": 84.533,
+                  "runs": 30,
+                  "samples_ns": [
+                    46329722,
+                    52667267,
+                    73641973,
+                    73860685,
+                    60611419,
+                    47130358,
+                    56137358,
+                    48279957,
+                    84532873,
+                    80827531,
+                    46956938,
+                    51105580,
+                    48289332,
+                    43689727,
+                    52006633,
+                    69036410,
+                    59161441,
+                    61411638,
+                    44231360,
+                    46816020,
+                    50358445,
+                    58367388,
+                    51443792,
+                    50358652,
+                    54165038,
+                    82142090,
+                    62414068,
+                    46834270,
+                    43104011,
+                    47426779
+                  ]
+                },
+                {
+                  "epoch": 2,
+                  "p50_ms": 53.8,
+                  "p95_ms": 79.977,
+                  "minimum_ms": 41.162,
+                  "maximum_ms": 84.705,
+                  "runs": 30,
+                  "samples_ns": [
+                    48066121,
+                    51492919,
+                    62990368,
+                    53386944,
+                    60498875,
+                    59739198,
+                    59463069,
+                    51169663,
+                    41162359,
+                    44057357,
+                    43143720,
+                    47211609,
+                    58318762,
+                    48590087,
+                    54213247,
+                    75353706,
+                    84705084,
+                    60705295,
+                    43908980,
+                    51295624,
+                    59547321,
+                    53279193,
+                    48060871,
+                    64411763,
+                    79976644,
+                    67532723,
+                    56507445,
+                    54644669,
+                    52464514,
+                    48426418
+                  ]
+                },
+                {
+                  "epoch": 3,
+                  "p50_ms": 53.542,
+                  "p95_ms": 87.308,
+                  "minimum_ms": 38.28,
+                  "maximum_ms": 179.226,
+                  "runs": 30,
+                  "samples_ns": [
+                    48175081,
+                    78118201,
+                    87307954,
+                    58340679,
+                    49718728,
+                    179226137,
+                    85107548,
+                    62594321,
+                    58312221,
+                    52349596,
+                    59862909,
+                    74624278,
+                    61199093,
+                    50385611,
+                    54169413,
+                    48691379,
+                    51950716,
+                    54688337,
+                    49511932,
+                    50956744,
+                    49139386,
+                    54104495,
+                    51462918,
+                    52979355,
+                    67147675,
+                    58701143,
+                    50276485,
+                    42431335,
+                    38279986,
+                    42278583
+                  ]
+                }
+              ]
+            },
+            "edge_bottleneck_ranking": {
+              "correct_within_arm": true,
+              "answer": [
+                [
+                  "confirm order",
+                  "payment reminder",
+                  2000,
+                  747513.717
+                ],
+                [
+                  "payment reminder",
+                  "payment reminder",
+                  484,
+                  735859.634298
+                ],
+                [
+                  "place order",
+                  "confirm order",
+                  2000,
+                  106005.8605
+                ]
+              ],
+              "answer_sha256": "34ecb123e6a6270bca1ed9f302917df1347966c0562f4998a71c7740e3dc1528",
+              "input": {
+                "source": "duckdb_parquet_execution_summary",
+                "selected_cases": 2000,
+                "event_rows": 6484,
+                "aggregate_rows": 3
+              },
+              "p50_ms": 28.062,
+              "p95_ms": 51.395,
+              "minimum_ms": 19.858,
+              "maximum_ms": 83.982,
+              "runs": 90,
+              "epoch_count": 3,
+              "epoch_p95_median_ms": 46.326,
+              "epoch_p95_range_ms": [
+                37.89,
+                52.357
+              ],
+              "epochs": [
+                {
+                  "epoch": 1,
+                  "p50_ms": 28.299,
+                  "p95_ms": 46.326,
+                  "minimum_ms": 20.078,
+                  "maximum_ms": 55.058,
+                  "runs": 30,
+                  "samples_ns": [
+                    26056484,
+                    27043165,
+                    28186222,
+                    30135290,
+                    36176332,
+                    24322669,
+                    23251696,
+                    24030956,
+                    31934815,
+                    23357572,
+                    20078401,
+                    27436128,
+                    32856620,
+                    23492532,
+                    21578173,
+                    21875885,
+                    22429726,
+                    33419710,
+                    26140735,
+                    34698978,
+                    29166402,
+                    28411933,
+                    29587449,
+                    55058051,
+                    46326013,
+                    39577796,
+                    30524295,
+                    27850259,
+                    30182749,
+                    40107678
+                  ]
+                },
+                {
+                  "epoch": 2,
+                  "p50_ms": 31.939,
+                  "p95_ms": 52.357,
+                  "minimum_ms": 19.858,
+                  "maximum_ms": 83.982,
+                  "runs": 30,
+                  "samples_ns": [
+                    29181653,
+                    27937801,
+                    42062246,
+                    44326444,
+                    83982199,
+                    51395208,
+                    37729062,
+                    38543989,
+                    42456460,
+                    38659492,
+                    34228680,
+                    52356972,
+                    39677756,
+                    37641061,
+                    38884161,
+                    32684534,
+                    32172610,
+                    26267404,
+                    26260195,
+                    28857314,
+                    23325280,
+                    24494712,
+                    19857565,
+                    21378836,
+                    21681049,
+                    22279266,
+                    25548477,
+                    25918941,
+                    31211680,
+                    31705187
+                  ]
+                },
+                {
+                  "epoch": 3,
+                  "p50_ms": 26.787,
+                  "p95_ms": 37.89,
+                  "minimum_ms": 21.109,
+                  "maximum_ms": 75.94,
+                  "runs": 30,
+                  "samples_ns": [
+                    28895607,
+                    25767105,
+                    32001733,
+                    34738896,
+                    27512379,
+                    30657631,
+                    35089734,
+                    37889731,
+                    31596061,
+                    25539935,
+                    24196251,
+                    26805161,
+                    22709730,
+                    22779939,
+                    21685007,
+                    22926316,
+                    24319710,
+                    23815579,
+                    21108666,
+                    23308029,
+                    27636089,
+                    23883871,
+                    27871717,
+                    26676702,
+                    25121013,
+                    26768577,
+                    30956843,
+                    27435587,
+                    37186304,
+                    75940380
+                  ]
+                }
+              ]
+            }
+          },
+          "concurrency": {
+            "1": {
+              "workers": 1,
+              "correct": true,
+              "throughput_qps": 21801.952817567322,
+              "p50_ms": 0.04,
+              "p95_ms": 0.052,
+              "epochs": [
+                {
+                  "correct": true,
+                  "requests": 109206,
+                  "elapsed_seconds": 5.009000841062516,
+                  "throughput_qps": 21801.952817567322,
+                  "p50_ms": 0.039,
+                  "p95_ms": 0.052,
+                  "minimum_ms": 0.034,
+                  "maximum_ms": 45.637,
+                  "runs": 109206,
+                  "summed_worker_rss_bytes": 141701120,
+                  "summed_worker_pss_bytes": 116477952
+                },
+                {
+                  "correct": true,
+                  "requests": 111876,
+                  "elapsed_seconds": 5.007920075906441,
+                  "throughput_qps": 22339.813396432906,
+                  "p50_ms": 0.04,
+                  "p95_ms": 0.048,
+                  "minimum_ms": 0.034,
+                  "maximum_ms": 43.425,
+                  "runs": 111876,
+                  "summed_worker_rss_bytes": 135573504,
+                  "summed_worker_pss_bytes": 110350336
+                },
+                {
+                  "correct": true,
+                  "requests": 91347,
+                  "elapsed_seconds": 5.008379498962313,
+                  "throughput_qps": 18238.83354265111,
+                  "p50_ms": 0.041,
+                  "p95_ms": 0.084,
+                  "minimum_ms": 0.034,
+                  "maximum_ms": 30.398,
+                  "runs": 91347,
+                  "summed_worker_rss_bytes": 132468736,
+                  "summed_worker_pss_bytes": 107245568
+                }
+              ]
+            },
+            "2": {
+              "workers": 2,
+              "correct": true,
+              "throughput_qps": 31974.71595646071,
+              "p50_ms": 0.048,
+              "p95_ms": 0.115,
+              "epochs": [
+                {
+                  "correct": true,
+                  "requests": 160210,
+                  "elapsed_seconds": 5.010521445074119,
+                  "throughput_qps": 31974.71595646071,
+                  "p50_ms": 0.048,
+                  "p95_ms": 0.116,
+                  "minimum_ms": 0.038,
+                  "maximum_ms": 55.245,
+                  "runs": 160210,
+                  "summed_worker_rss_bytes": 274194432,
+                  "summed_worker_pss_bytes": 208488448
+                },
+                {
+                  "correct": true,
+                  "requests": 171924,
+                  "elapsed_seconds": 5.011498000007123,
+                  "throughput_qps": 34305.91012901844,
+                  "p50_ms": 0.047,
+                  "p95_ms": 0.092,
+                  "minimum_ms": 0.034,
+                  "maximum_ms": 43.844,
+                  "runs": 171924,
+                  "summed_worker_rss_bytes": 276905984,
+                  "summed_worker_pss_bytes": 211136512
+                },
+                {
+                  "correct": true,
+                  "requests": 158037,
+                  "elapsed_seconds": 5.011262829997577,
+                  "throughput_qps": 31536.362262618826,
+                  "p50_ms": 0.048,
+                  "p95_ms": 0.115,
+                  "minimum_ms": 0.034,
+                  "maximum_ms": 68.383,
+                  "runs": 158037,
+                  "summed_worker_rss_bytes": 276787200,
+                  "summed_worker_pss_bytes": 210999296
+                }
+              ]
+            },
+            "4": {
+              "workers": 4,
+              "correct": true,
+              "throughput_qps": 56095.59790511234,
+              "p50_ms": 0.049,
+              "p95_ms": 0.126,
+              "epochs": [
+                {
+                  "correct": true,
+                  "requests": 299361,
+                  "elapsed_seconds": 5.017009993083775,
+                  "throughput_qps": 59669.20544561116,
+                  "p50_ms": 0.049,
+                  "p95_ms": 0.123,
+                  "minimum_ms": 0.039,
+                  "maximum_ms": 73.929,
+                  "runs": 299361,
+                  "summed_worker_rss_bytes": 527167488,
+                  "summed_worker_pss_bytes": 371720192
+                },
+                {
+                  "correct": true,
+                  "requests": 281687,
+                  "elapsed_seconds": 5.0215526800602674,
+                  "throughput_qps": 56095.59790511234,
+                  "p50_ms": 0.049,
+                  "p95_ms": 0.126,
+                  "minimum_ms": 0.039,
+                  "maximum_ms": 80.905,
+                  "runs": 281687,
+                  "summed_worker_rss_bytes": 539574272,
+                  "summed_worker_pss_bytes": 383275008
+                },
+                {
+                  "correct": true,
+                  "requests": 280005,
+                  "elapsed_seconds": 5.019433943089098,
+                  "throughput_qps": 55784.17868921634,
+                  "p50_ms": 0.049,
+                  "p95_ms": 0.139,
+                  "minimum_ms": 0.039,
+                  "maximum_ms": 86.974,
+                  "runs": 280005,
+                  "summed_worker_rss_bytes": 526548992,
+                  "summed_worker_pss_bytes": 370592768
+                }
+              ]
+            },
+            "8": {
+              "workers": 8,
+              "correct": true,
+              "throughput_qps": 93149.41297589257,
+              "p50_ms": 0.05,
+              "p95_ms": 0.184,
+              "epochs": [
+                {
+                  "correct": true,
+                  "requests": 469740,
+                  "elapsed_seconds": 5.038143867976032,
+                  "throughput_qps": 93236.71818619744,
+                  "p50_ms": 0.05,
+                  "p95_ms": 0.184,
+                  "minimum_ms": 0.046,
+                  "maximum_ms": 124.061,
+                  "runs": 469740,
+                  "summed_worker_rss_bytes": 1057898496,
+                  "summed_worker_pss_bytes": 711919616
+                },
+                {
+                  "correct": true,
+                  "requests": 473218,
+                  "elapsed_seconds": 5.080203781020828,
+                  "throughput_qps": 93149.41297589257,
+                  "p50_ms": 0.05,
+                  "p95_ms": 0.183,
+                  "minimum_ms": 0.045,
+                  "maximum_ms": 119.179,
+                  "runs": 473218,
+                  "summed_worker_rss_bytes": 1073504256,
+                  "summed_worker_pss_bytes": 727065600
+                },
+                {
+                  "correct": true,
+                  "requests": 462805,
+                  "elapsed_seconds": 5.03917092399206,
+                  "throughput_qps": 91841.49674235762,
+                  "p50_ms": 0.05,
+                  "p95_ms": 0.186,
+                  "minimum_ms": 0.046,
+                  "maximum_ms": 142.019,
+                  "runs": 462805,
+                  "summed_worker_rss_bytes": 1062473728,
+                  "summed_worker_pss_bytes": 716089344
+                }
+              ]
+            }
+          },
+          "memory": {
+            "dfg_conformance_95pct": {
+              "baseline_rss_bytes": 170053632,
+              "peak_rss_bytes": 170057728,
+              "incremental_peak_bytes": 4096,
+              "answer_sha256": "6d1597bda1ee4df597f7d0d7c2dcaafdd32552c0290ea422bef92594373cd118",
+              "input": {
+                "source": "duckdb_parquet_execution_summary",
+                "selected_cases": 1938,
+                "event_rows": 6250,
+                "aggregate_rows": 3
+              }
+            },
+            "variant_conformance_95pct": {
+              "baseline_rss_bytes": 170053632,
+              "peak_rss_bytes": 170057728,
+              "incremental_peak_bytes": 4096,
+              "answer_sha256": "80cd775e0a756938d2ce7f6c48bed2fb26d3c4a933b64ba1723e9612bac740bd",
+              "input": {
+                "source": "duckdb_parquet_execution_summary",
+                "selected_cases": 1938,
+                "event_rows": 6250,
+                "aggregate_rows": 6
+              }
+            },
+            "next_activity_prediction": {
+              "baseline_rss_bytes": 170053632,
+              "peak_rss_bytes": 170057728,
+              "incremental_peak_bytes": 4096,
+              "answer_sha256": "0d11e08bea5189f4b9bd8d8b63a71840edef2dc8b0a3d120c9a08d1d20e5739d",
+              "input": {
+                "source": "duckdb_parquet_execution_summary",
+                "selected_cases": 1938,
+                "event_rows": 6250,
+                "aggregate_rows": 3
+              }
+            },
+            "edge_bottleneck_ranking": {
+              "baseline_rss_bytes": 170053632,
+              "peak_rss_bytes": 170057728,
+              "incremental_peak_bytes": 4096,
+              "answer_sha256": "34ecb123e6a6270bca1ed9f302917df1347966c0562f4998a71c7740e3dc1528",
+              "input": {
+                "source": "duckdb_parquet_execution_summary",
+                "selected_cases": 2000,
+                "event_rows": 6484,
+                "aggregate_rows": 3
+              }
+            }
+          },
+          "source_sqlite_bytes": 3743744,
+          "snapshot_bytes": 605965,
+          "snapshot_conversion_ms": 440.602741,
+          "connection_open_ms": 85.644638,
+          "cache_disabled_connection_open_ms": 252.86186,
+          "snapshot_rebuilt": true
+        }
+      ]
+    }
+  },
+  "limitations": [
+    "This common-workload suite is separate from strict OCPQ Q1-Q7.",
+    "Import, snapshot conversion, process startup, and connection startup are excluded from steady-state latency and reported by each arm.",
+    "Concurrency uses each architecture's normal scalable service model; memory is reported per arm and is not normalized into an artificial single runtime.",
+    "The results apply to the declared fixed workloads and do not imply the same ratio for arbitrary dynamic queries.",
+    "DuckDB warm-cache and cache-disabled measurements are both published; only the warm-cache state is used in the primary three-arm latency table and concurrency run.",
+    "OCPA is descriptive rather than publication-ready because its documented importer failed on its unchanged upstream example; the disclosed setup adapter is retained in the raw evidence."
+  ]
+}

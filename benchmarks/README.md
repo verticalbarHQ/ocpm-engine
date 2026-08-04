@@ -266,3 +266,38 @@ a disclosed setup adapter and cannot pass the publication gate. See the
 [ecosystem benchmark contract](ecosystem/README.md), the
 [Rust4PM pair report](../docs/rust4pm-vs-pg-ocpm-engine.md), and the
 [OCPA pair report](../docs/ocpa-vs-pg-ocpm-engine.md).
+
+## DuckDB Parquet provider comparisons
+
+The 1.1 ecosystem runner adds `ocpm-engine` over a deployment-supplied DuckDB
+client and an existing caller-provisioned catalog. It writes immutable
+canonical Parquet snapshots before measurement, opens the catalog read-only,
+and never packages `libduckdb` in the wheel. The Docker runtime installs that
+client separately so the test environment remains reproducible.
+
+Run both external pairs and the SAP bridge with:
+
+```sh
+./benchmarks/run_ecosystem_benchmark.sh --pair all --sap
+```
+
+The Rust4PM and OCPA pairs run the same four common workloads on each
+competitor's own dataset. The SAP bridge combines the unchanged, accepted 1.0
+PostgreSQL/PM4Py evidence with a fresh DuckDB arm because neither `pg_ocpm` nor
+the PostgreSQL provider changed. Every accepted latency cell has an exact
+canonical answer hash. DuckDB cached and cache-disabled samples are distinct;
+conversion and connection/materialization time are excluded from steady-state
+latency and reported separately.
+
+The strict OCPQ Q1-Q7 suite is not relabeled as a DuckDB comparison. Its public
+contract measures every intermediate node of OCPQ's evaluation tree through a
+PostgreSQL binding-capsule protocol, while the provider-neutral engine API does
+not expose that intermediate tree. The existing clean OCPQ-versus-PostgreSQL
+evidence remains the valid comparison until a source-neutral all-node contract
+exists; substituting root-level engine answers would weaken the exactness gate.
+
+Published reports and retained raw evidence:
+
+- [DuckDB and Rust4PM](../docs/duckdb-vs-rust4pm-performance.md)
+- [DuckDB and OCPA](../docs/duckdb-vs-ocpa-performance.md)
+- [DuckDB and SAP O2C/P2P](../docs/duckdb-sap-pm4py-four-way-performance.md)

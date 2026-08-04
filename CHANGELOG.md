@@ -36,6 +36,20 @@ All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
   Rust4PM and OCPA common workloads, plus SAP O2C/P2P bridge reporting and
   explicit cached, cache-disabled, latency, concurrency, memory, storage,
   snapshot-conversion, and connection-open evidence.
+- Published a clean Rust4PM comparison with exact parity on four workloads:
+  the bounded repeated-result cache produced a 12.164x p50 geometric-mean
+  speedup, while cache-disabled DuckDB was slower at 0.056x. The clean OCPA
+  comparison also matched all answers but remains descriptive because OCPA's
+  documented importer failed on its unchanged upstream example.
+- Published clean SAP O2C/P2P four-way evidence against the accepted unchanged
+  PostgreSQL/PM4Py baseline. Cached DuckDB was 37.413x and 1832.710x faster
+  than vanilla PostgreSQL plus PM4Py on O2C and P2P respectively; cache-off
+  ratios were 1.852x and 1.132x. DuckDB's 5.11 MiB combined Parquet footprint
+  came with 213.05-225.26 MiB process RSS and 4.22-7.72 second conversion cost.
+- Kept strict OCPQ Q1-Q7 separate because it requires duplicate-preserving
+  parity for every intermediate evaluation-tree node through the PostgreSQL
+  binding-capsule contract. The provider-neutral API does not expose that tree,
+  so no root-only DuckDB number is mislabeled as an OCPQ-equivalent result.
 
 ## 1.0.0 - 2026-08-03
 

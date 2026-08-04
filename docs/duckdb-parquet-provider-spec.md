@@ -1,8 +1,10 @@
 # DuckDB Parquet provider specification and delivery strategy
 
-Status: 1.1.0 implementation and measured-delivery contract  
-Target: `ocpm-engine` 1.1.0  
-Compatibility baseline: `ocpm-engine` 1.0.0 and `pg_ocpm` 1.0.0  
+Status: 1.1.0 implementation and measured-delivery contract
+
+Target: `ocpm-engine` 1.1.0
+
+Compatibility baseline: `ocpm-engine` 1.0.0 and `pg_ocpm` 1.0.0
 Last updated: 2026-08-03
 
 ## 1. Decision summary

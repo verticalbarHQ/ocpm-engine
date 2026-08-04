@@ -263,7 +263,10 @@ def concurrency_worker(
     samples = []
     correct = True
     started = time.perf_counter()
-    while len(samples) < minimum_requests or time.perf_counter() - started < minimum_seconds:
+    while (
+        len(samples) < minimum_requests
+        or time.perf_counter() - started < minimum_seconds
+    ):
         request_started = time.perf_counter_ns()
         value = run_workload(engine, fixture, "dfg_conformance_95pct")
         samples.append(time.perf_counter_ns() - request_started)
@@ -316,7 +319,9 @@ def concurrency_epoch(
         ready.get(timeout=180)
     wall_started = time.perf_counter()
     start.set()
-    values = [output.get(timeout=max(180, int(minimum_seconds * 20))) for _ in processes]
+    values = [
+        output.get(timeout=max(180, int(minimum_seconds * 20))) for _ in processes
+    ]
     wall_elapsed = time.perf_counter() - wall_started
     for process in processes:
         process.join(timeout=30)
@@ -338,7 +343,9 @@ def aggregate_epochs(workers: int, epochs: list[dict[str, Any]]) -> dict[str, An
     return {
         "workers": workers,
         "correct": all(epoch["correct"] for epoch in epochs),
-        "throughput_qps": statistics.median(epoch["throughput_qps"] for epoch in epochs),
+        "throughput_qps": statistics.median(
+            epoch["throughput_qps"] for epoch in epochs
+        ),
         "p50_ms": statistics.median(epoch["p50_ms"] for epoch in epochs),
         "p95_ms": statistics.median(epoch["p95_ms"] for epoch in epochs),
         "epochs": epochs,
@@ -367,7 +374,9 @@ def run(args: argparse.Namespace) -> None:
             snapshot_root = Path(args.snapshot_dir).resolve()
             resolved_root = root.resolve()
             if resolved_root.parent != snapshot_root:
-                raise RuntimeError("refusing to rebuild a snapshot outside snapshot-dir")
+                raise RuntimeError(
+                    "refusing to rebuild a snapshot outside snapshot-dir"
+                )
             shutil.rmtree(resolved_root)
         prepared = ensure_snapshot(source_sqlite, root, entry["sqlite_sha256"][:16])
         engine = prepared["engine"]
@@ -389,7 +398,9 @@ def run(args: argparse.Namespace) -> None:
             time.perf_counter_ns() - uncached_opened
         ) / 1_000_000
         serial_without_result_cache = measure_serial(
-            lambda workload: run_workload(uncached_engine, fixture, workload),
+            lambda workload, active=uncached_engine: run_workload(
+                active, fixture, workload
+            ),
             warmups=args.warmups,
             runs=args.runs,
             epochs=args.latency_epochs,
@@ -441,7 +452,8 @@ def run(args: argparse.Namespace) -> None:
             "python": platform.python_version(),
             "platform": platform.platform(),
             "source_revision": os.environ.get("OCPM_ENGINE_SOURCE_REVISION"),
-            "source_tree_clean": os.environ.get("OCPM_ENGINE_SOURCE_TREE_CLEAN") == "true",
+            "source_tree_clean": os.environ.get("OCPM_ENGINE_SOURCE_TREE_CLEAN")
+            == "true",
             "image_id": os.environ.get("OCPM_ENGINE_IMAGE_ID"),
         },
         "method": {
@@ -452,7 +464,9 @@ def run(args: argparse.Namespace) -> None:
             "process_model": (
                 "one deployment-linked DuckDB connection pool per process worker"
             ),
-            "data_import": "OCEL SQLite to canonical Parquet conversion outside request timing",
+            "data_import": (
+                "OCEL SQLite to canonical Parquet conversion outside request timing"
+            ),
             "latency_states": {
                 "serial": "warm bounded exact-result cache",
                 "serial_without_result_cache": (

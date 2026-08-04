@@ -134,6 +134,13 @@ The preliminary release, patent, and ICPM evidence assessment is in
 The implementation-ready strategy for a provider-independent DuckDB module
 over local and S3 Parquet is in the
 [DuckDB Parquet provider specification](docs/duckdb-parquet-provider-spec.md).
+The clean 1.1 measurements are split into the
+[Rust4PM comparison](docs/duckdb-vs-rust4pm-performance.md),
+[OCPA comparison](docs/duckdb-vs-ocpa-performance.md), and
+[SAP O2C/P2P four-way comparison](docs/duckdb-sap-pm4py-four-way-performance.md).
+Each report publishes cached and cache-disabled latency separately and includes
+exactness, concurrency, process RSS, storage, conversion, and connection-open
+boundaries.
 
 ## Install
 

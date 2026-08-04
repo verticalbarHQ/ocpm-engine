@@ -1,5 +1,9 @@
 """Merge competitor, pg_ocpm, and DuckDB Parquet ecosystem benchmark arms."""
 
+# Markdown tables and retained benchmark-method prose intentionally exceed the
+# source line-length limit in a few generated report rows.
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 import argparse
@@ -42,9 +46,7 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
     arms = {
         args.competitor_name: load(args.competitor, args.competitor_name),
         "pg_ocpm_ocpm_engine": load(args.postgres, "pg_ocpm_ocpm_engine"),
-        "duckdb_parquet_ocpm_engine": load(
-            args.duckdb, "duckdb_parquet_ocpm_engine"
-        ),
+        "duckdb_parquet_ocpm_engine": load(args.duckdb, "duckdb_parquet_ocpm_engine"),
     }
     datasets = {name: dataset(value) for name, value in arms.items()}
     names = {value["dataset"] for value in datasets.values()}
@@ -64,7 +66,9 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
         ][workload]
         uncached_hash = answer_sha256(duckdb_uncached["answer"])
         if uncached_hash != duckdb_uncached["answer_sha256"]:
-            raise SystemExit(f"duckdb cache-off/{workload}: stored answer hash is invalid")
+            raise SystemExit(
+                f"duckdb cache-off/{workload}: stored answer hash is invalid"
+            )
         hashes["duckdb_parquet_ocpm_engine_cache_off"] = uncached_hash
         for name, value in datasets.items():
             if hashes[name] != value["serial"][workload]["answer_sha256"]:
@@ -92,10 +96,12 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
                     for name, value in datasets.items()
                 },
                 "duckdb_without_result_cache": {
-                    "p50_ms": datasets["duckdb_parquet_ocpm_engine"]
-                    ["serial_without_result_cache"][workload]["p50_ms"],
-                    "p95_ms": datasets["duckdb_parquet_ocpm_engine"]
-                    ["serial_without_result_cache"][workload]["p95_ms"],
+                    "p50_ms": datasets["duckdb_parquet_ocpm_engine"][
+                        "serial_without_result_cache"
+                    ][workload]["p50_ms"],
+                    "p95_ms": datasets["duckdb_parquet_ocpm_engine"][
+                        "serial_without_result_cache"
+                    ][workload]["p95_ms"],
                 },
             }
         )
@@ -162,13 +168,38 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
         }
         for name, value in datasets.items()
     }
-    clean = all(
-        bool(value["implementation"].get("source_tree_clean")) for value in arms.values()
-    ) and bool(
-        arms["pg_ocpm_ocpm_engine"]["implementation"].get(
-            "pg_ocpm_source_tree_clean"
+    competitor_dataset = datasets[args.competitor_name]
+    competitor_clean = bool(
+        arms[args.competitor_name]["implementation"].get("controller_source_tree_clean")
+    )
+    native_import = competitor_dataset.get("native_import_probe", {})
+    clean = (
+        competitor_clean
+        and bool(native_import.get("success"))
+        and bool(arms["pg_ocpm_ocpm_engine"]["implementation"].get("source_tree_clean"))
+        and bool(
+            arms["pg_ocpm_ocpm_engine"]["implementation"].get(
+                "pg_ocpm_source_tree_clean"
+            )
+        )
+        and bool(
+            arms["duckdb_parquet_ocpm_engine"]["implementation"].get(
+                "source_tree_clean"
+            )
         )
     )
+    limitations = [
+        "This common-workload suite is separate from strict OCPQ Q1-Q7.",
+        "Import, snapshot conversion, process startup, and connection startup are excluded from steady-state latency and reported by each arm.",
+        "Concurrency uses each architecture's normal scalable service model; memory is reported per arm and is not normalized into an artificial single runtime.",
+        "The results apply to the declared fixed workloads and do not imply the same ratio for arbitrary dynamic queries.",
+        "DuckDB warm-cache and cache-disabled measurements are both published; only the warm-cache state is used in the primary three-arm latency table and concurrency run.",
+    ]
+    if not native_import.get("success"):
+        competitor_label = "OCPA" if args.competitor_name == "ocpa" else "Rust4PM"
+        limitations.append(
+            f"{competitor_label} is descriptive rather than publication-ready because its documented importer failed on its unchanged upstream example; the disclosed setup adapter is retained in the raw evidence."
+        )
     return {
         "schema_version": 1,
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -181,6 +212,14 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
         "concurrency": concurrency,
         "memory": memory,
         "storage": storage,
+        "duckdb_setup": {
+            "snapshot_conversion_ms": datasets["duckdb_parquet_ocpm_engine"][
+                "snapshot_conversion_ms"
+            ],
+            "connection_open_ms": datasets["duckdb_parquet_ocpm_engine"][
+                "connection_open_ms"
+            ],
+        },
         "summary": {
             "exact_answer_cells": len(exactness),
             "p50_geometric_mean_speedup_over_competitor": speedups,
@@ -188,13 +227,7 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
         },
         "manifest": manifest,
         "arms": arms,
-        "limitations": [
-            "This common-workload suite is separate from strict OCPQ Q1-Q7.",
-            "Import, snapshot conversion, process startup, and connection startup are excluded from steady-state latency and reported by each arm.",
-            "Concurrency uses each architecture's normal scalable service model; memory is reported per arm and is not normalized into an artificial single runtime.",
-            "The results apply to the declared fixed workloads and do not imply the same ratio for arbitrary dynamic queries.",
-            "DuckDB warm-cache and cache-disabled measurements are both published; only the warm-cache state is used in the primary three-arm latency table and concurrency run.",
-        ],
+        "limitations": limitations,
     }
 
 
@@ -210,6 +243,12 @@ def render(value: dict[str, Any]) -> str:
         f"# {display}, pg_ocpm, and DuckDB Parquet benchmark",
         "",
         "## Result",
+        "",
+        (
+            "Publication gate: **passed**."
+            if value["publication_ready"]
+            else "Publication gate: **descriptive only**."
+        ),
         "",
         (
             f"All {value['summary']['exact_answer_cells']} workload answers matched exactly "
@@ -228,9 +267,7 @@ def render(value: dict[str, Any]) -> str:
         "|---|---:|---|",
     ]
     for row in value["exactness"]:
-        lines.append(
-            f"| {row['workload']} | yes | `{row['answer_sha256']}` |"
-        )
+        lines.append(f"| {row['workload']} | yes | `{row['answer_sha256']}` |")
     lines.extend(
         [
             "",
@@ -305,6 +342,16 @@ def render(value: dict[str, Any]) -> str:
             else "N/A"
         )
         lines.append(f"| {labels[name]} | {source} | {snapshot} |")
+    setup = value["duckdb_setup"]
+    lines.extend(
+        [
+            "",
+            "## DuckDB setup cost",
+            "",
+            f"Snapshot conversion: {setup['snapshot_conversion_ms']:.3f} ms. "
+            f"Existing-catalog connection open and optional relation materialization: {setup['connection_open_ms']:.3f} ms.",
+        ]
+    )
     lines.extend(["", "## Interpretation boundaries", ""])
     lines.extend(f"- {item}" for item in value["limitations"])
     lines.append("")

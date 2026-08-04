@@ -1,5 +1,9 @@
 """Join the fixed SAP PostgreSQL/PM4Py baseline with the DuckDB provider arm."""
 
+# Markdown tables and retained benchmark-method prose intentionally exceed the
+# source line-length limit in a few generated report rows.
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 import argparse
@@ -62,7 +66,10 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
             }
             if len(set(hashes.values())) != 1:
                 raise SystemExit(f"{name}/{workload}: exact-answer gate failed")
-            if cached_hash != cached["answer_sha256"] or cache_off_hash != cache_off["answer_sha256"]:
+            if (
+                cached_hash != cached["answer_sha256"]
+                or cache_off_hash != cache_off["answer_sha256"]
+            ):
                 raise SystemExit(f"{name}/{workload}: DuckDB stored hash is invalid")
             base_latency = latency_by_workload[workload]
             latency.append(
@@ -94,11 +101,12 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
             set(base["concurrency"]["levels"]) & set(lake["concurrency"]),
             key=int,
         ):
-            base_rows = {
-                arm: base["concurrency"][arm][level] for arm in BASELINE_ARMS
-            }
+            base_rows = {arm: base["concurrency"][arm][level] for arm in BASELINE_ARMS}
             lake_row = lake["concurrency"][level]
-            if not all(row["correct"] for row in base_rows.values()) or not lake_row["correct"]:
+            if (
+                not all(row["correct"] for row in base_rows.values())
+                or not lake_row["correct"]
+            ):
                 raise SystemExit(f"{name}/x{level}: concurrency correctness failed")
             concurrency.append(
                 {
@@ -166,11 +174,22 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
             row["source_sqlite_bytes"] for row in duckdb["datasets"]
         ),
     }
+    baseline_provenance = baseline.get("provenance", {})
+    baseline_clean = all(
+        baseline_provenance.get(field) is True
+        for field in (
+            "controller_source_tree_clean",
+            "ocpm_engine_source_tree_clean",
+            "pg_ocpm_source_tree_clean",
+        )
+    )
+    duckdb_clean = duckdb.get("implementation", {}).get("source_tree_clean") is True
+    publication_ready = baseline_clean and duckdb_clean
     return {
         "schema_version": 1,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "suite": "sap-common-pm-four-way",
-        "publication_ready": False,
+        "publication_ready": publication_ready,
         "datasets": merged,
         "storage": storage,
         "baseline": baseline,
@@ -179,7 +198,7 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
             "The three PostgreSQL/PM4Py arms reuse the fixed, exact 1.0.0 artifact because this change does not modify pg_ocpm or the PostgreSQL provider path.",
             "DuckDB cached and cache-disabled latency are separate columns; concurrency uses the normal bounded cache configuration.",
             "Snapshot conversion and connection-local relation construction are outside request latency and reported separately.",
-            "A clean committed rerun is required before publication_ready can become true.",
+            "The composite is publication-ready only when the accepted baseline and the current DuckDB arm both record clean committed source trees.",
         ],
     }
 
@@ -194,6 +213,12 @@ def render(value: dict[str, Any]) -> str:
     }
     lines = [
         "# SAP O2C and P2P four-way benchmark",
+        "",
+        (
+            "Publication gate: **passed**."
+            if value["publication_ready"]
+            else "Publication gate: **descriptive only**."
+        ),
         "",
         "All reported latency cells passed the exact-answer hash gate.",
     ]
