@@ -128,9 +128,7 @@ class StandaloneEngine:
         """Write a new immutable canonical Parquet snapshot and CURRENT pointer."""
 
         return self._result(
-            self._native.write_parquet_snapshot(
-                _encode(view or {}), str(root), version
-            )
+            self._native.write_parquet_snapshot(_encode(view or {}), str(root), version)
         )
 
     def execution_summary(self, request: JsonObject) -> dict[str, Any]:

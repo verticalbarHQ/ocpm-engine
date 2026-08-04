@@ -705,22 +705,24 @@ The Python package continues to expose one engine facade. Add typed constructor
 helpers without a SQL escape hatch:
 
 ```python
-engine = StandaloneEngine.from_duckdb_parquet({
-    "database": {
-        "kind": "existing",
-        "path": "/catalog/analytics.duckdb",
-        "read_only": True,
-    },
-    "location": {"kind": "local", "root": "/data/snapshot"},
-    "snapshot": {"kind": "current", "pointer": "CURRENT"},
-    "layout": {"kind": "canonical_v1"},
-    "cache": {"kind": "direct"},
-    "options": {
-        "memory_budget_bytes": 536_870_912,
-        "max_parallelism": 8,
-        "result_cache_bytes": 67108864,
-    },
-})
+engine = StandaloneEngine.from_duckdb_parquet(
+    {
+        "database": {
+            "kind": "existing",
+            "path": "/catalog/analytics.duckdb",
+            "read_only": True,
+        },
+        "location": {"kind": "local", "root": "/data/snapshot"},
+        "snapshot": {"kind": "current", "pointer": "CURRENT"},
+        "layout": {"kind": "canonical_v1"},
+        "cache": {"kind": "direct"},
+        "options": {
+            "memory_budget_bytes": 536_870_912,
+            "max_parallelism": 8,
+            "result_cache_bytes": 67108864,
+        },
+    }
+)
 ```
 
 An S3 constructor accepts a credential reference, not credential values.
