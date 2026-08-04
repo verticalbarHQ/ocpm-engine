@@ -10,6 +10,10 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      DUCKDB_INCLUDE_DIR: /usr/local/include
+      DUCKDB_LIB_DIR: /usr/local/lib
+      LIBRARY_PATH: /usr/local/lib
     strategy:
       fail-fast: false
       matrix:
