@@ -1123,8 +1123,13 @@ mod tests {
                 .duration_since(UNIX_EPOCH)
                 .expect("clock after epoch")
                 .as_nanos();
+            // A monotonic counter, because pid+nanos is not unique: tests run in parallel and two
+            // can read the same nanosecond, share a directory, and fail the second writer with
+            // DirectoryNotEmpty. That was latent until this file gained more tests.
+            static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+            let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             let path = std::env::temp_dir()
-                .join(format!("ocpm-duckdb-test-{}-{nonce}", std::process::id()));
+                .join(format!("ocpm-duckdb-test-{}-{nonce}-{seq}", std::process::id()));
             fs::create_dir_all(&path).expect("create test directory");
             Self(path)
         }
@@ -1200,6 +1205,186 @@ mod tests {
                 ..DuckDbOptions::default()
             },
         }
+    }
+
+
+    /// Build an `EntityLinkSnapshotV1` fixture whose `case_event_group` exercises every membership
+    /// shape the flattened join has to reproduce.
+    fn write_entity_link_fixture(root: &std::path::Path) {
+        let conn = Connection::open_in_memory().expect("fixture connection");
+        let q = |sql: String| conn.execute_batch(&sql).expect("fixture sql");
+        let out = |name: &str| root.join(name).to_string_lossy().replace('\'', "''");
+
+        q(format!(
+            "CREATE TABLE g(tenant_id INTEGER, case_id BIGINT, timestamp TIMESTAMP, \
+             system_note_ids UBIGINT[], time_rank BIGINT);
+             INSERT INTO g VALUES
+               -- the same member twice INSIDE one list: `list_position` took the first, so the
+               -- flattened form must not emit one row per occurrence
+               (7, 1, TIMESTAMP '2026-01-01 00:00:00', [7,7],     2),
+               -- list order deliberately the reverse of id order
+               (7, 2, TIMESTAMP '2026-01-02 00:00:00', [30,20,10], 5),
+               -- a SECOND group row on the same key sharing member 20: this fan-out is real and
+               -- must survive
+               (7, 2, TIMESTAMP '2026-01-02 00:00:00', [20,99],    7),
+               (7, 3, TIMESTAMP '2026-01-03 00:00:00', [],         1),
+               (7, 4, TIMESTAMP '2026-01-04 00:00:00', NULL,       1),
+               -- another tenant, which the view must not see at all
+               (99, 5, TIMESTAMP '2026-01-05 00:00:00', [55],      9);
+             COPY g TO '{}' (FORMAT parquet);",
+            out("case_event_group.parquet")
+        ));
+
+        q(format!(
+            "CREATE TABLE e(tenant_id INTEGER, case_id BIGINT, timestamp TIMESTAMP, \
+             activity_id VARCHAR, object_type VARCHAR, display VARCHAR, object_id BIGINT);
+             INSERT INTO e VALUES
+               (7, 1, TIMESTAMP '2026-01-01 00:00:00', 'a', 'T', '{{\"system_note_id\":\"7\"}}', 1),
+               (7, 2, TIMESTAMP '2026-01-02 00:00:00', 'a', 'T', '{{\"system_note_id\":\"10\"}}', 2),
+               (7, 2, TIMESTAMP '2026-01-02 00:00:00', 'b', 'T', '{{\"system_note_id\":\"20\"}}', 2),
+               (7, 2, TIMESTAMP '2026-01-02 00:00:00', 'c', 'T', '{{\"system_note_id\":\"30\"}}', 2),
+               -- present in no list on its key
+               (7, 2, TIMESTAMP '2026-01-02 00:00:00', 'd', 'T', '{{\"system_note_id\":\"77\"}}', 2),
+               (7, 3, TIMESTAMP '2026-01-03 00:00:00', 'a', 'T', '{{\"system_note_id\":\"8\"}}', 3),
+               (7, 4, TIMESTAMP '2026-01-04 00:00:00', 'a', 'T', '{{\"system_note_id\":\"9\"}}', 4),
+               -- no group row at all on this key
+               (7, 6, TIMESTAMP '2026-01-06 00:00:00', 'a', 'T', '{{\"system_note_id\":\"60\"}}', 6);
+             COPY e TO '{}' (FORMAT parquet);",
+            out("event_log.parquet")
+        ));
+
+        q(format!(
+            "CREATE TABLE t(tenant_id INTEGER, id BIGINT, type VARCHAR, status VARCHAR, \
+             currency VARCHAR, subsidiary VARCHAR, trandate VARCHAR, recordtype VARCHAR, \
+             customform VARCHAR, entity VARCHAR, postingperiod VARCHAR, lastmodifiedby VARCHAR);
+             INSERT INTO t VALUES
+               (7,1,'T','','','','','','','','',''), (7,2,'T','','','','','','','','',''),
+               (7,3,'T','','','','','','','','',''), (7,4,'T','','','','','','','','',''),
+               (7,6,'T','','','','','','','','','');
+             COPY t TO '{}' (FORMAT parquet);",
+            out("txn.parquet")
+        ));
+
+        q(format!(
+            "CREATE TABLE l(tenant_id INTEGER, source_object_id BIGINT, source_object_type VARCHAR, \
+             target_object_id BIGINT, target_object_type VARCHAR, source_timestamp TIMESTAMP, \
+             target_timestamp TIMESTAMP);
+             COPY l TO '{}' (FORMAT parquet);",
+            out("object_link.parquet")
+        ));
+
+        // The entity-link path reads the manifest only for its bytes (a provenance hash) and an
+        // optional `freezeT`, so a minimal document is enough.
+        fs::write(root.join("manifest.json"), b"{}").expect("write manifest");
+    }
+
+    fn entity_link_source(root: &std::path::Path) -> DuckDbParquetSource {
+        let catalog = root.join("entity-link.duckdb");
+        drop(Connection::open(&catalog).expect("provision catalog"));
+        DuckDbParquetSource {
+            database: DuckDbDatabase::Existing { path: catalog, read_only: false },
+            location: ParquetLocation::Local { root: root.to_path_buf() },
+            snapshot: SnapshotSelection::Root,
+            layout: crate::ParquetLayout::EntityLinkSnapshotV1(crate::EntityLinkSnapshotV1 {
+                event_log_file: "event_log.parquet".to_owned(),
+                object_file: "txn.parquet".to_owned(),
+                object_link_file: "object_link.parquet".to_owned(),
+                event_group_file: "case_event_group.parquet".to_owned(),
+                dataset_id: "fixture".to_owned(),
+                tenant_id: 7,
+                timestamp_policy: crate::SourceTimestampPolicy::Utc,
+            }),
+            cache: ParquetCachePolicy::Direct,
+            validation: SourceValidationPolicy::Balanced,
+            credentials: None,
+            options: DuckDbOptions { connection_pool_size: 1, ..DuckDbOptions::default() },
+        }
+    }
+
+    /// The flattened membership join must reproduce `list_contains` + `list_position` EXACTLY,
+    /// including the cases where the two could plausibly diverge. Written because there was no
+    /// coverage of `EntityLinkSnapshotV1` at all: every other test here exercises `CanonicalV1`.
+    #[test]
+    fn entity_link_membership_join_matches_the_list_predicate_it_replaces() {
+        let directory = TestDirectory::new();
+        write_entity_link_fixture(&directory.0);
+        let provider =
+            DuckDbProvider::open(entity_link_source(&directory.0)).expect("open provider");
+
+        let rows: Vec<(u64, u64)> = provider
+            .with_connection(|conn| {
+                let mut stmt = conn.prepare("SELECT event_id, sequence FROM ocpm_events ORDER BY event_id, sequence")?;
+                let mut out = Vec::new();
+                let mut q = stmt.query([])?;
+                while let Some(row) = q.next()? {
+                    out.push((row.get::<_, u64>(0)?, row.get::<_, u64>(1)?));
+                }
+                Ok(out)
+            })
+            .expect("read ocpm_events");
+
+        // A duplicate INSIDE one list matched once before and must match once now, at the FIRST
+        // ordinal — this is the case a naive flatten gets wrong.
+        assert_eq!(
+            rows.iter().filter(|(id, _)| *id == 7).collect::<Vec<_>>(),
+            vec![&(7u64, 2_000_001u64)],
+            "a member repeated inside one list must yield exactly one row at its first ordinal"
+        );
+
+        // Two DISTINCT group rows sharing a member fan out, and that is not a defect to collapse.
+        assert_eq!(
+            rows.iter().filter(|(id, _)| *id == 20).count(),
+            2,
+            "a member present in two separate group rows must still fan out"
+        );
+
+        // Reverse list order is honoured positionally, not by id order.
+        assert!(rows.contains(&(30, 5_000_001)), "30 is first in its list");
+        assert!(rows.contains(&(10, 5_000_003)), "10 is third in its list");
+
+        // No membership, empty list, NULL list, and no group row at all all fall through the LEFT
+        // JOIN to sequence 0 rather than dropping the event.
+        for id in [77u64, 8, 9, 60] {
+            assert!(rows.contains(&(id, 0)), "event {id} must survive with sequence 0");
+        }
+
+        // The other tenant's group row is not visible, so its member never appears.
+        assert!(!rows.iter().any(|(id, _)| *id == 55), "another tenant must not leak");
+    }
+
+    /// The semantics test above passes against BOTH the old and new forms, because the old form is
+    /// the reference semantics — it is slow, not wrong. This is the assertion that actually
+    /// distinguishes them: a list predicate in the ON clause makes DuckDB discard the equi-keys
+    /// and plan a nested loop, which on a production-sized snapshot does not complete.
+    #[test]
+    fn entity_link_membership_join_is_planned_as_an_equi_join() {
+        let directory = TestDirectory::new();
+        write_entity_link_fixture(&directory.0);
+        let provider =
+            DuckDbProvider::open(entity_link_source(&directory.0)).expect("open provider");
+
+        let plan: String = provider
+            .with_connection(|conn| {
+                let mut stmt = conn.prepare("EXPLAIN SELECT count(*) FROM ocpm_events")?;
+                let mut rows = stmt.query([])?;
+                let mut out = String::new();
+                while let Some(row) = rows.next()? {
+                    out.push_str(&row.get::<_, String>(1)?);
+                    out.push('\n');
+                }
+                Ok(out)
+            })
+            .expect("explain ocpm_events");
+
+        assert!(
+            !plan.contains("BLOCKWISE_NL_JOIN"),
+            "membership must not be tested inside the join condition — that plans a nested loop:\n{plan}"
+        );
+        assert!(plan.contains("HASH_JOIN"), "expected an equi-join plan:\n{plan}");
+        assert!(
+            plan.contains("tenant_id"),
+            "the tenant predicate must stay on the parquet scan so row groups can be pruned:\n{plan}"
+        );
     }
 
     #[test]
