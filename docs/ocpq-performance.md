@@ -49,9 +49,9 @@ The checker retains exact raw-latency reconstruction, at most 15% epoch-QPS
 variation, at least 5x 16:1 scaling, and a portable p95/p50 tail-amplification
 limit instead of treating an unreserved host as an absolute-latency SLA.
 
-The raw diagnostic artifacts are
-[0.9](results/ocpq-concurrency-ab-pg-0.9.0.json) and
-[1.0](results/ocpq-concurrency-ab-pg-1.0.0.json).
+The raw diagnostic artifacts are `ocpq-concurrency-ab-pg-0.9.0.json` and
+`ocpq-concurrency-ab-pg-1.0.0.json` in the repository's `docs/results/`
+directory.
 
 See [the four-way comparison](ocpq-1.0-four-way-comparison.md) for the two
 PM4Py arms and the interpretation boundary.
