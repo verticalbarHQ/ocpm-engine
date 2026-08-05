@@ -1128,8 +1128,10 @@ mod tests {
             // DirectoryNotEmpty. That was latent until this file gained more tests.
             static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
             let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            let path = std::env::temp_dir()
-                .join(format!("ocpm-duckdb-test-{}-{nonce}-{seq}", std::process::id()));
+            let path = std::env::temp_dir().join(format!(
+                "ocpm-duckdb-test-{}-{nonce}-{seq}",
+                std::process::id()
+            ));
             fs::create_dir_all(&path).expect("create test directory");
             Self(path)
         }
@@ -1207,7 +1209,6 @@ mod tests {
         }
     }
 
-
     /// Build an `EntityLinkSnapshotV1` fixture whose `case_event_group` exercises every membership
     /// shape the flattened join has to reproduce.
     fn write_entity_link_fixture(root: &std::path::Path) {
@@ -1282,8 +1283,13 @@ mod tests {
         let catalog = root.join("entity-link.duckdb");
         drop(Connection::open(&catalog).expect("provision catalog"));
         DuckDbParquetSource {
-            database: DuckDbDatabase::Existing { path: catalog, read_only: false },
-            location: ParquetLocation::Local { root: root.to_path_buf() },
+            database: DuckDbDatabase::Existing {
+                path: catalog,
+                read_only: false,
+            },
+            location: ParquetLocation::Local {
+                root: root.to_path_buf(),
+            },
             snapshot: SnapshotSelection::Root,
             layout: crate::ParquetLayout::EntityLinkSnapshotV1(crate::EntityLinkSnapshotV1 {
                 event_log_file: "event_log.parquet".to_owned(),
@@ -1297,7 +1303,10 @@ mod tests {
             cache: ParquetCachePolicy::Direct,
             validation: SourceValidationPolicy::Balanced,
             credentials: None,
-            options: DuckDbOptions { connection_pool_size: 1, ..DuckDbOptions::default() },
+            options: DuckDbOptions {
+                connection_pool_size: 1,
+                ..DuckDbOptions::default()
+            },
         }
     }
 
@@ -1313,7 +1322,9 @@ mod tests {
 
         let rows: Vec<(u64, u64)> = provider
             .with_connection(|conn| {
-                let mut stmt = conn.prepare("SELECT event_id, sequence FROM ocpm_events ORDER BY event_id, sequence")?;
+                let mut stmt = conn.prepare(
+                    "SELECT event_id, sequence FROM ocpm_events ORDER BY event_id, sequence",
+                )?;
                 let mut out = Vec::new();
                 let mut q = stmt.query([])?;
                 while let Some(row) = q.next()? {
@@ -1345,11 +1356,17 @@ mod tests {
         // No membership, empty list, NULL list, and no group row at all all fall through the LEFT
         // JOIN to sequence 0 rather than dropping the event.
         for id in [77u64, 8, 9, 60] {
-            assert!(rows.contains(&(id, 0)), "event {id} must survive with sequence 0");
+            assert!(
+                rows.contains(&(id, 0)),
+                "event {id} must survive with sequence 0"
+            );
         }
 
         // The other tenant's group row is not visible, so its member never appears.
-        assert!(!rows.iter().any(|(id, _)| *id == 55), "another tenant must not leak");
+        assert!(
+            !rows.iter().any(|(id, _)| *id == 55),
+            "another tenant must not leak"
+        );
     }
 
     /// The semantics test above passes against BOTH the old and new forms, because the old form is
@@ -1380,7 +1397,10 @@ mod tests {
             !plan.contains("BLOCKWISE_NL_JOIN"),
             "membership must not be tested inside the join condition — that plans a nested loop:\n{plan}"
         );
-        assert!(plan.contains("HASH_JOIN"), "expected an equi-join plan:\n{plan}");
+        assert!(
+            plan.contains("HASH_JOIN"),
+            "expected an equi-join plan:\n{plan}"
+        );
         assert!(
             plan.contains("tenant_id"),
             "the tenant predicate must stay on the parquet scan so row groups can be pruned:\n{plan}"
