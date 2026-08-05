@@ -25,6 +25,7 @@ theme:
   features:
     - navigation.sections
     - navigation.top
+    - navigation.footer
     - content.code.copy
     - search.suggest
 
@@ -53,9 +54,10 @@ exclude_docs: |
   ocpq-0.9-four-way-comparison.md
 
 nav:
-  - Home: index.md
-  - Installation: https://github.com/verticalbarHQ/ocpm-engine/blob/main/INSTALL.md
-  - Getting started: getting-started.md
+  - Start:
+      - Overview: index.md
+      - Installation: https://github.com/verticalbarHQ/ocpm-engine/blob/main/INSTALL.md
+      - Quickstart: getting-started.md
   - Modules:
       - Overview: api-reference.md
       - standalone: modules/standalone.md
@@ -66,19 +68,18 @@ nav:
       - models: modules/models.md
       - queries: modules/queries.md
       - dynamic_queries: modules/dynamic_queries.md
+  - Architecture:
+      - Engine specification (1.0.0): ocpm-engine-1.0.0-spec.md
+      - DuckDB Parquet provider: duckdb-parquet-provider-spec.md
+      - pg_ocpm aggregation pushdown: pg-ocpm-0.10-general-aggregation.md
+      - Query performance architecture: technical-performance-improvements.md
   - Benchmarks:
       - OCPQ strict result (1.0): ocpq-performance.md
       - OCPQ four-way comparison (1.0): ocpq-1.0-four-way-comparison.md
       - SAP O2C/P2P four-way with DuckDB (1.1): duckdb-sap-pm4py-four-way-performance.md
       - Rust4PM comparison (1.1): duckdb-vs-rust4pm-performance.md
       - OCPA comparison (1.1): duckdb-vs-ocpa-performance.md
-  - Design:
-      - 1.0.0 specification: ocpm-engine-1.0.0-spec.md
-      - DuckDB Parquet provider spec: duckdb-parquet-provider-spec.md
-      - pg_ocpm 0.10 general aggregation: pg-ocpm-0.10-general-aggregation.md
-      - Application query performance: technical-performance-improvements.md
-  - Releases:
-      - 1.0.0 release notes: ocpm-engine-1.0.0-release-notes.md
-  - Project:
+  - Resources:
+      - Release notes (1.0.0): ocpm-engine-1.0.0-release-notes.md
       - Academic implementation provenance: academic-implementation-provenance.md
       - Production dependency boundary: dependency-boundary.md

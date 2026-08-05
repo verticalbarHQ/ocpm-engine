@@ -20,6 +20,24 @@ stable-ABI bindings that release the GIL during native work.
   equality, and benchmark evidence passes exact-answer hash gates before
   publication.
 
+## Get started
+
+1. [Install](https://github.com/verticalbarHQ/ocpm-engine/blob/main/INSTALL.md)
+   the wheel from your configured private index, with the DuckDB requirement
+   and optional PostgreSQL setup.
+2. Follow the [quickstart](getting-started.md) from an empty environment to a
+   discovered, conformance-checked object-centric model.
+3. Keep the [module reference](api-reference.md) open while you build.
+
+## Explore the documentation
+
+| Section | What you will find |
+|---|---|
+| [Modules](api-reference.md) | API and function specs with example usages for every public module |
+| [Architecture](ocpm-engine-1.0.0-spec.md) | The engine specification, the [DuckDB Parquet provider](duckdb-parquet-provider-spec.md), [pg_ocpm aggregation pushdown](pg-ocpm-0.10-general-aggregation.md), and [query performance architecture](technical-performance-improvements.md) |
+| [Benchmarks](ocpq-performance.md) | Verified comparisons against OCPQ, PM4Py, Rust4PM, and OCPA |
+| [Resources](ocpm-engine-1.0.0-release-notes.md) | Release notes, [academic implementation provenance](academic-implementation-provenance.md), and the [production dependency boundary](dependency-boundary.md) |
+
 ## Why ocpm-engine is different
 
 Typical process-mining stacks materialize a full event log in a Python
@@ -57,16 +75,6 @@ cache-off latencies are reported on each page.
 | [SAP O2C/P2P, four-way with DuckDB](duckdb-sap-pm4py-four-way-performance.md) | 9x to 206x faster p50 than vanilla PostgreSQL plus PM4Py across conformance, prediction, and bottleneck workloads, with about 6 MiB of incremental memory instead of about 166 MiB; the cached DuckDB arm reaches 35,197 QPS at 8 workers |
 | [Rust4PM](duckdb-vs-rust4pm-performance.md) | 3.0x p50 geometric mean through pg_ocpm and 12.2x through cached DuckDB Parquet, exact on all workloads |
 | [OCPA](duckdb-vs-ocpa-performance.md) | 70x p50 geometric mean through pg_ocpm and 339x through cached DuckDB Parquet (descriptive gate) |
-
-## Start here
-
-- [Installation guide](https://github.com/verticalbarHQ/ocpm-engine/blob/main/INSTALL.md):
-  private wheel registry, source builds, DuckDB requirement, and PostgreSQL
-  setup with pg_ocpm
-- [Module reference](api-reference.md): every public module with API and
-  function specs and example usages
-- [README](https://github.com/verticalbarHQ/ocpm-engine#readme): API examples
-  for the standalone facade, compatibility API, and dynamic filters
 
 ## License
 
