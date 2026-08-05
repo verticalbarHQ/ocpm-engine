@@ -905,106 +905,12 @@ ratio to unseen workloads.
 
 ## 21. Delivery plan
 
-### Phase 0: freeze contracts and fixtures
-
-- Add this spec to the repository and review it publicly.
-- Freeze canonical Parquet V1, mapped layout V1, snapshot, timestamp, attribute
-  validity, diagnostics, and provider V2 contracts.
-- Create sanitized and generated fixtures with stable hashes.
-- Add a capability crosswalk test generated from the 1.0.0 public enums and
-  provider capability list so future enum additions fail until classified.
-
-Exit: no unresolved semantic question can change a public result shape.
-
-### Phase 1: bounded provider foundation
-
-- Add batch types, cursors, cancellation, resource context, estimates, and
-  explain evidence to `ocpm-provider`.
-- Adapt `ocpm-local` and `ocpm-postgres` without removing 1.0 entry points.
-- Add streaming export and the provider-neutral overlay.
-- Run all existing tests and provider differential tests.
-
-Exit: current local and PostgreSQL behavior is exact, bounded, and nonregressed.
-
-### Phase 2: local DuckDB and canonical Parquet
-
-- Add `ocpm-duckdb`, dynamic client linkage, existing-catalog connections, and
-  Parquet support without bundling DuckDB.
-- Implement CanonicalV1 validation, views, scans, ordering, profile, snapshot,
-  estimate, explain, and bounded process executions.
-- Implement typed filter, aggregate, binding, and traversal compiler stages.
-- Add local Direct mode and byte-bounded cache metadata.
-
-Exit: full 1.0.0 functional parity passes against `ocpm-local` on local
-Parquet.
-
-### Phase 3: mapped corpora and generalized production requirements
-
-- Implement MappedV1 and `EntityLinkSnapshotV1`.
-- Add stable JSON-path IDs, deduplication, rank ordering, source time zones,
-  attribute validity, publication scope, normalization, and acceleration
-  certificates.
-- Add Strict/Balanced/Fast validation and schema-drift diagnostics.
-
-Exit: sanitized production-shape and adversarial fixtures pass exactness,
-leakage, and deterministic-order tests.
-
-### Phase 4: S3 and secure extension packaging
-
-- Add structured S3 URI and credential references.
-- Package and bootstrap only the required signed core extensions.
-- Implement immutable pointer resolution, object metadata pinning, Direct
-  reads, cancellation, and observability.
-- Complete threat-model tests and dependency/license review.
-
-Exit: local and S3 modes are byte-for-byte equivalent across version rollover
-and concurrency tests.
-
-### Deferred: caller-managed physical cache catalogs
-
-- Specify physical-layout statistics and optional Parquet rewrite without
-  silently creating or owning a DuckDB instance.
-- Implement a documented cost model without dataset or request identifiers.
-- Add build/storage/break-even evidence and plan-stability tests before
-  exposing a configuration variant.
-
-This work is not part of 1.1.0 and no placeholder public option is shipped.
-
-### Phase 6: Python, docs, benchmark, and release
-
-- Expose structured constructors, errors, options, refresh, and diagnostics.
-- Build supported wheels and verify S3 extension availability offline.
-- Run the full Docker benchmark and promote only clean exact artifacts.
-- Publish migration guidance, security guidance, examples, API docs, release
-  notes, SBOM, checksums, and third-party notices.
-
-Exit: every compatibility row and release gate is green.
+Implementation was delivered in staged phases from contract freeze through
+release; the staged plan is maintained internally.
 
 ## 22. Expected file changes
 
-```text
-Cargo.toml
-crates/ocpm-core/src/...
-crates/ocpm-provider/src/...
-crates/ocpm-local/src/...
-crates/ocpm-postgres/src/...
-crates/ocpm-duckdb/Cargo.toml
-crates/ocpm-duckdb/src/lib.rs
-crates/ocpm-duckdb/src/config.rs
-crates/ocpm-duckdb/src/layout.rs
-crates/ocpm-duckdb/src/snapshot.rs
-crates/ocpm-duckdb/src/security.rs
-crates/ocpm-duckdb/src/compiler.rs
-crates/ocpm-duckdb/src/cursor.rs
-crates/ocpm-duckdb/src/diagnostics.rs
-crates/ocpm-duckdb/tests/...
-crates/ocpm-engine/src/...
-crates/ocpm-python/src/...
-benchmarks/duckdb/...
-docs/...
-```
-
-No file in the `pg_ocpm` repository is part of this delivery.
+The per-file change inventory for this provider is maintained internally.
 
 ## 23. Rollout and rollback
 
@@ -1043,7 +949,7 @@ The DuckDB module is done when:
 
 ## 25. Version 1.0.0 coverage manifest
 
-This manifest is the minimum source audit for Phase 0. A generated golden file
+This manifest is the minimum source audit for the release. A generated golden file
 will record the same public methods, enum variants, provider capabilities, and
 extension function families. CI fails when the 1.x surface changes without a
 new DuckDB classification and contract test.

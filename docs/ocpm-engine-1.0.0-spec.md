@@ -504,41 +504,9 @@ require clean committed revisions and machine-readable artifacts.
 
 ## 19. Delivery sequence
 
-### Phase 0: contracts and fixtures
-
-Freeze canonical semantics, typed requests/results, fixture hashes, capability
-matrix, provider contract tests, and benchmark protocols. No algorithm is
-accepted before its reference semantics and adversarial fixtures are recorded.
-
-### Phase 1: standalone foundation
-
-Add `ocpm-io`, `ocpm-provider`, and `ocpm-local`; move existing kernels behind
-the engine facade; eliminate mandatory PostgreSQL dependencies from default
-features; prove OCEL/XES round trips and local DFG/variant/query parity.
-
-### Phase 2: PostgreSQL acceleration
-
-Implement the 1.0 `ocpm-postgres` provider over the companion extension spec.
-Add capability/cost planning, physical plan evidence, streaming fallbacks, and
-cross-provider equivalence tests.
-
-### Phase 3: common mining completeness
-
-Deliver discovery, conformance, enhancement, organizational, serialization,
-and constraint-query requirements. Add resource bounds and concurrent tests as
-each algorithm lands.
-
-### Phase 4: prediction and monitoring
-
-Deliver feature encodings, reproducible baseline training, next-activity,
-remaining-time, outcome/risk prediction, model artifacts, evaluation, and
-localized drift.
-
-### Phase 5: release qualification
-
-Run the complete Docker correctness/performance suite, dependency/license and
-security audits, API documentation, examples, migration tests, and clean-build
-reproducibility. Publish 1.0.0 only when every `MUST` row is green.
+Implementation was delivered in staged phases from contract freeze through
+release qualification; the staged plan and its per-phase definitions of done
+are maintained internally.
 
 ## 20. Exit criteria
 
@@ -571,37 +539,9 @@ The 1.0.0 release is accepted when:
 
 ## 22. Normative implementation manifest
 
-All paths in this section are relative to the `ocpm-engine` repository root.
-The sibling extension repository is referenced as `../pg_ocpm`. These files are
-the minimum implementation set; splitting a file is allowed, but removing a
-named contract requires a spec amendment.
-
-| Path | Required change and definition of done |
-|---|---|
-| `Cargo.toml` | Add all crates in section 6.1; default features include local IO/algorithms and exclude PostgreSQL; `postgres` and `python` remain opt-in |
-| `crates/ocpm-core/src/log.rs` | Canonical event/object/E2O/O2O/attribute-history types and invariants |
-| `crates/ocpm-core/src/model.rs` | Versioned DFG, process-tree, Petri-net, OCPN, and OC-DECLARE artifact types |
-| `crates/ocpm-core/src/result.rs` | Result envelope, provenance, warnings, exactness, support, and resource diagnostics |
-| `crates/ocpm-core/src/canonical_json.rs` | Normative canonical serializer and SHA-256 content hashing |
-| `crates/ocpm-core/src/error.rs` | Stable public error codes from section 22.3 |
-| `crates/ocpm-io/src/{ocel_json,ocel_sqlite,xes,csv}.rs` | Streaming readers/writers, validation, limits, and golden round trips; OCEL XML remains deferred |
-| `crates/ocpm-provider/src/{lib,capability,batch,logical,physical,cost}.rs` | Provider trait, batches, logical/physical plans, capability versions, and cost model |
-| `crates/ocpm-local/src/{lib,index,execution,aggregate,binding,spill}.rs` | Complete local provider and every provider contract test |
-| `crates/ocpm-postgres/src/{lib,capability,scan,aggregate,binding,explain}.rs` | Optional extension adapter; no algorithm implementation |
-| `crates/ocpm-query/src/{ast,validate,plan,execute}.rs` | Closed query AST and factorized binding semantics |
-| `crates/ocpm-discovery/src/` | One module and golden fixture per required discovery algorithm |
-| `crates/ocpm-conformance/src/` | One module and golden fixture per required conformance method |
-| `crates/ocpm-enhancement/src/` | Performance, organization, drift, and monitoring methods |
-| `crates/ocpm-prediction/src/{feature,fit,artifact,predict,evaluate}.rs` | Baseline fitting, scoring, artifact lifecycle, and metrics |
-| `crates/ocpm-engine/src/{lib,facade,planner,explain}.rs` | The source-neutral facade from section 7 and physical planner |
-| `crates/ocpm-python/src/lib.rs` | Python mirror with no public PostgreSQL-only request/result types |
-| `schemas/*.schema.json` | Closed JSON Schema 2020-12 documents for every public request, result, model, and artifact |
-| `tests/provider_contract.rs` | Generated and curated local/PostgreSQL semantic equivalence suite |
-| `tests/golden/` | Reviewed canonical inputs and byte-exact outputs for every mandatory capability |
-| `tests/compat_python_0_10.py` | One-deprecation-window compatibility behavior and warnings |
-| `benchmarks/manifests/1.0.0.toml` | All immutable benchmark pins and environment metadata required by section 22.10 |
-| `benchmarks/results/1.0.0/` | Raw samples, answer hashes, logs, resource samples, and generated report inputs |
-| `docs/api/` | Rust/Python examples and semantics for every mandatory capability |
+The subsections below fix the normative 1.0.0 implementation decisions; the
+per-file delivery tracking used during implementation is maintained
+internally.
 
 No compatibility support is promised for versions older than `pg_ocpm 0.8.0`
 or `ocpm-engine 0.10.0`. The 0.10 Python facade is removed in 2.0, no earlier
@@ -808,7 +748,7 @@ sort by the canonical physical-plan string.
 
 Provider estimates are trained only from generic operator/size telemetry. They
 cannot use dataset names, activities, query IDs, or expected results. After the
-Phase 2 calibration suite, median actual/estimated operator time must be within
+calibration suite, median actual/estimated operator time must be within
 2x and p90 within 4x; otherwise the affected pushdown is disabled by default.
 Runtime feedback updates process-local exponentially weighted operator
 coefficients and is cleared/segmented by provider version and hardware class.
@@ -846,25 +786,10 @@ and failure/timeout counts. Arms share the same host, cgroup limits, data bytes,
 and answer contract. Cold runs restart containers/drop only experiment-owned
 caches by a documented non-destructive procedure.
 
-The manifest's actual pins are a Phase 0 deliverable. No numeric 1.0 claim or
+The manifest's actual pins are a release deliverable. No numeric 1.0 claim or
 release candidate is valid before those hashes exist. Release exceptions require a
 linked maintainer decision that names the failed threshold, measured tradeoff,
 scope, expiry/revisit version, and why correctness or a mandatory capability
 justifies it.
 
-### 22.11 Phase definitions of done
 
-- Phase 0: all public schemas compile, every `MUST` has a capability row, golden
-  fixtures and benchmark manifest source pins exist, and architecture/security
-  decisions have no open release-blocking choice.
-- Phase 1: default-feature Rust and Python run IO/query/DFG/variant tests with
-  PostgreSQL absent; tracked memory, spill, cancellation, and canonical hashes
-  pass.
-- Phase 2: every PostgreSQL-advertised operation passes provider equivalence,
-  estimate calibration, fallback, cancellation, and snapshot tests.
-- Phase 3: all discovery/conformance/enhancement capability rows are green and
-  documented; searches report exact/truncated state correctly.
-- Phase 4: all prediction/monitoring rows, leakage tests, fit/evaluate/load,
-  calibration, and artifact compatibility tests are green.
-- Phase 5: clean Docker, compatibility, security, license, SBOM, benchmark, docs,
-  and packaging gates pass with no unresolved release exception.
