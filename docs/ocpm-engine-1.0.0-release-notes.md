@@ -65,6 +65,5 @@ different discovery/conformance algorithms, or end-to-end deployment memory.
 PostgreSQL server memory is reported separately from client RSS. See the
 [strict OCPQ report](ocpq-performance.md),
 [four-way OCPQ comparison](ocpq-1.0-four-way-comparison.md),
-[SAP report](https://github.com/verticalbarHQ/ocpm-engine/blob/main/docs/sap-pm4py-three-way-performance.md),
-[Rust4PM pair](https://github.com/verticalbarHQ/ocpm-engine/blob/main/docs/rust4pm-vs-pg-ocpm-engine.md), and
-[OCPA pair](https://github.com/verticalbarHQ/ocpm-engine/blob/main/docs/ocpa-vs-pg-ocpm-engine.md) for the complete boundaries.
+and the 1.0-era SAP, Rust4PM, and OCPA reports in the repository's `docs/`
+directory for the complete boundaries.

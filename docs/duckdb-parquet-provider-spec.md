@@ -672,7 +672,7 @@ SQL and paths as security boundaries.
 
 Requirements:
 
-- No arbitrary SQL in Rust, Python, JSON, mapping, or MCP-facing APIs.
+- No arbitrary SQL in Rust, Python, JSON, mapping, or adapter-facing APIs.
 - Only fixed compiler-owned SQL templates. All data values use prepared
   parameters. Identifiers come from validated schema mappings and are quoted by
   one audited utility.

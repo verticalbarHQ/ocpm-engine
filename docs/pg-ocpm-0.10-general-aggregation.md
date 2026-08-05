@@ -101,7 +101,8 @@ The strict OCPQ rerun also retained exact every-node parity for Q1-Q7. Its
 geometric-mean speedup was 16.482x, its minimum query speedup was 8.260x, its
 maximum client peak over baseline was 6,299,648 bytes, and the serving schema
 occupied 114,974,720 bytes with the request-result cache disabled. These
-numbers are a local preview because the 0.10 source trees are not yet committed.
+numbers are a development preview; the published 1.0 benchmark reports
+supersede them.
 
 ## References
 

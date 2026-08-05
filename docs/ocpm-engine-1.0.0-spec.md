@@ -14,7 +14,7 @@ transparently push selective scans, relationship traversal, and sufficient
 statistics into PostgreSQL.
 
 The engine is the primary public entry point. Applications, Python clients, and
-the proposed `ocpm-mcp` adapter call the engine, never extension-specific SQL.
+external adapters call the engine, never extension-specific SQL.
 Provider choice can change the physical plan, latency, memory, and transfer
 volume, but not result semantics.
 
@@ -87,7 +87,7 @@ Therefore 1.0 is a product-boundary change, not a version-label change.
 
 ```mermaid
 flowchart TD
-    A["Rust, Python, service, or ocpm-mcp client"] --> B["ocpm-engine typed API"]
+    A["Rust, Python, or service client"] --> B["ocpm-engine typed API"]
     B --> C["Canonical validation and logical planner"]
     C --> D["Capability and cost-based physical planner"]
     D --> E["Local provider"]
@@ -494,8 +494,8 @@ require clean committed revisions and machine-readable artifacts.
 - The typed query API has no raw SQL, arbitrary file read, or shell escape.
 - Tenant and dataset scopes are mandatory at source boundaries and included in
   every cache key.
-- Attribute values are untrusted data. Rendering and future LLM adapters must
-  not interpret them as instructions.
+- Attribute values are untrusted data. Rendering layers and downstream
+  adapters must not interpret them as instructions.
 - Provenance and diagnostics redact credentials, DSNs, filesystem secrets, and
   attribute values by default.
 - Parsers enforce byte, nesting, entity, relationship, and decompression limits.
@@ -688,7 +688,7 @@ public binding.
 `EngineOptions::default()` means 512 MiB tracked memory, 8 MiB target batches,
 16 MiB maximum batches, `min(available_parallelism, 8)` workers, no embedded
 deadline, a 4 GiB spill quota, and a process-specific temporary directory with
-owner-only permissions. Python uses the same defaults. Service/MCP adapters set
+owner-only permissions. Python uses the same defaults. Service adapters set
 a 30-second deadline unless a lower policy applies.
 
 Hash aggregation, external sort, binding joins, variant grouping, and alignment
@@ -846,9 +846,8 @@ and failure/timeout counts. Arms share the same host, cgroup limits, data bytes,
 and answer contract. Cold runs restart containers/drop only experiment-owned
 caches by a documented non-destructive procedure.
 
-The manifest's actual pins are a Phase 0 deliverable because several source and
-image revisions are currently uncommitted. No numeric 1.0 claim or release
-candidate is valid before those hashes exist. Release exceptions require a
+The manifest's actual pins are a Phase 0 deliverable. No numeric 1.0 claim or
+release candidate is valid before those hashes exist. Release exceptions require a
 linked maintainer decision that names the failed threshold, measured tradeoff,
 scope, expiry/revisit version, and why correctness or a mandatory capability
 justifies it.
