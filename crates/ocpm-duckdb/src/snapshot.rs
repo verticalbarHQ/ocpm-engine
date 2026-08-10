@@ -550,7 +550,41 @@ fn create_entity_link_views(
           FROM read_parquet({event_path})
           WHERE tenant_id = {tenant}
         ), groups AS (
-          SELECT * FROM read_parquet({group_path}) WHERE tenant_id = {tenant}
+          -- Membership is flattened to one scalar row per (physical group row, member), carrying
+          -- the member's 1-based ordinal. `generate_subscripts` aligns with `unnest` and is
+          -- 1-based, so the ordinal equals what `list_position` returned.
+          --
+          -- This is what lets the join below be an equi-join. Testing membership with
+          -- `list_contains` inside the ON clause makes DuckDB discard the equi-keys and plan a
+          -- BLOCKWISE_NL_JOIN, because a list predicate cannot be a hash key: on a 6.4M-event
+          -- snapshot with 5.0M group rows that is 3.2e13 comparisons and does not complete.
+          --
+          -- `min(member_ordinal)` per (row, member) is REQUIRED for equivalence, not a tidiness
+          -- pass: `list_position` returns the FIRST occurrence, so a list carrying the same id
+          -- twice matched once before and would otherwise emit one joined row per occurrence.
+          -- The grouping key includes a per-row identity so that two DISTINCT group rows holding
+          -- the same member still fan out exactly as they did before — a global DISTINCT would
+          -- silently collapse them.
+          --
+          -- The tenant predicate stays on the parquet scan rather than moving above the LATERAL,
+          -- so row-group pruning is not lost.
+          SELECT
+            g.case_id,
+            g.timestamp,
+            g.time_rank,
+            u.member_id,
+            min(u.member_ordinal) AS member_ordinal
+          FROM (
+            SELECT row_number() OVER () AS group_row_id, *
+            FROM read_parquet({group_path})
+            WHERE tenant_id = {tenant}
+          ) g,
+          LATERAL (
+            SELECT
+              unnest(g.system_note_ids) AS member_id,
+              generate_subscripts(g.system_note_ids, 1) AS member_ordinal
+          ) u
+          GROUP BY g.group_row_id, g.case_id, g.timestamp, g.time_rank, u.member_id
         )
         SELECT
           events.stable_event_id AS event_id,
@@ -560,7 +594,7 @@ fn create_entity_link_views(
           CAST(events.timestamp AS VARCHAR) AS source_timestamp,
           CAST(
             coalesce(groups.time_rank, 0) * 1000000
-            + coalesce(list_position(groups.system_note_ids, events.stable_event_id), 0)
+            + coalesce(groups.member_ordinal, 0)
             AS UBIGINT
           ) AS sequence,
           NULL::VARCHAR AS lifecycle,
@@ -569,7 +603,7 @@ fn create_entity_link_views(
         LEFT JOIN groups
           ON groups.case_id = events.case_id
          AND groups.timestamp = events.timestamp
-         AND list_contains(groups.system_note_ids, events.stable_event_id);
+         AND groups.member_id = events.stable_event_id;
 
         CREATE TEMP VIEW ocpm_objects AS
         SELECT
