@@ -41,6 +41,29 @@ bottleneck detector needs no tensor runtime; other predictive GNN tasks remain
 behind an explicit backend protocol. PostgreSQL and DuckDB only accelerate the
 canonical observation projection and never change graph or model semantics.
 
+## Bottleneck algorithms
+
+The engine exposes the following generally applicable methods through the same
+provider-neutral API. Deterministic methods are returned by `bottlenecks`; the
+optional graph model is returned separately by `gnn_bottlenecks` so a learned
+risk score cannot be mistaken for an exact diagnostic.
+
+| Method | High-level approach |
+|---|---|
+| Tail-impact ranking | Ranks object-centric directly-follows edges by excess duration above a robust Tukey or caller-supplied threshold, alongside median, p90, p95, tail mean, affected rate, and Wilson uncertainty. |
+| Synchronization delay attribution | Measures readiness spread at shared events and identifies which object type arrives last. |
+| Waiting-time decomposition | Assigns non-overlapping wait to batching, resource contention, prioritization, explicit resource unavailability, and a residual category. |
+| Queue and resource pressure | Combines recent arrival and throughput rates, interval-union utilization, maximum queue depth, backlog growth, and wait/service latency. |
+| Performance-pattern mining | Detects temporal batches, FIFO overtaking through inversion counting, and bursty interarrival behavior. |
+| Localized bottleneck drift | Compares baseline and current edge-duration distributions with a two-sample KS statistic and Benjamini-Hochberg correction. |
+| Recursive blocking cascades | Traces resource-overlap blocker chains with cycle and depth guards and attributes their accumulated delay. |
+| Temporal hypothesis testing | Tests caller-declared precedence and probability-raising hypotheses using risk difference, risk ratio, significance, and multiple-testing correction; it does not claim causal proof. |
+| Graph-aware risk detection | Uses an optional bounded two-layer GraphSAGE-style classifier with leakage-safe features and temporal holdout diagnostics. |
+
+See the [full bottleneck algorithm catalog](docs/bottleneck-analysis.md) for
+inputs, outputs, exactness, complexity, limitations, examples, and the
+peer-reviewed basis for each method.
+
 OCEL 2.0 XML is intentionally not claimed in 1.0. The detailed XML interchange
 syntax is not defined by the peer-reviewed sources currently admitted by this
 project's clean-room policy. It will remain deferred until an eligible source

@@ -23,7 +23,8 @@ stable-ABI bindings that release the GIL during native work.
   synchronization, queue and waiting-cause attribution, localized drift,
   performance patterns, and blocking cascades across every provider; an
   explicit optional CPU GNN adds graph-context risk without replacing exact
-  results.
+  results. The [algorithm catalog](bottleneck-analysis.md#algorithm-catalog)
+  names every implemented method and explains its evidence and exactness.
 
 ## Get started
 
@@ -39,7 +40,7 @@ stable-ABI bindings that release the GIL during native work.
 | Section | What you will find |
 |---|---|
 | [Modules](api-reference.md) | API and function specs with example usages for every public module |
-| [Bottleneck analysis](bottleneck-analysis.md) | Shared exact semantics, graph-aware risk, evidence requirements, provider acceleration, and limitations |
+| [Bottleneck algorithm catalog](bottleneck-analysis.md#algorithm-catalog) | Eleven implemented methods with their high-level approach, output field, exactness, evidence requirements, provider acceleration, and limitations |
 | [Architecture](ocpm-engine-1.0.0-spec.md) | The engine specification, the [DuckDB Parquet provider](duckdb-parquet-provider-spec.md), [pg_ocpm aggregation pushdown](pg-ocpm-0.10-general-aggregation.md), and [query performance architecture](technical-performance-improvements.md) |
 | [Benchmarks](ocpq-performance.md) | Verified comparisons against OCPQ, PM4Py, Rust4PM, and OCPA |
 | [Resources](ocpm-engine-1.0.0-release-notes.md) | Release notes, [academic implementation provenance](academic-implementation-provenance.md), the [production dependency boundary](dependency-boundary.md), [community distribution](community-distribution.md), and the [commercial offering boundary](https://github.com/verticalbarHQ/ocpm-engine/blob/main/COMMERCIAL.md) |

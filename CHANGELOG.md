@@ -4,6 +4,10 @@ All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
 
 ## Unreleased
 
+- Added a prominently linked bottleneck algorithm catalog that names every
+  implemented deterministic and probabilistic method, summarizes its approach,
+  and identifies its output, evidence requirements, exactness, and academic
+  provenance.
 - Added `Engine::bottlenecks` and `StandaloneEngine.bottlenecks` as the single
   provider-neutral API for robust tail/impact ranking, object synchronization,
   non-overlapping waiting-cause attribution, queue/resource pressure,

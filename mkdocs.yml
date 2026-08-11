@@ -58,9 +58,10 @@ nav:
       - Overview: index.md
       - Installation: https://github.com/verticalbarHQ/ocpm-engine/blob/main/INSTALL.md
       - Quickstart: getting-started.md
+  - Analysis:
+      - Bottleneck algorithm catalog: bottleneck-analysis.md
   - Modules:
       - Overview: api-reference.md
-      - Bottleneck analysis: bottleneck-analysis.md
       - standalone: modules/standalone.md
       - engine: modules/engine.md
       - analytics: modules/analytics.md
