@@ -8,9 +8,10 @@ possible.
 The project is licensed under Apache-2.0. Outside code and documentation
 contributions require an accepted [Contributor License Agreement](CLA.md)
 before a pull request can be merged. The CLA preserves contributor ownership,
-allows the public project to remain Apache-2.0, and permits Vertical Bar, Inc.
-to offer commercial or proprietary licenses. A sign-off alone does not replace
-the CLA.
+allows the public project to remain Apache-2.0, and gives Vertical Bar, Inc. the
+rights needed to administer accepted contributions and preserve future release
+flexibility. It does not require users of the Apache-2.0 core to obtain a
+commercial license. A sign-off alone does not replace the CLA.
 
 Maintainers must record acceptance in the private CLA register. Do not commit
 signed agreements, postal addresses, or other personal information to this

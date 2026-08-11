@@ -145,6 +145,35 @@ class StandaloneEngine:
     def enhance(self, request: JsonObject) -> dict[str, Any]:
         return self._result(self._native.enhance_json(_encode(request)))
 
+    def bottlenecks(self, request: JsonObject) -> dict[str, Any]:
+        """Run provider-neutral latency, queue, drift, and cause analysis."""
+
+        return self._result(self._native.bottlenecks_json(_encode(request)))
+
+    def fit_gnn_bottlenecks(self, request: JsonObject) -> dict[str, Any]:
+        """Fit the optional CPU graph-aware bottleneck detector."""
+
+        return self._result(self._native.fit_gnn_bottlenecks_json(_encode(request)))
+
+    def score_gnn_bottlenecks(
+        self,
+        request: JsonObject,
+        artifact: JsonObject,
+    ) -> dict[str, Any]:
+        """Score graph-aware bottleneck risk with a portable artifact."""
+
+        return self._result(
+            self._native.score_gnn_bottlenecks_json(
+                _encode(request),
+                _encode(artifact),
+            )
+        )
+
+    def gnn_bottlenecks(self, request: JsonObject) -> dict[str, Any]:
+        """Fit and score graph-aware bottleneck risk in one provider scan."""
+
+        return self._result(self._native.gnn_bottlenecks_json(_encode(request)))
+
     def fit_prediction(self, request: JsonObject) -> dict[str, Any]:
         return self._result(self._native.fit_prediction_json(_encode(request)))
 

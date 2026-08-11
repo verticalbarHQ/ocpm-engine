@@ -26,10 +26,20 @@ only in the archived benchmark results; no OCPQ benchmark code is supplied.
   conformance;
 - process maps, timelines, histograms, performance, rework, organizational,
   bottleneck, window-comparison, and drift enhancement;
+- tail-aware bottleneck ranking, object synchronization, waiting-cause and
+  queue attribution, performance patterns, blocking cascades, and localized
+  statistical drift through one [provider-neutral API](docs/bottleneck-analysis.md);
+- optional graph-aware bottleneck risk detection with deterministic CPU
+  training, temporal holdout diagnostics, and bounded memory;
 - next-activity, remaining-time, and outcome prediction with temporal holdout
   evaluation;
 - canonical JSON, DOT, PNML, SVG, OCEL JSON, XES, CSV, and SQLite I/O; and
 - Python 3.11+ stable-ABI bindings that release the GIL during native work.
+
+Graph-aware analysis is a separate optional `ocpm-gnn` module. Its built-in
+bottleneck detector needs no tensor runtime; other predictive GNN tasks remain
+behind an explicit backend protocol. PostgreSQL and DuckDB only accelerate the
+canonical observation projection and never change graph or model semantics.
 
 OCEL 2.0 XML is intentionally not claimed in 1.0. The detailed XML interchange
 syntax is not defined by the peer-reviewed sources currently admitted by this
@@ -147,15 +157,16 @@ boundaries.
 
 ## Install
 
-The complete installation guide, covering the private wheel registry, source
-builds, the external DuckDB requirement, and PostgreSQL setup with
+The complete installation guide, covering public PyPI wheels, certified private
+builds, source builds, the external DuckDB requirement, and PostgreSQL setup with
 [`pg_ocpm`](https://github.com/verticalbarHQ/pg_ocpm), is in
 [INSTALL.md](INSTALL.md).
 
-Authorized binary releases are installed from the private wheel registry. The
-wheel-only procedure, external DuckDB requirement, and registry controls are in
-[`docs/private-distribution.md`](docs/private-distribution.md). Public PyPI and
-npm are not release channels for this package.
+Community wheels are published to PyPI from reviewed signed tags without
+bundling DuckDB. The public release contract is in
+[`docs/community-distribution.md`](docs/community-distribution.md). Certified
+enterprise builds and supported private channels are described in
+[`docs/private-distribution.md`](docs/private-distribution.md).
 
 ```sh
 python -m pip install .
@@ -388,9 +399,16 @@ and license-gated; see [NOTICE](NOTICE), the
 [third-party notices](THIRD_PARTY_NOTICES.md), and the generated
 [dependency license bundle](THIRD_PARTY_LICENSES.html).
 
-Contributions require the applicable [Contributor License Agreement](CLA.md),
-which allows Vertical Bar, Inc. to keep the public project Apache-2.0 and offer
-separately licensed commercial editions.
+No separate commercial license is required to use the Apache-2.0 core.
+Vertical Bar, Inc. offers distinct enterprise products, certified builds,
+managed services, support, warranties, and commercial assurance; see the
+[commercial offering boundary](COMMERCIAL.md). Project names and branding are
+covered by the [trademark policy](TRADEMARKS.md).
+
+Contributions require the applicable [Contributor License Agreement](CLA.md).
+The CLA preserves contributor ownership and gives Vertical Bar, Inc. the rights
+needed to administer contributions and preserve future release flexibility. It
+does not narrow any recipient's Apache-2.0 rights.
 
 See [governance](GOVERNANCE.md), the [code of conduct](CODE_OF_CONDUCT.md),
 [security policy](SECURITY.md), and [first public-release strategy](docs/open-source-release.md).

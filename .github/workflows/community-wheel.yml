@@ -1,0 +1,170 @@
+name: Community wheel release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing signed tag and public GitHub release, for example v1.1.0
+        required: true
+        type: string
+      confirmation:
+        description: Enter publish-community-ocpm-engine to publish public wheels
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  wheels:
+    name: ${{ matrix.id }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: linux-x86_64
+            runner: ubuntu-latest
+            duckdb_asset: libduckdb-linux-amd64.zip
+            duckdb_sha256: 1fb8ce388157d84a25abe685a8a2520bf00c00321821968e4bb398fd766e7abb
+          - id: linux-aarch64
+            runner: ubuntu-24.04-arm
+            duckdb_asset: libduckdb-linux-arm64.zip
+            duckdb_sha256: abe4f6f005ee0b448a058322f4263584b4bd1b6faf7ab4637b79eeaf978f8e9c
+          - id: macos-arm64
+            runner: macos-14
+            duckdb_asset: libduckdb-osx-universal.zip
+            duckdb_sha256: 7b5b8915cc382d0708636fe6385c0cdad5a61c9ff8ba2638b3e2141640783155
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Check production dependency boundary
+        run: python3 scripts/check-core-dependency-boundary.py
+      - name: Check licensing contract
+        run: python3 scripts/check-licensing.py
+      - name: Install Rust MSRV
+        run: rustup toolchain install 1.85.1 --profile minimal --no-self-update
+      - name: Provision external DuckDB client
+        shell: bash
+        env:
+          DUCKDB_ASSET: ${{ matrix.duckdb_asset }}
+          DUCKDB_SHA256: ${{ matrix.duckdb_sha256 }}
+          DUCKDB_VERSION: 1.5.5
+        run: |
+          curl -fsSL -o "/tmp/${DUCKDB_ASSET}" \
+            "https://github.com/duckdb/duckdb/releases/download/v${DUCKDB_VERSION}/${DUCKDB_ASSET}"
+          echo "${DUCKDB_SHA256}  /tmp/${DUCKDB_ASSET}" | shasum -a 256 --check
+          mkdir -p /tmp/libduckdb
+          unzip -q "/tmp/${DUCKDB_ASSET}" -d /tmp/libduckdb
+          sudo install -m 0644 /tmp/libduckdb/duckdb.h /usr/local/include/duckdb.h
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            sudo install -m 0644 /tmp/libduckdb/libduckdb.so /usr/local/lib/libduckdb.so
+            sudo ldconfig
+          else
+            sudo install -m 0644 /tmp/libduckdb/libduckdb.dylib /usr/local/lib/libduckdb.dylib
+          fi
+          {
+            echo "DUCKDB_INCLUDE_DIR=/usr/local/include"
+            echo "DUCKDB_LIB_DIR=/usr/local/lib"
+            echo "LD_LIBRARY_PATH=/usr/local/lib"
+            echo "DYLD_LIBRARY_PATH=/usr/local/lib"
+          } >> "$GITHUB_ENV"
+      - name: Install wheel tooling
+        run: python -m pip install 'maturin==1.14.1' 'twine==6.2.0'
+      - name: Build and audit wheel
+        env:
+          RUSTUP_TOOLCHAIN: 1.85.1
+        run: PYTHON=python DIST_DIR="$PWD/dist" ./scripts/build-private-wheel.sh
+      - name: Validate package metadata
+        run: python -m twine check dist/*.whl
+      - name: Install wheel smoke test
+        run: |
+          python -m pip install --force-reinstall --only-binary=:all: dist/*.whl
+          python -c 'import ocpm_engine; print(ocpm_engine.__version__)'
+      - name: Create checksum
+        run: |
+          cd dist
+          shasum -a 256 ./*.whl ./*.manifest.json \
+            > "SHA256SUMS-${{ matrix.id }}"
+      - uses: anchore/sbom-action@v0
+        with:
+          path: dist
+          format: spdx-json
+          output-file: dist/sbom-${{ matrix.id }}.spdx.json
+          upload-artifact: false
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ocpm-engine-${{ matrix.id }}
+          path: dist
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    if: inputs.confirmation == 'publish-community-ocpm-engine'
+    needs: wheels
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/ocpm-engine
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ocpm-engine-*
+          path: release
+          merge-multiple: true
+      - name: Verify signed tag, version, repository, and release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          object_type=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" \
+            --jq .object.type)
+          test "$object_type" = tag
+          tag_object=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" \
+            --jq .object.sha)
+          verified=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/git/tags/${tag_object}" \
+            --jq .verification.verified)
+          test "$verified" = true
+          tag_sha=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${RELEASE_TAG}" --jq .sha)
+          test "$tag_sha" = "$GITHUB_SHA"
+          package_version=$(python -c \
+            'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+          test "$RELEASE_TAG" = "v${package_version}"
+          visibility=$(gh repo view --json visibility --jq .visibility)
+          test "$visibility" = PUBLIC
+          draft=$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)
+          prerelease=$(gh release view "$RELEASE_TAG" --json isPrerelease --jq .isPrerelease)
+          test "$draft" = false
+          test "$prerelease" = false
+      - name: Select audited wheels for PyPI
+        run: |
+          mkdir pypi
+          cp release/*.whl pypi/
+          python -m pip install 'twine==6.2.0'
+          python -m twine check pypi/*.whl
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: pypi/*.whl
+      - name: Attach wheels, checksums, manifests, and SBOMs to public release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: gh release upload "$RELEASE_TAG" release/* --clobber
+      - name: Publish wheels to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: pypi/

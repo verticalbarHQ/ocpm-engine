@@ -1,22 +1,16 @@
 [package]
-name = "ocpm-python"
+name = "ocpm-gnn"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Python bindings for ocpm-engine native kernels"
+description = "Optional provider-neutral graph neural networks for ocpm-engine"
 publish = false
-
-[lib]
-name = "_native"
-crate-type = ["cdylib"]
 
 [dependencies]
 ocpm-core.workspace = true
-ocpm-engine = { workspace = true, features = ["duckdb-s3", "gnn"] }
 ocpm-provider.workspace = true
-pyo3 = { version = "0.29.0", features = ["extension-module", "abi3-py311"] }
 serde.workspace = true
 serde_json.workspace = true

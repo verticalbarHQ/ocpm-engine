@@ -32,6 +32,17 @@ def main() -> None:
         ROOT / "CLA.md", r"commercial, and proprietary", "CLA lacks relicensing grant"
     )
     require(
+        ROOT / "CLA.md",
+        r"contributions to `ocpm-engine`",
+        "CLA names the wrong project",
+    )
+    require(
+        ROOT / "COMMERCIAL.md",
+        r"No commercial license is required",
+        "missing Apache commercial-use clarification",
+    )
+    require(ROOT / "TRADEMARKS.md", r"Fair use", "missing trademark policy")
+    require(
         ROOT / "CODE_OF_CONDUCT.md",
         r"Reporting and enforcement",
         "missing conduct policy",
@@ -93,6 +104,7 @@ def main() -> None:
             "licenseref-proprietary",
             "all rights reserved",
             "repository currently grants no open-source license",
+            "separately licensed commercial editions",
         ):
             if phrase in text:
                 raise SystemExit(

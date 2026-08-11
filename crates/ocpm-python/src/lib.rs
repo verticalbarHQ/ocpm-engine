@@ -8,7 +8,7 @@ use ocpm_core::{
     frequency_drift as score_frequency_drift, next_activity_prediction, rank_bottlenecks,
     variant_frequency_conformance,
 };
-use ocpm_engine::Engine;
+use ocpm_engine::{BottleneckRequest, Engine, GnnBottleneckArtifact, GnnBottleneckRequest};
 use ocpm_provider::{ExecutionSummaryRequest, ProviderCapability};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -220,6 +220,44 @@ impl PyStandaloneEngine {
         let request: EnhancementRequest = parse_json(request_json)?;
         let result = py
             .detach(|| self.engine.enhance(&request))
+            .map_err(json_error)?;
+        encode_json(&result)
+    }
+
+    fn bottlenecks_json(&self, py: Python<'_>, request_json: &str) -> PyResult<String> {
+        let request: BottleneckRequest = parse_json(request_json)?;
+        let result = py
+            .detach(|| self.engine.bottlenecks(&request))
+            .map_err(json_error)?;
+        encode_json(&result)
+    }
+
+    fn fit_gnn_bottlenecks_json(&self, py: Python<'_>, request_json: &str) -> PyResult<String> {
+        let request: GnnBottleneckRequest = parse_json(request_json)?;
+        let result = py
+            .detach(|| self.engine.fit_gnn_bottlenecks(&request))
+            .map_err(json_error)?;
+        encode_json(&result)
+    }
+
+    fn score_gnn_bottlenecks_json(
+        &self,
+        py: Python<'_>,
+        request_json: &str,
+        artifact_json: &str,
+    ) -> PyResult<String> {
+        let request: GnnBottleneckRequest = parse_json(request_json)?;
+        let artifact: GnnBottleneckArtifact = parse_json(artifact_json)?;
+        let result = py
+            .detach(|| self.engine.score_gnn_bottlenecks(&request, &artifact))
+            .map_err(json_error)?;
+        encode_json(&result)
+    }
+
+    fn gnn_bottlenecks_json(&self, py: Python<'_>, request_json: &str) -> PyResult<String> {
+        let request: GnnBottleneckRequest = parse_json(request_json)?;
+        let result = py
+            .detach(|| self.engine.gnn_bottlenecks(&request))
             .map_err(json_error)?;
         encode_json(&result)
     }

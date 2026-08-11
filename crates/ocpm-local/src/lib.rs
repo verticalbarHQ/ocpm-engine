@@ -429,6 +429,7 @@ impl OcpmProvider for LocalProvider {
             ProviderCapability::DfgAggregate,
             ProviderCapability::VariantAggregate,
             ProviderCapability::PerformanceAggregate,
+            ProviderCapability::BottleneckObservations,
             ProviderCapability::PredictionFeatures,
         ]
     }

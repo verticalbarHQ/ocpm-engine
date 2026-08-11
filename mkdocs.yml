@@ -60,6 +60,7 @@ nav:
       - Quickstart: getting-started.md
   - Modules:
       - Overview: api-reference.md
+      - Bottleneck analysis: bottleneck-analysis.md
       - standalone: modules/standalone.md
       - engine: modules/engine.md
       - analytics: modules/analytics.md
@@ -83,3 +84,4 @@ nav:
       - Release notes (1.0.0): ocpm-engine-1.0.0-release-notes.md
       - Academic implementation provenance: academic-implementation-provenance.md
       - Production dependency boundary: dependency-boundary.md
+      - Community distribution: community-distribution.md

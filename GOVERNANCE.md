@@ -39,10 +39,12 @@ Maintainers publish versioned, reviewed releases according to
 [RELEASING.md](RELEASING.md). Security reports follow
 [SECURITY.md](SECURITY.md). Supported delivery channels, paid support, managed
 services, and separately developed proprietary components do not narrow the
-Apache-2.0 rights in the public core.
+Apache-2.0 rights in the public core. The boundary between the public core and
+paid offerings is documented in [COMMERCIAL.md](COMMERCIAL.md).
 
 ## Trademarks
 
 Apache-2.0 does not grant trademark rights. Descriptive references to the
-project are permitted as the license allows, but names or branding that imply
-endorsement by Vertical Bar, Inc. require written permission.
+project are permitted, but names or branding that imply endorsement by
+Vertical Bar, Inc. require written permission. See
+[TRADEMARKS.md](TRADEMARKS.md) for the complete policy.

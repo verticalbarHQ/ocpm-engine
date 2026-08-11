@@ -31,6 +31,8 @@ from .event_batches import (
     summarize_event_batch_rows,
     summarize_event_window_batch_rows,
 )
+from .gnn import GnnBackend
+from .gnn import require_backend as require_gnn_backend
 from .models import (
     BindingIndexCoverage,
     BindingNeighborCoverage,
@@ -86,6 +88,7 @@ __all__ = [
     "LifecycleVariantExecution",
     "LifecycleVariantRequest",
     "EventVariantCount",
+    "GnnBackend",
     "NetworkFilter",
     "OcpmEngine",
     "StandaloneEngine",
@@ -107,6 +110,7 @@ __all__ = [
     "dfg_conformance",
     "frequency_drift",
     "next_activity",
+    "require_gnn_backend",
     "score_dynamic_dfg_rows",
     "summarize_event_batch_rows",
     "summarize_event_window_batch_rows",

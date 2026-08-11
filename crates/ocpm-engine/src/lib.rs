@@ -18,6 +18,11 @@ use ocpm_provider::{ExecutionSummaryRequest, OcpmProvider, ProviderCapability};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+pub use ocpm_bottleneck::{
+    AvailabilityInterval, BlockingCascade, BottleneckChange, BottleneckRequest, BottleneckResult,
+    BottleneckSignal, CausalHypothesisResult, PerformancePattern, ResourcePressure,
+    SynchronizationAttribution, TemporalHypothesis, WaitingCauseAttribution,
+};
 #[cfg(feature = "duckdb")]
 pub use ocpm_duckdb::{
     DuckDbOptions, DuckDbParquetSource, DuckDbProvider, EntityLinkSnapshotV1, ExtensionPolicy,
@@ -26,6 +31,13 @@ pub use ocpm_duckdb::{
 };
 pub use ocpm_io::CsvMapping;
 pub use ocpm_provider::{ExecutionMode, ProcessExecution};
+
+#[cfg(feature = "gnn")]
+pub use ocpm_gnn::{
+    GnnArtifact, GnnBackend, GnnBottleneckArtifact, GnnBottleneckDiagnostics, GnnBottleneckRequest,
+    GnnBottleneckResult, GnnBottleneckSignal, GnnEdgeThreshold, GnnModelWeights, GnnRequest,
+    GnnTask, GnnTrainingDiagnostics,
+};
 
 pub struct Engine {
     provider: Arc<dyn OcpmProvider>,
@@ -80,6 +92,92 @@ impl Engine {
                 )
             })?;
         Self::from_log(log)
+    }
+
+    /// Execute bottleneck analysis through pg_ocpm when its canonical
+    /// transition projection can preserve every predicate. Unsupported views
+    /// use the exact canonical snapshot path automatically.
+    #[cfg(feature = "postgres")]
+    pub async fn bottlenecks_postgres(
+        client: &ocpm_postgres::PgClient,
+        tenant_id: i64,
+        dataset_id: i64,
+        request: &BottleneckRequest,
+    ) -> OcpmResult<BottleneckResult> {
+        let capabilities = ocpm_postgres::pg_ocpm_capabilities(client)
+            .await
+            .map_err(postgres_error)?;
+        if !capabilities.bottleneck_pushdown()
+            || !postgres_bottleneck_view_supported(&request.view)
+            || request
+                .comparison_view
+                .as_ref()
+                .is_some_and(|view| !postgres_bottleneck_view_supported(view))
+        {
+            return Self::from_postgres_snapshot(client, tenant_id, dataset_id)
+                .await?
+                .bottlenecks(request);
+        }
+        let observations = ocpm_postgres::load_bottleneck_observations(
+            client,
+            tenant_id,
+            dataset_id,
+            &request.view,
+            request.leading_object_type.as_deref(),
+        )
+        .await
+        .map_err(postgres_error)?;
+        let comparison = match &request.comparison_view {
+            Some(view) => Some(
+                ocpm_postgres::load_bottleneck_observations(
+                    client,
+                    tenant_id,
+                    dataset_id,
+                    view,
+                    request.leading_object_type.as_deref(),
+                )
+                .await
+                .map_err(postgres_error)?,
+            ),
+            None => None,
+        };
+        ocpm_bottleneck::analyze_observations(
+            "pg_ocpm",
+            &observations,
+            comparison.as_deref(),
+            request,
+        )
+    }
+
+    /// Run graph-aware bottleneck detection over pg_ocpm's canonical
+    /// observation projection. Unsupported predicates use the exact snapshot
+    /// path, while all graph and learning semantics remain in ocpm-engine.
+    #[cfg(all(feature = "postgres", feature = "gnn"))]
+    pub async fn gnn_bottlenecks_postgres(
+        client: &ocpm_postgres::PgClient,
+        tenant_id: i64,
+        dataset_id: i64,
+        request: &GnnBottleneckRequest,
+    ) -> OcpmResult<GnnBottleneckResult> {
+        let capabilities = ocpm_postgres::pg_ocpm_capabilities(client)
+            .await
+            .map_err(postgres_error)?;
+        if !capabilities.bottleneck_pushdown() || !postgres_bottleneck_view_supported(&request.view)
+        {
+            return Self::from_postgres_snapshot(client, tenant_id, dataset_id)
+                .await?
+                .gnn_bottlenecks(request);
+        }
+        let observations = ocpm_postgres::load_bottleneck_observations(
+            client,
+            tenant_id,
+            dataset_id,
+            &request.view,
+            request.leading_object_type.as_deref(),
+        )
+        .await
+        .map_err(postgres_error)?;
+        ocpm_gnn::detect_from_observations("pg_ocpm", &observations, request)
     }
 
     pub fn provider_name(&self) -> &'static str {
@@ -362,12 +460,66 @@ impl Engine {
         ocpm_enhancement::enhance(self.provider.as_ref(), request)
     }
 
+    /// Run the complete provider-neutral bottleneck suite. Providers may push
+    /// only the canonical observation projection down to storage; analytical
+    /// semantics always execute in the shared kernel.
+    pub fn bottlenecks(&self, request: &BottleneckRequest) -> OcpmResult<BottleneckResult> {
+        ocpm_bottleneck::analyze(self.provider.as_ref(), request)
+    }
+
     pub fn fit_prediction(&self, request: &FitPredictionRequest) -> OcpmResult<PredictionArtifact> {
         ocpm_prediction::fit(self.provider.as_ref(), request)
     }
 
     pub fn predict(&self, request: &PredictionRequest) -> OcpmResult<PredictionResult> {
         ocpm_prediction::predict(self.provider.as_ref(), request)
+    }
+
+    #[cfg(feature = "gnn")]
+    pub fn fit_gnn(
+        &self,
+        backend: &dyn GnnBackend,
+        request: &GnnRequest,
+    ) -> OcpmResult<GnnArtifact> {
+        backend.fit(request)
+    }
+
+    #[cfg(feature = "gnn")]
+    pub fn predict_gnn(
+        &self,
+        backend: &dyn GnnBackend,
+        request: &GnnRequest,
+        artifact: &GnnArtifact,
+    ) -> OcpmResult<PredictionResult> {
+        backend.predict(request, artifact)
+    }
+
+    /// Fit the built-in provider-neutral graph bottleneck model.
+    #[cfg(feature = "gnn")]
+    pub fn fit_gnn_bottlenecks(
+        &self,
+        request: &GnnBottleneckRequest,
+    ) -> OcpmResult<GnnBottleneckArtifact> {
+        ocpm_gnn::fit(self.provider.as_ref(), request)
+    }
+
+    /// Score graph-aware bottleneck risk with a portable model artifact.
+    #[cfg(feature = "gnn")]
+    pub fn score_gnn_bottlenecks(
+        &self,
+        request: &GnnBottleneckRequest,
+        artifact: &GnnBottleneckArtifact,
+    ) -> OcpmResult<GnnBottleneckResult> {
+        ocpm_gnn::score(self.provider.as_ref(), request, artifact)
+    }
+
+    /// Fit and score graph-aware bottleneck risk with one provider projection.
+    #[cfg(feature = "gnn")]
+    pub fn gnn_bottlenecks(
+        &self,
+        request: &GnnBottleneckRequest,
+    ) -> OcpmResult<GnnBottleneckResult> {
+        ocpm_gnn::detect(self.provider.as_ref(), request)
     }
 
     pub fn evaluate_prediction(
@@ -444,6 +596,27 @@ fn predicate_summary(view: &DatasetView) -> Vec<String> {
     predicates
 }
 
+#[cfg(feature = "postgres")]
+fn postgres_bottleneck_view_supported(view: &DatasetView) -> bool {
+    view.qualifiers.is_empty()
+        && view.event_ids.is_empty()
+        && view.object_ids.is_empty()
+        && view.event_attributes.is_empty()
+        && view.object_attributes.is_empty()
+        && view.statuses.is_empty()
+        && view.related_object_types.is_empty()
+        && view.minimum_execution_duration_nanos.is_none()
+        && view.maximum_execution_duration_nanos.is_none()
+}
+
+#[cfg(feature = "postgres")]
+fn postgres_error(error: impl std::fmt::Display) -> ocpm_core::OcpmError {
+    ocpm_core::OcpmError::new(
+        ocpm_core::OcpmErrorCode::ProviderUnavailable,
+        format!("pg_ocpm bottleneck projection failed: {error}"),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -483,5 +656,79 @@ mod tests {
             engine.profile(&DatasetView::default()).unwrap().event_count,
             1
         );
+    }
+
+    #[test]
+    fn bottleneck_entrypoint_preserves_multi_object_synchronization() {
+        let event = |id, activity: &str, timestamp| Event {
+            id,
+            external_id: format!("e{id}"),
+            activity: activity.to_owned(),
+            timestamp: Timestamp::from_epoch_nanos(timestamp),
+            sequence: 0,
+            lifecycle: None,
+            attributes: BTreeMap::new(),
+        };
+        let log = CanonicalLog {
+            dataset_id: "synchronization".to_owned(),
+            tenant_id: "tenant".to_owned(),
+            events: vec![
+                event(1, "order_ready", 0),
+                event(2, "item_ready", 5_000_000_000),
+                event(3, "ship", 10_000_000_000),
+            ],
+            objects: vec![
+                Object {
+                    id: 1,
+                    external_id: "o1".to_owned(),
+                    object_type: "order".to_owned(),
+                },
+                Object {
+                    id: 2,
+                    external_id: "i1".to_owned(),
+                    object_type: "item".to_owned(),
+                },
+            ],
+            event_object_relations: vec![
+                EventObjectRelation {
+                    relation_id: 1,
+                    event_id: 1,
+                    object_id: 1,
+                    qualifier: String::new(),
+                },
+                EventObjectRelation {
+                    relation_id: 2,
+                    event_id: 2,
+                    object_id: 2,
+                    qualifier: String::new(),
+                },
+                EventObjectRelation {
+                    relation_id: 3,
+                    event_id: 3,
+                    object_id: 1,
+                    qualifier: String::new(),
+                },
+                EventObjectRelation {
+                    relation_id: 4,
+                    event_id: 3,
+                    object_id: 2,
+                    qualifier: String::new(),
+                },
+            ],
+            ..CanonicalLog::default()
+        };
+        let engine = Engine::from_log(log).unwrap();
+        let result = engine
+            .bottlenecks(&BottleneckRequest {
+                view: DatasetView {
+                    object_types: vec!["order".to_owned(), "item".to_owned()],
+                    ..DatasetView::default()
+                },
+                minimum_support: 1,
+                ..BottleneckRequest::default()
+            })
+            .unwrap();
+        assert_eq!(result.diagnostics.synchronized_event_count, 1);
+        assert_eq!(result.synchronization.len(), 2);
     }
 }

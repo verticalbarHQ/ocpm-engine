@@ -14,6 +14,9 @@ usages:
 | [`ocpm_engine.standalone`](modules/standalone.md) | File-based analysis: `StandaloneEngine` over OCEL JSON, XES, SQLite, or DuckDB Parquet, plus `serialize_model` |
 | [`ocpm_engine.engine`](modules/engine.md) | PostgreSQL compatibility API: `OcpmEngine` query planning and execution over pg_ocpm |
 | [`ocpm_engine.analytics`](modules/analytics.md) | Conformance, prediction, bottleneck, and drift scoring from compact aggregate rows |
+| [`ocpm_engine.standalone.StandaloneEngine.bottlenecks`](bottleneck-analysis.md) | Provider-neutral tail latency, synchronization, queue, waiting-cause, drift, spectrum, and blocking analysis |
+| [`StandaloneEngine.gnn_bottlenecks`](bottleneck-analysis.md#graph-aware-bottleneck-detection) | Optional built-in CPU graph bottleneck detection plus fit/score artifact APIs |
+| [`ocpm_engine.gnn`](bottleneck-analysis.md#graph-aware-bottleneck-detection) | Protocol for separately packaged predictive GNN backends |
 | [`ocpm_engine.event_batches`](modules/event_batches.md) | Native summarization of factorized pg_ocpm event batches |
 | [`ocpm_engine.bindings`](modules/bindings.md) | Native decoding of compact binding-result capsules |
 | [`ocpm_engine.models`](modules/models.md) | Request contracts, query plans, executions, and capability reports |
@@ -25,10 +28,10 @@ composes four:
 
 ```python
 from ocpm_engine import (
-    EventLogRequest,     # models: request contract
+    EventLogRequest,  # models: request contract
     EventLogWindow,
-    OcpmEngine,          # engine: planning and execution
-    dfg_conformance,     # analytics: scoring
+    OcpmEngine,  # engine: planning and execution
+    dfg_conformance,  # analytics: scoring
     TransitionCount,
 )
 
@@ -42,15 +45,18 @@ request = EventLogRequest(
         EventLogWindow(test_start, test_end),
     ),
 )
-execution = engine.execute_event_log_summary(
-    cursor, request, capabilities=capabilities
-)
-training, test = execution.summaries   # event_batches: EventLogSummary
+execution = engine.execute_event_log_summary(cursor, request, capabilities=capabilities)
+training, test = execution.summaries  # event_batches: EventLogSummary
 
 test_index = {(e.source, e.target): e.frequency for e in test.dfg}
 rows = [
-    TransitionCount(e.source, e.target, "directly_follows",
-                    e.frequency, test_index.get((e.source, e.target), 0))
+    TransitionCount(
+        e.source,
+        e.target,
+        "directly_follows",
+        e.frequency,
+        test_index.get((e.source, e.target), 0),
+    )
     for e in training.dfg
 ]
 score = dfg_conformance(rows, coverage=0.95)

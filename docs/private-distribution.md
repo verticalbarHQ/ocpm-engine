@@ -1,9 +1,11 @@
-# Private wheel distribution
+# Certified enterprise distribution
 
-Vertical Bar, Inc. distributes supported `ocpm-engine` builds to customers as
-a native wheel from a private PEP 503-compatible index. The core is licensed
-under Apache-2.0. The supported release process never builds or uploads a source
-distribution and explicitly refuses public PyPI endpoints.
+Vertical Bar, Inc. distributes certified `ocpm-engine` builds to customers as a
+native wheel from a private PEP 503-compatible index. The same core is available
+under Apache-2.0 through public source and PyPI community releases. A commercial
+agreement covers the certified channel, support, updates, service levels,
+warranty, indemnification, or separately identified components; it is not
+required to use the Apache-2.0 core.
 
 ## Artifact contract
 
@@ -88,9 +90,10 @@ publish run requires all of the following:
 5. Secret `AWS_CODEARTIFACT_PUBLISH_ROLE_ARN` and, when used, variable
    `AWS_CODEARTIFACT_DOMAIN_OWNER`.
 
-The uploader accepts only explicit HTTPS repository URLs and refuses PyPI and
-TestPyPI. CI attaches SHA-256 checksums, an SBOM, and build provenance to the
-private release artifacts.
+The enterprise uploader accepts only explicit HTTPS repository URLs and refuses
+PyPI and TestPyPI so certified artifacts cannot be sent to the community channel
+by mistake. The separate community workflow owns PyPI publication. CI attaches
+SHA-256 checksums, an SBOM, and build provenance to the certified artifacts.
 
 ## Source and artifact boundary
 

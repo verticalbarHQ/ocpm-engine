@@ -19,12 +19,17 @@ stable-ABI bindings that release the GIL during native work.
 - **Exactness first**: optimized and fallback paths are tested for canonical
   equality, and benchmark evidence passes exact-answer hash gates before
   publication.
+- **Advanced bottlenecks**: one API provides tail-aware ranking,
+  synchronization, queue and waiting-cause attribution, localized drift,
+  performance patterns, and blocking cascades across every provider; an
+  explicit optional CPU GNN adds graph-context risk without replacing exact
+  results.
 
 ## Get started
 
 1. [Install](https://github.com/verticalbarHQ/ocpm-engine/blob/main/INSTALL.md)
-   the wheel from your configured private index, with the DuckDB requirement
-   and optional PostgreSQL setup.
+   the PyPI community wheel, a certified enterprise wheel, or a source build,
+   with the DuckDB requirement and optional PostgreSQL setup.
 2. Follow the [quickstart](getting-started.md) from an empty environment to a
    discovered, conformance-checked object-centric model.
 3. Keep the [module reference](api-reference.md) open while you build.
@@ -34,9 +39,10 @@ stable-ABI bindings that release the GIL during native work.
 | Section | What you will find |
 |---|---|
 | [Modules](api-reference.md) | API and function specs with example usages for every public module |
+| [Bottleneck analysis](bottleneck-analysis.md) | Shared exact semantics, graph-aware risk, evidence requirements, provider acceleration, and limitations |
 | [Architecture](ocpm-engine-1.0.0-spec.md) | The engine specification, the [DuckDB Parquet provider](duckdb-parquet-provider-spec.md), [pg_ocpm aggregation pushdown](pg-ocpm-0.10-general-aggregation.md), and [query performance architecture](technical-performance-improvements.md) |
 | [Benchmarks](ocpq-performance.md) | Verified comparisons against OCPQ, PM4Py, Rust4PM, and OCPA |
-| [Resources](ocpm-engine-1.0.0-release-notes.md) | Release notes, [academic implementation provenance](academic-implementation-provenance.md), and the [production dependency boundary](dependency-boundary.md) |
+| [Resources](ocpm-engine-1.0.0-release-notes.md) | Release notes, [academic implementation provenance](academic-implementation-provenance.md), the [production dependency boundary](dependency-boundary.md), [community distribution](community-distribution.md), and the [commercial offering boundary](https://github.com/verticalbarHQ/ocpm-engine/blob/main/COMMERCIAL.md) |
 
 ## Why ocpm-engine is different
 
@@ -44,10 +50,11 @@ Typical process-mining stacks materialize a full event log in a Python
 dataframe runtime before any analysis runs, and every query pays that
 hydration cost again. `ocpm-engine` is built around the opposite contract:
 
-- **Exact, or it does not ship.** Optimized and fallback paths are tested
+- **Exact deterministic kernels, explicit probabilistic models.** Optimized and fallback paths are tested
   for canonical equality, and every published benchmark latency passes an
-  exact-answer hash gate against the competing implementation. There is no
-  sampling or approximation mode.
+  exact-answer hash gate against the competing implementation. Optional GNN
+  outputs are labeled probabilistic, carry temporal validation diagnostics,
+  and never replace exact bottleneck results.
 - **Statistics move, events stay put.** Sufficient statistics and
   factorized batches cross the wire instead of event rows, so conformance,
   prediction, bottleneck, and drift scoring run in megabytes of incremental

@@ -167,9 +167,9 @@ fn configure_s3(
     #[cfg(not(feature = "s3"))]
     {
         let _ = (connection, location, credentials, extension_policy);
-        return Err(DuckDbProviderError::Unsupported(
+        Err(DuckDbProviderError::Unsupported(
             "S3 support requires the ocpm-duckdb s3 feature".to_owned(),
-        ));
+        ))
     }
     #[cfg(feature = "s3")]
     {

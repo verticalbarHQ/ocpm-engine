@@ -10,8 +10,9 @@ Current version: **1.1.0**.
 
 Choose one installation path:
 
-1. [Private wheel registry](#install-from-the-private-wheel-registry) (authorized customers)
-2. [Build from source](#build-from-source)
+1. [PyPI community wheel](#install-the-community-wheel-from-pypi)
+2. [Certified enterprise wheel](#install-a-certified-enterprise-wheel)
+3. [Build from source](#build-from-source)
 
 Then, if you plan to use a database provider:
 
@@ -26,12 +27,24 @@ Then, if you plan to use a database provider:
 - For the DuckDB provider: a deployment-supplied DuckDB **1.5** client library
   (`ocpm-engine` never bundles, downloads, or embeds DuckDB)
 
-## Install from the private wheel registry
+## Install the community wheel from PyPI
 
-Authorized binary releases are native wheels served from a private
-PEP 503-compatible index. Public PyPI and npm are not release channels for this
-package. Registry controls and the artifact contract are documented in
-[docs/private-distribution.md](docs/private-distribution.md).
+Install the deployment-managed DuckDB 1.5.5 shared client in the normal dynamic
+loader path first. The wheel dynamically links to that client and never bundles,
+downloads, or installs DuckDB. Then install the signed-tag community release:
+
+```sh
+python -m pip install --only-binary=:all: ocpm-engine==1.1.0
+```
+
+Public wheel controls, checksums, provenance, and supported platforms are
+documented in [docs/community-distribution.md](docs/community-distribution.md).
+
+## Install a certified enterprise wheel
+
+Certified builds are served from a private PEP 503-compatible index with
+supported update access and commercial assurance. Authenticate with a
+short-lived registry credential. For AWS CodeArtifact:
 
 Authenticate with a short-lived registry credential. For AWS CodeArtifact:
 
@@ -178,8 +191,8 @@ model = engine.discover(
 ## Troubleshooting
 
 - `pip` tries to build from source or resolves an unexpected package: pass
-  `--only-binary=:all:` and confirm the private index is the only configured
-  index.
+  `--only-binary=:all:` and confirm that the selected public or private index
+  contains a wheel for your platform.
 - Import fails mentioning `libduckdb`: the DuckDB provider requires the
   deployment-supplied DuckDB 1.5 client on the dynamic-loader path; the wheel
   intentionally does not bundle it.

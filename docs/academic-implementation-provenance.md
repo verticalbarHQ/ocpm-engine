@@ -1,7 +1,7 @@
 # Academic implementation provenance for ocpm-engine 1.0
 
 Status: normative clean-room engineering policy  
-Snapshot date: 2026-08-03
+Snapshot date: 2026-08-10
 
 ## Source boundary
 
@@ -45,6 +45,17 @@ entry and independently authored tests.
 | Predictive-process definitions | Ceravolo et al., “Predictive process monitoring: concepts, challenges, and future research directions,” Process Science 2024, [doi:10.1007/s44311-024-00002-4](https://doi.org/10.1007/s44311-024-00002-4) | Next-activity, outcome/risk, time, calibration, and evaluation scope |
 | Frequency drift | Yeshchenko et al., “Comprehensive concept drift characterization in process mining,” Information Systems 2026, [doi:10.1016/j.is.2025.102584](https://doi.org/10.1016/j.is.2025.102584) | Windowed behavior comparison and localized drift contributions |
 | Jensen-Shannon divergence | Lin, “Divergence Measures Based on the Shannon Entropy,” IEEE Transactions on Information Theory 1991, [doi:10.1109/18.61115](https://doi.org/10.1109/18.61115) | Symmetric bounded distribution divergence used by drift scoring |
+| Object-centric performance operations | Adams et al., “OPerA: Object-Centric Performance Analysis,” ICPM 2022, [doi:10.1007/978-3-031-17995-2_20](https://doi.org/10.1007/978-3-031-17995-2_20) | Object readiness, synchronization, pooling, lagging, and flow-time interpretation |
+| Waiting-cause decomposition | Lashkevich et al., “Why am I waiting? Data-driven analysis of waiting times in business processes,” Information Systems 2024, [doi:10.1016/j.is.2024.102434](https://doi.org/10.1016/j.is.2024.102434) | Evidence-gated, non-overlapping batching, prioritization, contention, unavailability, and residual attribution |
+| Queue mining and delay prediction | Senderovich et al., “Queue mining for delay prediction in multi-class service processes,” Information Systems 2015, [doi:10.1016/j.is.2015.03.010](https://doi.org/10.1016/j.is.2015.03.010) | Arrival, service, waiting, queue, throughput, and capacity-pressure measures |
+| Performance spectrum | Denisov et al., “The Performance Spectrum Miner: Visual Analytics for Fine-Grained Performance Analysis of Processes,” BPM 2018, [doi:10.1007/978-3-319-98648-7_9](https://doi.org/10.1007/978-3-319-98648-7_9) | Relative timing, overtaking, and congestion-pattern measures |
+| Batch detection | Martin et al., “Batch Processing: Definition and Event Log Identification,” BPM Workshops 2019, [doi:10.1007/978-3-030-37453-2_15](https://doi.org/10.1007/978-3-030-37453-2_15) | Configurable temporal batch clusters and batch prevalence |
+| Explainable object-centric drift | Adams et al., “Detecting and explaining object-centric process drift,” Information Systems 2023, [doi:10.1016/j.is.2023.102177](https://doi.org/10.1016/j.is.2023.102177) | Edge-localized distribution change and object-type attribution |
+| Temporal causal hypotheses | Koorn et al., “AITIA-PM: A framework for analyzing causality in process mining,” Engineering Applications of Artificial Intelligence 2024, [doi:10.1016/j.engappai.2023.107145](https://doi.org/10.1016/j.engappai.2023.107145) | Caller-declared temporal precedence and probability-raising hypothesis tests; no causal-proof claim |
+| Recursive blocking analysis | García-Bañuelos et al., “Discovering and analyzing blocking cascades in cargo processes,” Process Science 2026, [doi:10.1007/s44311-026-00038-8](https://doi.org/10.1007/s44311-026-00038-8) | Domain-neutral resource-overlap chains with cycle and depth guards |
+| Object-centric event GNN representation | Bernard and Andritsos, “HOEG: A New Approach for Object-Centric Predictive Process Monitoring,” BPM 2024, [doi:10.1007/978-3-031-61057-8_14](https://doi.org/10.1007/978-3-031-61057-8_14) | Optional graph module, object/event context, and heterogeneous categorical features; this project uses transition nodes and documents that deliberate representation choice |
+| Inductive neighborhood aggregation | Hamilton, Ying, and Leskovec, “Inductive Representation Learning on Large Graphs,” NeurIPS 2017, [paper and reviews](https://proceedings.neurips.cc/paper/2017/hash/5dd9db5e033da9c6fb5ba83c7a7ebea9-Abstract.html) | Two learned mean-aggregation layers over bounded neighborhoods; deterministic feature hashing supports unseen categorical values |
+| GNN empirical comparison | Weinzierl et al., “Graph Neural Networks for Predictive Process Monitoring: A Comparative Study,” ICPM Workshops 2023, [doi:10.1007/978-3-031-50974-2_39](https://doi.org/10.1007/978-3-031-50974-2_39) | Separate optional GNN module, temporal holdout diagnostics, and explicit probabilistic result selection |
 
 ## Evidence-limited interoperability
 
