@@ -1,8 +1,8 @@
 # Getting started
 
 This walkthrough goes from an empty environment to a discovered, conformance-
-checked object-centric model. For installation options (private wheel registry,
-source builds, the external DuckDB requirement), see the
+checked object-centric model. For installation options (PyPI community wheel,
+certified enterprise wheel, source builds, and the external DuckDB requirement), see the
 [installation guide](https://github.com/verticalbarHQ/ocpm-engine/blob/main/INSTALL.md).
 
 ## 1. Install
@@ -10,7 +10,7 @@ source builds, the external DuckDB requirement), see the
 ```sh
 python3.11 -m venv .venv
 . .venv/bin/activate
-pip install --only-binary=:all: ocpm-engine==1.1.0   # from your configured private index
+pip install --only-binary=:all: ocpm-engine==1.1.0
 ```
 
 Or, for development, clone the repository and run `pip install -e '.[dev]'`.

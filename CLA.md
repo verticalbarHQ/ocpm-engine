@@ -1,10 +1,14 @@
 # Contributor License Agreement policy
 
-Vertical Bar, Inc. accepts code and documentation contributions to `pg_ocpm`
+Vertical Bar, Inc. accepts code and documentation contributions to `ocpm-engine`
 only after the applicable Contributor License Agreement below has been signed
 and accepted. This policy keeps the public project under Apache-2.0 while
 allowing Vertical Bar, Inc. to offer the project, accepted contributions, and
 derivative products under commercial or other licenses.
+
+The public core remains available under Apache-2.0, including for commercial
+use. This agreement does not require recipients of the Apache-2.0 core to buy a
+commercial license or narrow rights already granted by Apache-2.0.
 
 Contributors retain ownership of their contributions. The agreement grants
 Vertical Bar, Inc. a broad, non-exclusive copyright and patent license. It does
@@ -162,4 +166,4 @@ agreement version, signature date, covered GitHub identities, employer or
 entity when applicable, acceptance date, and approving Company representative.
 Signed agreements and addresses must not be committed to this public repository.
 
-CLA document version: 1.0, 2026-08-04.
+CLA document version: 1.1, 2026-08-10.

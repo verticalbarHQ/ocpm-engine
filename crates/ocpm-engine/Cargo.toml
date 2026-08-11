@@ -14,16 +14,19 @@ default = []
 postgres = ["dep:ocpm-postgres"]
 duckdb = ["dep:ocpm-duckdb"]
 duckdb-s3 = ["duckdb", "ocpm-duckdb/s3"]
+gnn = ["dep:ocpm-gnn"]
 
 [dependencies]
 ocpm-conformance.workspace = true
 ocpm-core.workspace = true
 ocpm-discovery.workspace = true
 ocpm-enhancement.workspace = true
+ocpm-bottleneck.workspace = true
 ocpm-io = { path = "../ocpm-io", version = "1.1.0" }
 ocpm-local.workspace = true
 ocpm-duckdb = { workspace = true, optional = true }
 ocpm-prediction.workspace = true
+ocpm-gnn = { workspace = true, optional = true }
 ocpm-provider.workspace = true
 ocpm-postgres = { workspace = true, optional = true }
 ocpm-query.workspace = true

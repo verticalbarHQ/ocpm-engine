@@ -4,6 +4,27 @@ All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
 
 ## Unreleased
 
+- Added `Engine::bottlenecks` and `StandaloneEngine.bottlenecks` as the single
+  provider-neutral API for robust tail/impact ranking, object synchronization,
+  non-overlapping waiting-cause attribution, queue/resource pressure,
+  performance patterns, localized distribution drift, blocking cascades, and
+  caller-declared temporal hypotheses.
+- Added exact bottleneck-observation acceleration for DuckDB Parquet and
+  pg_ocpm, with predicate-aware canonical fallback and multi-object-type parity.
+  Providers project data only; the shared Rust kernel owns every threshold,
+  ranking, attribution, and statistical test.
+- Moved graph/GNN prediction behind the independent optional `ocpm-gnn` module
+  and Python backend protocol. The base engine no longer accepts `graph` as a
+  tabular feature encoding and adds no tensor-runtime dependency.
+- Added a built-in optional CPU graph bottleneck detector with learned
+  two-layer mean aggregation, deterministic feature hashing, temporal holdout
+  diagnostics, content-hashed artifacts, target-leakage guards, and hard node
+  and neighborhood limits. Added local-versus-DuckDB parity coverage for both
+  the exact and graph-aware bottleneck paths.
+- Indexed contention, FIFO overtaking, prioritization, and hypothesis exposure
+  paths with merged interval timelines, prefix sums, Fenwick trees, and time
+  range searches; documented exact memory/concurrency behavior and the
+  resource-partitioned worst-case cascade bound.
 - Licensed the core workspace and Python wheel under Apache-2.0 with an
   owner-specific NOTICE, inherited Cargo metadata, package-carried dependency
   license bundle, and a CI licensing contract. Added individual and corporate
@@ -14,14 +35,19 @@ All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
   and vendored paths. Removed the complete OCPQ benchmark implementation and
   retained only its previously published result evidence; OCPA, Rust4PM, and
   PM4Py remain in minimal, pinned benchmark environments.
-- Added a wheel-only private distribution path with platform-native artifact
-  audits, public-PyPI refusal, short-lived CodeArtifact publishing, SBOMs,
-  checksums, build provenance, and installed-wheel smoke tests.
+- Added public PyPI community wheels and a separate certified enterprise
+  distribution path with platform-native artifact audits, short-lived trusted
+  publishing, SBOMs, checksums, build provenance, and installed-wheel smoke
+  tests. Both channels keep DuckDB external to the package.
 - Exposed the native release version as the conventional package-level
   `ocpm_engine.__version__` attribute for installation verification.
 - Made the confidentiality boundary explicit: Rust/Cargo sources and DuckDB
   binaries are excluded, while the required Python compatibility façade remains
   visible until sensitive planner and fallback logic is migrated into Rust.
+- Documented that commercial use of the Apache-2.0 core requires no separate
+  license, while certified builds, managed services, support, warranty,
+  indemnification, and separately packaged enterprise components are paid
+  offerings. Added explicit commercial and trademark policies.
 
 ## 1.1.0 - 2026-08-03
 

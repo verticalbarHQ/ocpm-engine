@@ -14,22 +14,27 @@ Before publishing a version:
    benchmark when execution paths change.
 4. Commit the release atomically and tag the verified commit `vX.Y.Z`.
 
-Private Python artifacts are built by the `Private wheel distribution`
-workflow. Run it without publishing first and inspect every platform wheel,
-manifest, checksum, SBOM, installed-wheel smoke test, and provenance result.
-Publishing requires a signed tag at the workflow commit, an exact confirmation
-string, and a short-lived GitHub OIDC session scoped to one private
-CodeArtifact repository. The uploader refuses PyPI and TestPyPI URLs and never
-builds a source distribution.
+Community Python artifacts are built by the `Community wheel release` workflow.
+Run it against a reviewed signed tag and inspect every platform wheel, manifest,
+checksum, SBOM, installed-wheel smoke test, and provenance result. Publication
+requires the exact confirmation string and a PyPI trusted-publisher identity
+scoped to the `ocpm-engine` project. The workflow never builds a source
+distribution or bundles DuckDB.
 
-Private registry access controls the supported delivery channel, provenance,
-and customer entitlement. It does not narrow the Apache-2.0 rights attached to
-the core wheel. Proprietary additions or alternative commercial licenses must
-be documented and packaged separately from the unmodified Apache core.
+Certified customer artifacts remain available through the `Private wheel
+distribution` workflow and a short-lived GitHub OIDC session scoped to one
+private CodeArtifact repository.
+
+Private registry access controls the certified delivery channel, support,
+provenance, updates, and customer entitlement. It does not narrow the
+Apache-2.0 rights attached to the core wheel. Proprietary additions must be
+documented and packaged separately from the Apache core.
 
 The wheel excludes Rust/C sources, Cargo metadata, tests, benchmarks, and the
 DuckDB client library. The current compatibility façade remains Python source
 and is reported in the artifact manifest. Binary-only delivery is an artifact
 format, not a restriction on the Apache-2.0 source rights. Separately licensed
 components must remain outside the public core. See
-[`docs/private-distribution.md`](docs/private-distribution.md).
+[`docs/community-distribution.md`](docs/community-distribution.md) for public
+release procedure and [`docs/private-distribution.md`](docs/private-distribution.md)
+for the certified enterprise channel.

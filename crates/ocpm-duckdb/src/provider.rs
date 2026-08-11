@@ -14,8 +14,9 @@ use ocpm_core::{
 };
 use ocpm_local::LocalProvider;
 use ocpm_provider::{
-    ExecutionMode, ExecutionSummaryRequest, OcpmProvider, ProcessExecution, ProviderCapability,
-    ProviderEstimate,
+    BottleneckObservation, BottleneckObservationRequest, ExecutionMode, ExecutionSummaryRequest,
+    OcpmProvider, ProcessExecution, ProviderCapability, ProviderEstimate, bottleneck_leading_types,
+    observations_from_executions,
 };
 use std::{
     collections::{BTreeMap, HashMap, VecDeque},
@@ -484,6 +485,7 @@ impl OcpmProvider for DuckDbProvider {
             ProviderCapability::DfgAggregate,
             ProviderCapability::VariantAggregate,
             ProviderCapability::PerformanceAggregate,
+            ProviderCapability::BottleneckObservations,
             ProviderCapability::PredictionFeatures,
         ]
     }
@@ -517,6 +519,20 @@ impl OcpmProvider for DuckDbProvider {
         request: &ExecutionSummaryRequest,
     ) -> OcpmResult<Option<EventLogSummary>> {
         Ok(Some(self.summarize(request)?))
+    }
+
+    fn bottleneck_observations(
+        &self,
+        request: &BottleneckObservationRequest,
+    ) -> OcpmResult<Vec<BottleneckObservation>> {
+        let mut observations = Vec::new();
+        for leading in bottleneck_leading_types(request) {
+            self.scan_executions::<()>(&request.view, leading, false, |execution| {
+                observations.extend(observations_from_executions(&[execution]));
+                Ok(())
+            })?;
+        }
+        Ok(observations)
     }
 
     fn snapshot(&self, view: &DatasetView) -> OcpmResult<CanonicalLog> {
@@ -1109,6 +1125,9 @@ mod tests {
         SourceValidationPolicy, write_canonical_snapshot,
     };
     use ocpm_core::{Constraint, EventObjectRelation, Object, QueryRequest};
+    use ocpm_local::LocalProvider;
+    #[cfg(feature = "s3")]
+    use std::process::Command;
     use std::{
         collections::BTreeMap,
         fs,
@@ -1180,6 +1199,54 @@ mod tests {
                     qualifier: "case".to_owned(),
                 })
                 .collect(),
+            ..CanonicalLog::default()
+        }
+    }
+
+    fn performance_log() -> CanonicalLog {
+        let mut events = Vec::new();
+        let mut objects = Vec::new();
+        let mut relations = Vec::new();
+        for case in 0_u64..16 {
+            let object_id = 100 + case;
+            let first_event = case * 3 + 1;
+            let start = i128::from(case) * 100_000_000_000;
+            let approval_seconds = if case % 5 == 0 { 45 } else { 2 + case % 3 };
+            events.extend([
+                event(first_event, "create", start, "open"),
+                event(
+                    first_event + 1,
+                    "approve",
+                    start + i128::from(approval_seconds) * 1_000_000_000,
+                    "open",
+                ),
+                event(
+                    first_event + 2,
+                    "ship",
+                    start + i128::from(approval_seconds + 3) * 1_000_000_000,
+                    "closed",
+                ),
+            ]);
+            objects.push(Object {
+                id: object_id,
+                external_id: format!("order-{case}"),
+                object_type: "Order".to_owned(),
+            });
+            for offset in 0..3 {
+                relations.push(EventObjectRelation {
+                    relation_id: first_event + offset,
+                    event_id: first_event + offset,
+                    object_id,
+                    qualifier: "case".to_owned(),
+                });
+            }
+        }
+        CanonicalLog {
+            dataset_id: "performance-parity".to_owned(),
+            tenant_id: "tenant".to_owned(),
+            events,
+            objects,
+            event_object_relations: relations,
             ..CanonicalLog::default()
         }
     }
@@ -1461,6 +1528,128 @@ mod tests {
             .expect("query");
         assert_eq!(result.total_matches, 1);
         assert!(!result.truncated);
+    }
+
+    #[test]
+    fn duckdb_and_local_bottleneck_kernels_have_semantic_parity() {
+        let directory = TestDirectory::new();
+        let canonical = performance_log();
+        write_canonical_snapshot(&canonical, &directory.0, "v1").expect("write snapshot");
+        let duckdb = DuckDbProvider::open(source(&directory.0)).expect("open provider");
+        let local = LocalProvider::new(canonical).expect("open local provider");
+
+        let request = ocpm_bottleneck::BottleneckRequest {
+            view: DatasetView {
+                object_types: vec!["Order".to_owned()],
+                ..DatasetView::default()
+            },
+            leading_object_type: Some("Order".to_owned()),
+            minimum_support: 2,
+            ..ocpm_bottleneck::BottleneckRequest::default()
+        };
+        let mut local_result = ocpm_bottleneck::analyze(&local, &request).unwrap();
+        let duckdb_result = ocpm_bottleneck::analyze(&duckdb, &request).unwrap();
+        local_result.diagnostics.provider = duckdb_result.diagnostics.provider.clone();
+        assert_eq!(local_result, duckdb_result);
+
+        let graph_request = ocpm_gnn::GnnBottleneckRequest {
+            view: request.view,
+            leading_object_type: request.leading_object_type,
+            minimum_support: 2,
+            epochs: 20,
+            patience: 5,
+            ..ocpm_gnn::GnnBottleneckRequest::default()
+        };
+        let local_artifact = ocpm_gnn::fit(&local, &graph_request).unwrap();
+        let duckdb_artifact = ocpm_gnn::fit(&duckdb, &graph_request).unwrap();
+        assert_eq!(local_artifact, duckdb_artifact);
+
+        let mut local_graph = ocpm_gnn::score(&local, &graph_request, &local_artifact).unwrap();
+        let duckdb_graph = ocpm_gnn::score(&duckdb, &graph_request, &duckdb_artifact).unwrap();
+        local_graph.diagnostics.provider = duckdb_graph.diagnostics.provider.clone();
+        assert_eq!(local_graph, duckdb_graph);
+    }
+
+    #[cfg(feature = "s3")]
+    #[test]
+    #[ignore = "requires MinIO, mc, preconfigured alias, and DuckDB extension download access"]
+    fn s3_parquet_bottleneck_paths_match_local_provider() {
+        let directory = TestDirectory::new();
+        let canonical = performance_log();
+        write_canonical_snapshot(&canonical, &directory.0, "v1").expect("write snapshot");
+
+        let mirror_target = std::env::var("OCPM_S3_TEST_MC_TARGET")
+            .expect("OCPM_S3_TEST_MC_TARGET must name a preconfigured mc alias path");
+        let status = Command::new("mc")
+            .arg("mirror")
+            .arg("--overwrite")
+            .arg(&directory.0)
+            .arg(&mirror_target)
+            .status()
+            .expect("run mc mirror");
+        assert!(status.success(), "mc mirror failed");
+
+        let catalog = directory.0.join("s3-client.duckdb");
+        drop(Connection::open(&catalog).expect("provision test catalog"));
+        let s3 = DuckDbProvider::open(DuckDbParquetSource {
+            database: DuckDbDatabase::Existing {
+                path: catalog,
+                read_only: false,
+            },
+            location: ParquetLocation::S3 {
+                uri: std::env::var("OCPM_S3_TEST_URI").expect("OCPM_S3_TEST_URI"),
+                region: Some("us-east-1".to_owned()),
+                endpoint: Some(
+                    std::env::var("OCPM_S3_TEST_ENDPOINT").expect("OCPM_S3_TEST_ENDPOINT"),
+                ),
+                url_style: Some(crate::S3UrlStyle::Path),
+                use_ssl: Some(false),
+            },
+            snapshot: SnapshotSelection::Current {
+                pointer: "CURRENT".to_owned(),
+            },
+            layout: crate::ParquetLayout::CanonicalV1,
+            cache: ParquetCachePolicy::Direct,
+            validation: SourceValidationPolicy::Strict,
+            credentials: Some(crate::S3CredentialReference {
+                chain: "env".to_owned(),
+                profile: None,
+            }),
+            options: DuckDbOptions {
+                connection_pool_size: 1,
+                max_parallelism: 1,
+                extension_policy: crate::ExtensionPolicy::InstallCore,
+                ..DuckDbOptions::default()
+            },
+        })
+        .expect("open S3 provider");
+        let local = LocalProvider::new(canonical).expect("open local provider");
+        let request = ocpm_bottleneck::BottleneckRequest {
+            view: DatasetView {
+                object_types: vec!["Order".to_owned()],
+                ..DatasetView::default()
+            },
+            leading_object_type: Some("Order".to_owned()),
+            minimum_support: 2,
+            ..ocpm_bottleneck::BottleneckRequest::default()
+        };
+        let mut local_result = ocpm_bottleneck::analyze(&local, &request).unwrap();
+        let s3_result = ocpm_bottleneck::analyze(&s3, &request).unwrap();
+        local_result.diagnostics.provider = s3_result.diagnostics.provider.clone();
+        assert_eq!(local_result, s3_result);
+
+        let graph_request = ocpm_gnn::GnnBottleneckRequest {
+            view: request.view,
+            leading_object_type: request.leading_object_type,
+            minimum_support: 2,
+            epochs: 20,
+            patience: 5,
+            ..ocpm_gnn::GnnBottleneckRequest::default()
+        };
+        assert_eq!(
+            ocpm_gnn::fit(&local, &graph_request).unwrap(),
+            ocpm_gnn::fit(&s3, &graph_request).unwrap()
+        );
     }
 
     #[test]

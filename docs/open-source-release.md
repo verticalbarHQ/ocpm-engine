@@ -20,18 +20,20 @@ history is not the public release artifact.
 6. Sign and publish a source archive and supported binary packages carrying
    LICENSE, NOTICE, copyright, and third-party notices.
 
-## Dual-licensing boundary
+## Open-source and commercial boundary
 
-The Apache-2.0 grant for a published core version is irrevocable subject to its
-terms. A private registry can control the supported delivery channel, update
-entitlement, and commercial services, but it cannot retract recipients'
-Apache-2.0 rights in that core.
+The Apache-2.0 core permits commercial use and redistribution without a
+separate commercial license. The grant for a published core version is
+irrevocable subject to its terms. A private registry may control access to a
+certified build, updates, support, and enterprise services, but it cannot
+retract recipients' Apache-2.0 rights in that core.
 
-Vertical Bar, Inc. may offer the same company-owned code and CLA-covered
-contributions under proprietary terms. Separately developed proprietary
-connectors, hosted operations, policy, support, or enterprise modules should
+General-purpose OCPM semantics, public APIs, provider interfaces, and
+performance paths remain in the public core. Separately developed proprietary
+connectors, hosted operations, governance, support, or enterprise modules must
 remain in distinct packages and repositories with explicit interfaces and
-license metadata.
+license metadata. See the
+[commercial offering boundary](https://github.com/verticalbarHQ/ocpm-engine/blob/main/COMMERCIAL.md).
 
 ## Contribution launch
 

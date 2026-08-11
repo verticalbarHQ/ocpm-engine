@@ -127,7 +127,26 @@ SELECT ocpm.version(),
        ) IS NOT NULL,
        to_regprocedure(
            'ocpm.lifecycle_variant_window_counts(bigint,bigint,timestamptz[],timestamptz[],text[],text[],text[],text[],text[],bigint)'
+       ) IS NOT NULL,
+       to_regprocedure(
+           'ocpm.bottleneck_observations(bigint,bigint,timestamptz,timestamptz,text,text[],text[])'
        ) IS NOT NULL
+"#;
+
+pub const BOTTLENECK_OBSERVATIONS_SQL: &str = r#"
+SELECT object_id, object_type,
+       source_event_id, source_activity,
+       source_timestamp, source_submicro_nanos,
+       source_lifecycle, source_attributes,
+       target_event_id, target_activity,
+       target_timestamp, target_submicro_nanos,
+       target_lifecycle, target_attributes
+FROM ocpm.bottleneck_observations(
+    $1, $2,
+    COALESCE($3::timestamptz, '-infinity'::timestamptz),
+    COALESCE($4::timestamptz, 'infinity'::timestamptz),
+    $5, $6, $7
+)
 "#;
 
 pub const BINDING_INDEX_COVERAGE_SQL: &str = r#"
@@ -240,6 +259,8 @@ pub enum AdapterError {
     InvalidWindowOrdinal(i32),
     #[error("lifecycle DFG query returned an invalid chunk")]
     InvalidLifecycleDfgChunk,
+    #[error("pg_ocpm bottleneck pushdown cannot preserve view predicate: {0}")]
+    UnsupportedBottleneckPushdown(String),
 }
 
 /// A decoded binding capsule plus its encoded wire size.
@@ -306,6 +327,7 @@ pub struct PgOcpmCapabilities {
     pub event_log_window_batches: bool,
     pub lifecycle_dfg_window_counts: bool,
     pub lifecycle_variant_window_counts: bool,
+    pub bottleneck_observations: bool,
 }
 
 impl PgOcpmCapabilities {
@@ -324,6 +346,10 @@ impl PgOcpmCapabilities {
     pub fn lifecycle_variant_pushdown(&self) -> bool {
         self.lifecycle_variant_window_counts
     }
+
+    pub fn bottleneck_pushdown(&self) -> bool {
+        self.bottleneck_observations
+    }
 }
 
 pub async fn pg_ocpm_capabilities(client: &Client) -> Result<PgOcpmCapabilities, AdapterError> {
@@ -335,6 +361,7 @@ pub async fn pg_ocpm_capabilities(client: &Client) -> Result<PgOcpmCapabilities,
         event_log_window_batches: row.try_get(3)?,
         lifecycle_dfg_window_counts: row.try_get(4)?,
         lifecycle_variant_window_counts: row.try_get(5)?,
+        bottleneck_observations: row.try_get(6)?,
     })
 }
 
@@ -1817,6 +1844,85 @@ pub async fn activity_profile(
         .collect())
 }
 
+/// Load the exact transition projection consumed by ocpm-engine's shared
+/// bottleneck kernel. Unsupported predicates fail closed so callers can use a
+/// canonical snapshot fallback without changing results.
+pub async fn load_bottleneck_observations(
+    client: &Client,
+    tenant_id: i64,
+    dataset_id: i64,
+    view: &ocpm_core::DatasetView,
+    leading_object_type: Option<&str>,
+) -> Result<Vec<ocpm_provider::BottleneckObservation>, AdapterError> {
+    let unsupported = [
+        (!view.qualifiers.is_empty(), "qualifiers"),
+        (!view.event_ids.is_empty(), "event_ids"),
+        (!view.object_ids.is_empty(), "object_ids"),
+        (!view.event_attributes.is_empty(), "event_attributes"),
+        (!view.object_attributes.is_empty(), "object_attributes"),
+        (!view.statuses.is_empty(), "statuses"),
+        (
+            !view.related_object_types.is_empty(),
+            "related_object_types",
+        ),
+        (
+            view.minimum_execution_duration_nanos.is_some(),
+            "minimum_execution_duration_nanos",
+        ),
+        (
+            view.maximum_execution_duration_nanos.is_some(),
+            "maximum_execution_duration_nanos",
+        ),
+    ];
+    if let Some((_, name)) = unsupported.into_iter().find(|(present, _)| *present) {
+        return Err(AdapterError::UnsupportedBottleneckPushdown(name.to_owned()));
+    }
+    client
+        .execute(
+            "SELECT set_config('ocpm.tenant_id', $1, false)",
+            &[&tenant_id.to_string()],
+        )
+        .await?;
+    let from = view.start.as_ref().map(timestamp_system_time).transpose()?;
+    let to = view.end.as_ref().map(timestamp_system_time).transpose()?;
+    let object_types = (!view.object_types.is_empty()).then_some(view.object_types.as_slice());
+    let activities = (!view.activities.is_empty()).then_some(view.activities.as_slice());
+    let rows = client
+        .query(
+            BOTTLENECK_OBSERVATIONS_SQL,
+            &[
+                &dataset_id,
+                &tenant_id,
+                &from,
+                &to,
+                &leading_object_type,
+                &object_types,
+                &activities,
+            ],
+        )
+        .await?;
+    rows.into_iter()
+        .map(|row| {
+            let source = system_timestamp(row.get(4));
+            let target = system_timestamp(row.get(10));
+            Ok(ocpm_provider::BottleneckObservation {
+                object_id: positive_id(row.get(0))?,
+                object_type: row.get(1),
+                source_event_id: positive_id(row.get(2))?,
+                source_activity: row.get(3),
+                source_timestamp_nanos: source.epoch_nanos_utc + row.get::<_, i16>(5) as i128,
+                source_lifecycle: row.get(6),
+                source_attributes: json_object_attributes(row.get(7))?,
+                target_event_id: positive_id(row.get(8))?,
+                target_activity: row.get(9),
+                target_timestamp_nanos: target.epoch_nanos_utc + row.get::<_, i16>(11) as i128,
+                target_lifecycle: row.get(12),
+                target_attributes: json_object_attributes(row.get(13))?,
+            })
+        })
+        .collect()
+}
+
 /// Load one canonical pg_ocpm 1.0 snapshot for provider-neutral execution.
 ///
 /// The caller supplies an already-authorized connection. This function sets the
@@ -2011,6 +2117,20 @@ fn system_timestamp(value: SystemTime) -> ocpm_core::Timestamp {
         Err(error) => -(error.duration().as_nanos() as i128),
     };
     ocpm_core::Timestamp::from_epoch_nanos(nanos)
+}
+
+fn timestamp_system_time(value: &ocpm_core::Timestamp) -> Result<SystemTime, AdapterError> {
+    let absolute = value.epoch_nanos_utc.unsigned_abs();
+    let seconds =
+        u64::try_from(absolute / 1_000_000_000).map_err(|_| AdapterError::TimestampOverflow)?;
+    let nanos = (absolute % 1_000_000_000) as u32;
+    let duration = std::time::Duration::new(seconds, nanos);
+    if value.epoch_nanos_utc >= 0 {
+        UNIX_EPOCH.checked_add(duration)
+    } else {
+        UNIX_EPOCH.checked_sub(duration)
+    }
+    .ok_or(AdapterError::TimestampOverflow)
 }
 
 fn json_object_attributes(

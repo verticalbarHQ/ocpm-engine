@@ -5,8 +5,8 @@ use ocpm_postgres::{
     PreparedBindingTreeQuery, PreparedEventLogQuery, PreparedEventWindowBatchQuery,
     RelationBindingSpec, activity_profile, binding_index_coverage,
     binding_relation_universal_equal, dfg_counts, dfg_window_counts, event_log_summary,
-    event_log_window_summaries, lifecycle_dfg_window_counts, load_canonical_snapshot,
-    pg_ocpm_capabilities, variant_counts, variant_window_counts,
+    event_log_window_summaries, lifecycle_dfg_window_counts, load_bottleneck_observations,
+    load_canonical_snapshot, pg_ocpm_capabilities, variant_counts, variant_window_counts,
 };
 use std::time::{Duration, SystemTime};
 
@@ -114,6 +114,25 @@ async fn canonical_pg_ocpm_1_snapshot_round_trips() {
     assert_eq!(log.objects.len(), 1);
     assert_eq!(log.event_object_relations.len(), 2);
     assert_eq!(log.events[0].activity, "create");
+
+    let observations = load_bottleneck_observations(
+        &client,
+        tenant_id,
+        dataset_id,
+        &ocpm_core::DatasetView::default(),
+        Some("order"),
+    )
+    .await
+    .expect("load canonical bottleneck observations");
+    assert_eq!(observations.len(), 1);
+    assert_eq!(observations[0].source_activity, "create");
+    assert_eq!(observations[0].target_activity, "approve");
+    assert!(
+        pg_ocpm_capabilities(&client)
+            .await
+            .expect("inspect pg_ocpm capabilities")
+            .bottleneck_pushdown()
+    );
 
     client
         .execute(

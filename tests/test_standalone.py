@@ -36,6 +36,60 @@ def canonical_fixture() -> dict:
     }
 
 
+def gnn_fixture() -> dict:
+    events = []
+    objects = []
+    relations = []
+    for case in range(16):
+        object_id = 100 + case
+        first_event = case * 3 + 1
+        start = case * 100_000_000_000
+        delay = 45 if case % 5 == 0 else 2 + case % 3
+        for offset, activity, timestamp in (
+            (0, "create", start),
+            (1, "approve", start + delay * 1_000_000_000),
+            (2, "ship", start + (delay + 3) * 1_000_000_000),
+        ):
+            event_id = first_event + offset
+            events.append(
+                {
+                    "id": event_id,
+                    "external_id": f"e{event_id}",
+                    "activity": activity,
+                    "timestamp": {"epoch_nanos_utc": timestamp},
+                    "sequence": offset,
+                    "attributes": {
+                        "org:resource": {
+                            "type": "string",
+                            "value": f"r{case % 3}",
+                        }
+                    },
+                }
+            )
+            relations.append(
+                {
+                    "relation_id": event_id,
+                    "event_id": event_id,
+                    "object_id": object_id,
+                    "qualifier": "case",
+                }
+            )
+        objects.append(
+            {
+                "id": object_id,
+                "external_id": f"order-{case}",
+                "object_type": "Order",
+            }
+        )
+    return {
+        "dataset_id": "gnn-fixture",
+        "tenant_id": "tenant",
+        "events": events,
+        "objects": objects,
+        "event_object_relations": relations,
+    }
+
+
 def provision_duckdb_catalog(path) -> None:
     library = ctypes.CDLL(os.environ.get("OCPM_DUCKDB_LIBRARY", "libduckdb.so"))
     library.duckdb_open.argtypes = [ctypes.c_char_p, ctypes.POINTER(ctypes.c_void_p)]
@@ -75,6 +129,30 @@ def test_standalone_profiles_queries_discovers_and_exports() -> None:
     assert "create" in serialize_model(artifact, "dot")
     assert engine.canonical_json()["dataset_id"] == "fixture"
     assert engine.ocel2_json()["events"][0]["id"] == "e1"
+
+
+def test_standalone_gnn_bottleneck_fit_score_and_detect() -> None:
+    engine = StandaloneEngine(gnn_fixture())
+    request = {
+        "semantic_version": "1.0",
+        "view": {"object_types": ["Order"]},
+        "leading_object_type": "Order",
+        "minimum_support": 2,
+        "epochs": 20,
+        "patience": 5,
+    }
+
+    artifact = engine.fit_gnn_bottlenecks(request)
+    scored = engine.score_gnn_bottlenecks(request, artifact)
+    detected = engine.gnn_bottlenecks(request)
+
+    assert artifact["model_hash"].startswith("sha256:")
+    assert scored["model_hash"] == artifact["model_hash"]
+    assert detected["model_hash"] == artifact["model_hash"]
+    assert detected["diagnostics"]["exact"] is False
+    assert detected["diagnostics"]["observation_count"] == 32
+    assert detected["training"]["validation_count"] == 7
+    assert detected["signals"]
 
 
 def test_standalone_incremental_append_is_atomic() -> None:

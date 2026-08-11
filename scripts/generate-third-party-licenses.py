@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import pathlib
+import shutil
 import subprocess
 import tempfile
 
@@ -41,10 +42,12 @@ def main() -> None:
             )
         rendered = generated.read_text(encoding="utf-8")
         generated.write_text(
-            "\n".join(line.rstrip() for line in rendered.splitlines()) + "\n",
+            "\n".join(line.rstrip() for line in rendered.splitlines()).rstrip() + "\n",
             encoding="utf-8",
         )
-        generated.replace(ROOT / "THIRD_PARTY_LICENSES.html")
+        # The generator is also run from a Docker build with the repository on
+        # a bind mount; `/tmp` and the workspace may be different filesystems.
+        shutil.copyfile(generated, ROOT / "THIRD_PARTY_LICENSES.html")
     (ROOT / "THIRD_PARTY_LICENSES_INPUT.sha256").write_text(
         input_digest() + "\n",
         encoding="ascii",

@@ -72,9 +72,7 @@ request = DynamicDfgRequest.from_mapping(
         "filter": {
             "statuses": ["complete"],
             "activities": {"include": ["Order:Approved"]},
-            "event_attributes": {
-                "include": [{"key": "region", "value": "west"}]
-            },
+            "event_attributes": {"include": [{"key": "region", "value": "west"}]},
             "edges": {
                 "include": [
                     {
@@ -126,10 +124,14 @@ a path or edge is absent from a window.
 ## Capabilities and coverage
 
 ```python
-PgOcpmCapabilities(version, event_log_rows, event_log_batches,
-                   event_log_window_batches,
-                   lifecycle_dfg_window_counts=False,
-                   lifecycle_variant_window_counts=False)
+PgOcpmCapabilities(
+    version,
+    event_log_rows,
+    event_log_batches,
+    event_log_window_batches,
+    lifecycle_dfg_window_counts=False,
+    lifecycle_variant_window_counts=False,
+)
 ```
 
 Convenience properties: `factorized_event_export`,
@@ -137,9 +139,16 @@ Convenience properties: `factorized_event_export`,
 `lifecycle_variant_pushdown`.
 
 ```python
-BindingIndexCoverage(refreshed_at, source_watermark,
-                     event_identity_complete, object_types, activities,
-                     event_activities, neighbors, relations)
+BindingIndexCoverage(
+    refreshed_at,
+    source_watermark,
+    event_identity_complete,
+    object_types,
+    activities,
+    event_activities,
+    neighbors,
+    relations,
+)
 ```
 
 Observable binding-index declarations and dataset refresh markers, with

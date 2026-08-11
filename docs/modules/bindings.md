@@ -41,7 +41,7 @@ Decode factorized groups without expanding their Cartesian products. Each
 ```python
 from ocpm_engine import binding_capsule_info, decode_binding_capsule
 
-cursor.execute(sql, params)          # any ocpm.binding_* capsule result
+cursor.execute(sql, params)  # any ocpm.binding_* capsule result
 capsule = cursor.fetchone()[0]
 
 info = binding_capsule_info(capsule)

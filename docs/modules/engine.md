@@ -111,10 +111,8 @@ request = EventLogRequest(
         EventLogWindow(test_start, test_end),
     ),
 )
-execution = engine.execute_event_log_summary(
-    cursor, request, capabilities=capabilities
-)
-assert execution.expanded_event_rows == 0   # factorized 0.9 path
+execution = engine.execute_event_log_summary(cursor, request, capabilities=capabilities)
+assert execution.expanded_event_rows == 0  # factorized 0.9 path
 training, test = execution.summaries
 ```
 

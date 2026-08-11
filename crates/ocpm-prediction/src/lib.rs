@@ -75,6 +75,12 @@ impl PredictionArtifact {
                 "prediction artifact content hash does not match",
             ));
         }
+        if !matches!(self.feature_encoding.as_str(), "sequential" | "tabular") {
+            return Err(OcpmError::new(
+                OcpmErrorCode::ArtifactIncompatible,
+                "graph/GNN artifacts belong to the optional ocpm-gnn module",
+            ));
+        }
         Ok(())
     }
 }
@@ -102,14 +108,7 @@ pub fn fit(
         .and_then(|value| value.as_str())
         .unwrap_or("sequential")
         .to_owned();
-    if !matches!(
-        feature_encoding.as_str(),
-        "sequential" | "tabular" | "graph"
-    ) {
-        return Err(OcpmError::invalid_request(
-            "feature_encoding must be sequential, tabular, or graph",
-        ));
-    }
+    validate_feature_encoding(&feature_encoding)?;
     let leading = request
         .parameters
         .get("leading_object_type")
@@ -376,6 +375,7 @@ pub fn evaluate_temporal_holdout(
         .and_then(|value| value.as_str())
         .unwrap_or("sequential")
         .to_owned();
+    validate_feature_encoding(&feature_encoding)?;
     let target_attribute = parameters
         .get("target_attribute")
         .and_then(|value| value.as_str())
@@ -513,6 +513,20 @@ fn prefix_key(values: &[String]) -> String {
     serde_json::to_string(values).expect("activity vectors are serializable")
 }
 
+fn validate_feature_encoding(value: &str) -> OcpmResult<()> {
+    if value == "graph" {
+        return Err(OcpmError::invalid_request(
+            "graph/GNN prediction belongs to the optional ocpm-gnn module",
+        ));
+    }
+    if !matches!(value, "sequential" | "tabular") {
+        return Err(OcpmError::invalid_request(
+            "feature_encoding must be sequential or tabular",
+        ));
+    }
+    Ok(())
+}
+
 fn feature_key(
     values: &[String],
     encoding: &str,
@@ -528,12 +542,6 @@ fn feature_key(
             "object_count": object_count,
         }))
         .expect("tabular features are serializable"),
-        "graph" => serde_json::to_string(&serde_json::json!({
-            "encoding": "graph",
-            "activity_suffix": values,
-            "object_count": object_count,
-        }))
-        .expect("graph features are serializable"),
         _ => prefix_key(values),
     }
 }
@@ -592,5 +600,11 @@ mod tests {
             backoff_key(&path, 0, 3, "sequential", |key| key == supported),
             Some((supported, 1))
         );
+    }
+
+    #[test]
+    fn graph_encoding_requires_the_optional_gnn_module() {
+        let error = validate_feature_encoding("graph").unwrap_err();
+        assert!(error.message.contains("ocpm-gnn"));
     }
 }

@@ -91,9 +91,22 @@ DFG, OC-DFG, Alpha, process-tree, Petri-net, OCPN, and declarative discovery.
 ```python
 conformance(request: Mapping) -> dict
 enhance(request: Mapping) -> dict
+bottlenecks(request: Mapping) -> dict
 ```
 Conformance checking and model enhancement (frequencies, durations,
-bottlenecks).
+bottlenecks). `bottlenecks` runs the full provider-neutral tail, synchronization,
+waiting-cause, queue, drift, spectrum, and cascade suite described in the
+[bottleneck analysis contract](../bottleneck-analysis.md).
+
+```python
+fit_gnn_bottlenecks(request: Mapping) -> dict
+score_gnn_bottlenecks(request: Mapping, artifact: Mapping) -> dict
+gnn_bottlenecks(request: Mapping) -> dict
+```
+The optional CPU graph module can fit a portable artifact, score one, or fit
+and score in one provider scan. It uses the same accelerated transition
+projection for local, DuckDB, and PostgreSQL data, with all graph semantics in
+the engine. See [graph-aware bottleneck detection](../bottleneck-analysis.md#graph-aware-bottleneck-detection).
 
 ```python
 fit_prediction(request: Mapping) -> dict
@@ -103,7 +116,10 @@ evaluate_prediction(view: Mapping, target: str, *,
                     parameters: Mapping | None = None) -> dict
 ```
 Prediction: fit a model, predict, or run a temporal holdout evaluation for
-`target` on the selected view.
+`target` on the selected view. Core prediction accepts `sequential` and
+`tabular` feature encodings. Predictive Graph/GNN tasks use the separate
+optional `ocpm_engine.gnn` backend protocol; graph-aware bottleneck detection
+uses the built-in optional CPU module above.
 
 ```python
 execution_summary(request: Mapping) -> dict
