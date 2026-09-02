@@ -3,6 +3,10 @@
   "workloads": [
     {
       "name": "deterministic_smoke",
+      "expected_input": {
+        "workload": "deterministic_smoke",
+        "values": [1, 2, 3, 5, 8]
+      },
       "payload": {
         "memory_kib": 2048,
         "sleep_ms": 100,

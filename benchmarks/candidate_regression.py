@@ -313,6 +313,9 @@ def benchmark_workload(
     input_sha256, answer_sha256 = require_same_answer(
         name, preflight["baseline"], preflight["candidate"]
     )
+    expected_input_sha256 = sha256_bytes(canonical(workload["expected_input"]))
+    if input_sha256 != expected_input_sha256:
+        raise RuntimeError(f"{name}: worker input does not match manifest")
     for _ in range(args.warmups):
         for arm in ("baseline", "candidate"):
             result = invoke(workers[arm], request, args.timeout_seconds)
@@ -401,10 +404,16 @@ def load_manifest(path: Path) -> dict[str, Any]:
     if value["schema_version"] != 1 or not isinstance(value["workloads"], list):
         raise RuntimeError("invalid candidate manifest")
     for workload in value["workloads"]:
-        if not isinstance(workload, dict) or set(workload) != {"name", "payload"}:
+        if not isinstance(workload, dict) or set(workload) != {
+            "name",
+            "payload",
+            "expected_input",
+        }:
             raise RuntimeError("candidate workload fields changed")
         if not isinstance(workload["name"], str) or not workload["name"]:
             raise RuntimeError("candidate workload name is invalid")
+        if not isinstance(workload["expected_input"], dict):
+            raise RuntimeError("candidate workload expected input is invalid")
     return value
 
 

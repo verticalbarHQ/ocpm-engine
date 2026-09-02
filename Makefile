@@ -87,4 +87,5 @@ perf-candidate-check: check-python
 		(echo "BASELINE_SOURCE is required" >&2; exit 2)
 	$(PYTHON) benchmarks/check_candidate_regression.py \
 		--baseline-source "$(BASELINE_SOURCE)" \
+		--manifest benchmarks/fixtures/candidate-gate-engine.json \
 		"$(or $(CANDIDATE_RESULT),.benchmarks/candidate-regression.json)"

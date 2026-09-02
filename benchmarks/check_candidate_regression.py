@@ -20,6 +20,17 @@ CONCURRENCY_CEILING = 1.10
 CONCURRENCY_ABSOLUTE_SLACK_NS = 100_000
 STORAGE_CEILING = 1.01
 MAX_CONCURRENCY_QPS_CV = 0.15
+EXPECTED_GATE_SETTINGS = {
+    "random_seed": 1729,
+    "warmups": 4,
+    "latency_epochs": 3,
+    "samples_per_epoch": 20,
+    "memory_samples": 4,
+    "concurrency_levels": [1, 2, 4],
+    "concurrency_epochs": 5,
+    "concurrency_requests_per_worker": 8,
+    "concurrency_min_seconds": 5.0,
+}
 
 
 def canonical_payload(value: dict[str, Any]) -> bytes:
@@ -70,6 +81,37 @@ def source_provenance(repository: Path) -> dict[str, Any]:
         "tree_clean": not bool(status),
         "tree_sha256": hashlib.sha256(tracked + canonical(untracked)).hexdigest(),
     }
+
+
+def manifest_expectations(path: Path) -> tuple[str, list[dict[str, str]]]:
+    value = json.loads(path.read_text())
+    if not isinstance(value, dict) or set(value) != {"schema_version", "workloads"}:
+        fail("candidate manifest fields changed")
+    workloads = value["workloads"]
+    if value["schema_version"] != 1 or not isinstance(workloads, list) or not workloads:
+        fail("invalid candidate manifest")
+    expected = []
+    names = set()
+    for workload in workloads:
+        if not isinstance(workload, dict) or set(workload) != {
+            "name",
+            "payload",
+            "expected_input",
+        }:
+            fail("candidate workload fields changed")
+        name = workload["name"]
+        if not isinstance(name, str) or not name or name in names:
+            fail("candidate workload name is invalid or duplicated")
+        names.add(name)
+        expected.append(
+            {
+                "name": name,
+                "input_sha256": hashlib.sha256(
+                    canonical(workload["expected_input"])
+                ).hexdigest(),
+            }
+        )
+    return file_sha256(path), expected
 
 
 def fail(message: str) -> None:
@@ -170,6 +212,9 @@ def validate(
     expected_candidate_source: dict[str, Any] | None = None,
     expected_baseline_lock_sha256: str | None = None,
     expected_candidate_lock_sha256: str | None = None,
+    expected_manifest_sha256: str | None = None,
+    expected_workloads: list[dict[str, str]] | None = None,
+    expected_gate_settings: dict[str, Any] | None = None,
 ) -> None:
     required = {
         "schema_version",
@@ -203,6 +248,18 @@ def validate(
     for name, expected in expected_limits.items():
         if settings.get(name) != expected:
             fail(f"settings/{name}: threshold changed")
+    if expected_gate_settings is not None:
+        for name, expected in expected_gate_settings.items():
+            if settings.get(name) != expected:
+                fail(f"settings/{name}: gate setting changed")
+    concurrency_levels = settings.get("concurrency_levels")
+    if (
+        not isinstance(concurrency_levels, list)
+        or not concurrency_levels
+        or any(type(level) is not int or level < 1 for level in concurrency_levels)
+        or len(set(concurrency_levels)) != len(concurrency_levels)
+    ):
+        fail("settings/concurrency_levels: levels must be nonempty unique positives")
     controller = value["controller"]
     arms = value["arms"]
     if (
@@ -251,10 +308,28 @@ def validate(
                 "candidate": expected_candidate_lock_sha256,
             }[arm],
         )
-    if value["fixture"].get("workload_count") != len(value["workloads"]):
+    fixture = value["fixture"]
+    if not isinstance(fixture, dict) or set(fixture) != {
+        "manifest_sha256",
+        "workload_count",
+    }:
+        fail("fixture fields changed")
+    if fixture.get("workload_count") != len(value["workloads"]):
         fail("fixture workload count mismatch")
     if not value["workloads"]:
         fail("artifact has no workloads")
+    if (
+        expected_manifest_sha256 is not None
+        and fixture.get("manifest_sha256") != expected_manifest_sha256
+    ):
+        fail("fixture manifest does not match the gate manifest")
+    if expected_workloads is not None:
+        actual_workloads = [
+            {"name": workload.get("name"), "input_sha256": workload.get("input_sha256")}
+            for workload in value["workloads"]
+        ]
+        if actual_workloads != expected_workloads:
+            fail("workload inputs do not match the gate manifest")
 
     for workload in value["workloads"]:
         name = workload.get("name", "unknown")
@@ -317,6 +392,8 @@ def validate(
             fail(f"{name}: storage regression")
 
         concurrency = workload.get("concurrency")
+        if not isinstance(concurrency, list) or not concurrency:
+            fail(f"{name}: concurrency evidence is empty")
         if [row.get("workers") for row in concurrency] != settings[
             "concurrency_levels"
         ]:
@@ -385,6 +462,7 @@ def main() -> None:
     parser.add_argument("--controller-source", type=Path, default=root)
     parser.add_argument("--baseline-source", required=True, type=Path)
     parser.add_argument("--candidate-source", type=Path, default=root)
+    parser.add_argument("--manifest", required=True, type=Path)
     parser.add_argument("--allow-dirty-controller", action="store_true")
     parser.add_argument("--allow-dirty-candidate", action="store_true")
     parser.add_argument("--allow-unverified-workers", action="store_true")
@@ -394,6 +472,7 @@ def main() -> None:
     controller_source = source_provenance(args.controller_source)
     baseline_source = source_provenance(args.baseline_source)
     candidate_source = source_provenance(args.candidate_source)
+    manifest_sha256, expected_workloads = manifest_expectations(args.manifest)
 
     validate(
         value,
@@ -410,6 +489,9 @@ def main() -> None:
         expected_candidate_lock_sha256=file_sha256(
             args.candidate_source / "Cargo.lock"
         ),
+        expected_manifest_sha256=manifest_sha256,
+        expected_workloads=expected_workloads,
+        expected_gate_settings=EXPECTED_GATE_SETTINGS,
     )
     print(f"candidate regression artifact valid: {args.artifact}")
 

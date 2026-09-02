@@ -9,7 +9,11 @@ from pathlib import Path
 import pytest
 
 import benchmarks.candidate_regression as candidate_regression
-from benchmarks.check_candidate_regression import payload_sha256, validate
+from benchmarks.check_candidate_regression import (
+    manifest_expectations,
+    payload_sha256,
+    validate,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKER = ROOT / "tests/fixtures/candidate_gate_worker.py"
@@ -141,6 +145,53 @@ def test_checker_rejects_a_historical_payload_without_workloads(artifact: dict) 
     changed["workloads"] = []
     changed["fixture"]["workload_count"] = 0
     with pytest.raises(ValueError, match="no workloads"):
+        validate(
+            resign(changed),
+            allow_dirty_controller=True,
+            allow_dirty_candidate=True,
+            allow_unverified_workers=True,
+        )
+
+
+def test_checker_binds_workloads_to_the_expected_manifest(artifact: dict) -> None:
+    manifest_sha256, expected_workloads = manifest_expectations(MANIFEST)
+    validate(
+        artifact,
+        allow_dirty_controller=True,
+        allow_dirty_candidate=True,
+        allow_unverified_workers=True,
+        expected_manifest_sha256=manifest_sha256,
+        expected_workloads=expected_workloads,
+    )
+    wrong_manifest = copy.deepcopy(artifact)
+    wrong_manifest["fixture"]["manifest_sha256"] = "0" * 64
+    with pytest.raises(ValueError, match="fixture manifest does not match"):
+        validate(
+            resign(wrong_manifest),
+            allow_dirty_controller=True,
+            allow_dirty_candidate=True,
+            allow_unverified_workers=True,
+            expected_manifest_sha256=manifest_sha256,
+            expected_workloads=expected_workloads,
+        )
+    changed = copy.deepcopy(artifact)
+    changed["workloads"][0]["input_sha256"] = "0" * 64
+    with pytest.raises(ValueError, match="workload inputs do not match"):
+        validate(
+            resign(changed),
+            allow_dirty_controller=True,
+            allow_dirty_candidate=True,
+            allow_unverified_workers=True,
+            expected_manifest_sha256=manifest_sha256,
+            expected_workloads=expected_workloads,
+        )
+
+
+def test_checker_rejects_empty_concurrency_evidence(artifact: dict) -> None:
+    changed = copy.deepcopy(artifact)
+    changed["settings"]["concurrency_levels"] = []
+    changed["workloads"][0]["concurrency"] = []
+    with pytest.raises(ValueError, match="levels must be nonempty"):
         validate(
             resign(changed),
             allow_dirty_controller=True,
