@@ -4,6 +4,11 @@ All notable changes to `ocpm-engine` are documented here. Dates use ISO 8601.
 
 ## Unreleased
 
+- Added opt-in request execution contexts, cooperative DuckDB cancellation,
+  isolated session-owned catalogs and spill directories, aggregate profile and
+  bottleneck-observation projection, and explicit population/source-capability
+  envelopes. Existing synchronous provider methods and population semantics
+  remain the compatibility defaults.
 - Added a prominently linked bottleneck algorithm catalog that names every
   implemented deterministic and probabilistic method, summarizes its approach,
   and identifies its output, evidence requirements, exactness, and academic

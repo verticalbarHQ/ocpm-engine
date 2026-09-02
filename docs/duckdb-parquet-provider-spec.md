@@ -607,6 +607,23 @@ Fallback rules:
 No result is approximate unless the public request explicitly selects a
 versioned approximate algorithm and the result reports its error contract.
 
+Explicit population selectors are opt-in and do not change `DatasetView` or
+legacy bottleneck semantics. Their time windows are half-open: event-time
+selection retains the events in the window, leading-object-start selection
+retains full filtered executions whose first event is in the window, and
+execution-contained selection retains full filtered executions whose first and
+last events are both in the window. A case-set selector intersects a supplied
+stable leading-object set with the source. Every resolved result reports the
+selector and the number of existing selected leading objects. The initial
+population entry point rejects `comparison_view` rather than silently applying
+different population semantics to the two sides.
+
+Analysis capability reports describe the source contract, not whether one
+particular view happens to contain a non-null value. An available capability
+may therefore produce a valid empty result. Providers that do not declare an
+optional capability default to an explicit unavailable reason; existing
+third-party provider implementations remain source compatible.
+
 ## 14. Concurrency and resource model
 
 - One provider connects to one caller-selected DuckDB database/catalog through
@@ -615,17 +632,27 @@ versioned approximate algorithm and the result reports its error contract.
   database file.
 - Read queries use pinned immutable Parquet relations. Source writes are not
   performed through query connections.
-- DuckDB `threads` is bounded by `EngineOptions.max_parallelism`. Admission
-  control accounts for both request concurrency and DuckDB worker threads to
-  prevent oversubscription.
-- `memory_limit`, `max_temp_directory_size`, and the temp directory are set
-  from engine options before configuration is locked.
+- DuckDB `threads` is bounded per connection by
+  `DuckDbOptions.max_parallelism`. Admission control accounts for both request
+  concurrency and per-connection DuckDB worker threads to prevent
+  oversubscription.
+- `memory_limit` and `max_temp_directory_size` are per pooled connection and
+  are set from engine options before configuration is locked. Admission must
+  account for the connection count; isolated sessions give every connection a
+  private spill directory.
 - Engine memory accounting includes batch buffers, decoded strings, result
   materialization, overlay state, and cache metadata. DuckDB-reported memory,
   process RSS, spill bytes, and remote bytes are recorded separately.
-- A failed query releases its connection and intermediate buffers. A future
-  provider-contract revision will add deadline/cancellation tokens and DuckDB
-  interruption; 1.1.0 does not advertise a cancellation API.
+- A failed query releases its connection and intermediate buffers. The 1.1.0
+  synchronous API remains unchanged; the additive provider contract also
+  offers request-scoped deadline/cancellation contexts. DuckDB queries that
+  execute through the context-aware connection path are interrupted and leave
+  the connection reusable. Compatibility fallbacks check the context before
+  and after their legacy operation but cannot preempt that operation.
+- Callers that need session-local catalog and spill ownership may opt into an
+  isolated provider session. Each session owns one in-memory catalog and spill
+  directory per pooled connection and removes its session directory when
+  dropped; legacy provider construction keeps its existing catalog behavior.
 - The aggregate result cache is byte-bounded, generation-scoped, disableable,
   and least-recently-used.
 
