@@ -46,8 +46,33 @@ impl From<DuckDbProviderError> for OcpmError {
                 OcpmError::new(OcpmErrorCode::UnsupportedFormat, message)
             }
             DuckDbProviderError::Canonical(error) => error,
+            DuckDbProviderError::DuckDb(error) => classify_duckdb_failure(error.to_string()),
             other => OcpmError::new(OcpmErrorCode::ProviderUnavailable, other.to_string()),
         }
+    }
+}
+
+fn classify_duckdb_failure(message: String) -> OcpmError {
+    let normalized = message.to_ascii_lowercase();
+    if normalized.contains("max_temp_directory_size")
+        || normalized.contains("temp directory size limit")
+    {
+        return resource_limit_without_observed_values(message, "max_temp_bytes");
+    }
+    if normalized.contains("out of memory") || normalized.contains("memory limit") {
+        return resource_limit_without_observed_values(message, "memory_budget_bytes");
+    }
+    OcpmError::new(OcpmErrorCode::ProviderUnavailable, message)
+}
+
+fn resource_limit_without_observed_values(message: String, field_path: &str) -> OcpmError {
+    OcpmError {
+        code: OcpmErrorCode::ResourceLimit,
+        message,
+        retryable: true,
+        field_path: Some(field_path.to_owned()),
+        limit: None,
+        actual: None,
     }
 }
 
@@ -208,4 +233,24 @@ pub(crate) fn parse_attribute(
             AttributeValue::String(serde_json::to_string(value)?)
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn duckdb_resource_failures_have_stable_typed_fields() {
+        let memory = classify_duckdb_failure("Out of Memory Error".to_owned());
+        assert_eq!(memory.code, OcpmErrorCode::ResourceLimit);
+        assert_eq!(memory.field_path.as_deref(), Some("memory_budget_bytes"));
+        assert_eq!((memory.limit, memory.actual), (None, None));
+
+        let spill = classify_duckdb_failure("max_temp_directory_size reached".to_owned());
+        assert_eq!(spill.code, OcpmErrorCode::ResourceLimit);
+        assert_eq!(spill.field_path.as_deref(), Some("max_temp_bytes"));
+
+        let provider = classify_duckdb_failure("network read failed".to_owned());
+        assert_eq!(provider.code, OcpmErrorCode::ProviderUnavailable);
+    }
 }

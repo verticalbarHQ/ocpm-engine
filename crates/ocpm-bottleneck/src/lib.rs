@@ -6,7 +6,10 @@
 //! source from another process-mining project was consulted.
 
 use ocpm_core::{AttributeValue, DatasetView, EventId, ObjectId, OcpmError, OcpmResult};
-use ocpm_provider::{BottleneckObservation, BottleneckObservationRequest, OcpmProvider};
+use ocpm_provider::{
+    BottleneckObservation, BottleneckObservationProjection, BottleneckObservationRequest,
+    ExecutionContext, OcpmProvider,
+};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
@@ -245,18 +248,25 @@ pub fn analyze(
     request: &BottleneckRequest,
 ) -> OcpmResult<BottleneckResult> {
     validate_request(request)?;
-    let observations = provider.bottleneck_observations(&BottleneckObservationRequest {
-        view: request.view.clone(),
-        leading_object_type: request.leading_object_type.clone(),
-    })?;
+    let projection = observation_projection(request);
+    let observations = provider.projected_bottleneck_observations(
+        &BottleneckObservationRequest {
+            view: request.view.clone(),
+            leading_object_type: request.leading_object_type.clone(),
+        },
+        &projection,
+    )?;
     let comparison = request
         .comparison_view
         .as_ref()
         .map(|view| {
-            provider.bottleneck_observations(&BottleneckObservationRequest {
-                view: view.clone(),
-                leading_object_type: request.leading_object_type.clone(),
-            })
+            provider.projected_bottleneck_observations(
+                &BottleneckObservationRequest {
+                    view: view.clone(),
+                    leading_object_type: request.leading_object_type.clone(),
+                },
+                &projection,
+            )
         })
         .transpose()?;
     analyze_observations(
@@ -267,16 +277,101 @@ pub fn analyze(
     )
 }
 
+pub fn analyze_with_context(
+    provider: &dyn OcpmProvider,
+    request: &BottleneckRequest,
+    context: &ExecutionContext,
+) -> OcpmResult<BottleneckResult> {
+    // Providers may interrupt observation acquisition. The shared CPU kernel
+    // remains cooperative at phase boundaries so legacy analytical semantics
+    // and provider contracts stay unchanged.
+    validate_request(request)?;
+    let projection = observation_projection(request);
+    let observations = provider.projected_bottleneck_observations_with_context(
+        &BottleneckObservationRequest {
+            view: request.view.clone(),
+            leading_object_type: request.leading_object_type.clone(),
+        },
+        &projection,
+        context,
+    )?;
+    context.check()?;
+    let comparison = request
+        .comparison_view
+        .as_ref()
+        .map(|view| {
+            provider.projected_bottleneck_observations_with_context(
+                &BottleneckObservationRequest {
+                    view: view.clone(),
+                    leading_object_type: request.leading_object_type.clone(),
+                },
+                &projection,
+                context,
+            )
+        })
+        .transpose()?;
+    context.check()?;
+    let result = analyze_observations_with_context(
+        provider.name(),
+        &observations,
+        comparison.as_deref(),
+        request,
+        context,
+    )?;
+    context.check()?;
+    Ok(result)
+}
+
+fn observation_projection(request: &BottleneckRequest) -> BottleneckObservationProjection {
+    let mut attribute_names =
+        BTreeSet::from([request.resource_attribute.clone(), "resource".to_owned()]);
+    attribute_names.extend(
+        request
+            .hypotheses
+            .iter()
+            .filter_map(|hypothesis| hypothesis.cause_attribute.clone()),
+    );
+    BottleneckObservationProjection::new(attribute_names.into_iter().collect())
+}
+
 pub fn analyze_observations(
     provider_name: &str,
     observations: &[BottleneckObservation],
     comparison: Option<&[BottleneckObservation]>,
     request: &BottleneckRequest,
 ) -> OcpmResult<BottleneckResult> {
+    analyze_observations_checked(provider_name, observations, comparison, request, || Ok(()))
+}
+
+/// Analyze already acquired observations while honoring cancellation and
+/// deadlines between CPU-intensive analytical phases.
+pub fn analyze_observations_with_context(
+    provider_name: &str,
+    observations: &[BottleneckObservation],
+    comparison: Option<&[BottleneckObservation]>,
+    request: &BottleneckRequest,
+    context: &ExecutionContext,
+) -> OcpmResult<BottleneckResult> {
+    analyze_observations_checked(provider_name, observations, comparison, request, || {
+        context.check()
+    })
+}
+
+fn analyze_observations_checked(
+    provider_name: &str,
+    observations: &[BottleneckObservation],
+    comparison: Option<&[BottleneckObservation]>,
+    request: &BottleneckRequest,
+    mut check: impl FnMut() -> OcpmResult<()>,
+) -> OcpmResult<BottleneckResult> {
     validate_request(request)?;
+    check()?;
     let (signals, distributions) = edge_signals(observations, request);
+    check()?;
     let synchronization = synchronization(observations, request.minimum_support);
+    check()?;
     let instances = lifecycle_instances(observations, &request.resource_attribute);
+    check()?;
     let mut warnings = Vec::new();
     if instances.is_empty() {
         warnings.push(
@@ -301,13 +396,19 @@ pub fn analyze_observations(
         );
     }
     let waiting_causes = waiting_causes(&instances, request);
+    check()?;
     let resource_pressure = resource_pressure(&instances, request.minimum_support);
+    check()?;
     let patterns = performance_patterns(&instances, request);
+    check()?;
     let cascades = blocking_cascades(&instances, request.minimum_support);
+    check()?;
     let changes = comparison
         .map(|baseline| drift_changes(baseline, &distributions, request))
         .unwrap_or_default();
+    check()?;
     let hypotheses = temporal_hypotheses(observations, request);
+    check()?;
     Ok(BottleneckResult {
         semantic_version: "1.0".to_owned(),
         signals,
@@ -553,6 +654,15 @@ fn lifecycle_instances(
     observations: &[BottleneckObservation],
     resource_attribute: &str,
 ) -> Vec<ActivityInstance> {
+    // A source with no lifecycle projection cannot yield paired activity
+    // instances. Avoid cloning every event and attribute map merely to prove
+    // that the result is empty; this is especially important for providers
+    // that stream millions of transition observations.
+    if observations.iter().all(|observation| {
+        observation.source_lifecycle.is_none() && observation.target_lifecycle.is_none()
+    }) {
+        return Vec::new();
+    }
     let mut points =
         BTreeMap::<(ObjectId, String), BTreeMap<(i128, u64, EventId), EventPoint>>::new();
     for observation in observations {
@@ -1050,6 +1160,9 @@ fn temporal_hypotheses(
     observations: &[BottleneckObservation],
     request: &BottleneckRequest,
 ) -> Vec<CausalHypothesisResult> {
+    if request.hypotheses.is_empty() {
+        return Vec::new();
+    }
     let mut by_object = BTreeMap::<ObjectId, Vec<&BottleneckObservation>>::new();
     for observation in observations {
         by_object
@@ -1662,5 +1775,23 @@ mod tests {
             + causes.unavailability_seconds
             + causes.extraneous_seconds;
         assert!((attributed - causes.total_wait_seconds).abs() < 1e-9);
+    }
+
+    #[test]
+    fn context_aware_analysis_checks_between_cpu_phases() {
+        let context = ExecutionContext::new();
+        let cancellation = context.cancellation();
+        let mut checks = 0;
+        let error =
+            analyze_observations_checked("test", &[], None, &BottleneckRequest::default(), || {
+                checks += 1;
+                if checks == 4 {
+                    cancellation.cancel();
+                }
+                context.check()
+            })
+            .unwrap_err();
+        assert_eq!(checks, 4);
+        assert_eq!(error.code, ocpm_core::OcpmErrorCode::Cancelled);
     }
 }

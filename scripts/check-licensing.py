@@ -84,8 +84,18 @@ def main() -> None:
         "generated third-party license bundle is missing",
     )
     digest = hashlib.sha256()
-    for name in ("Cargo.lock", "about.toml", "about.hbs"):
-        digest.update((ROOT / name).read_bytes())
+    dependency_inputs = [
+        ROOT / "Cargo.lock",
+        ROOT / "Cargo.toml",
+        ROOT / "about.toml",
+        ROOT / "about.hbs",
+        *sorted((ROOT / "crates").glob("*/Cargo.toml")),
+    ]
+    for path in dependency_inputs:
+        digest.update(path.relative_to(ROOT).as_posix().encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
     recorded_digest = (ROOT / "THIRD_PARTY_LICENSES_INPUT.sha256").read_text().strip()
     if recorded_digest != digest.hexdigest():
         raise SystemExit(

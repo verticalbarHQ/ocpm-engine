@@ -10,14 +10,26 @@ import subprocess
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-INPUTS = ("Cargo.lock", "about.toml", "about.hbs")
 EXPECTED_VERSION = "cargo-about 0.8.4"
+
+
+def input_paths() -> list[pathlib.Path]:
+    return [
+        ROOT / "Cargo.lock",
+        ROOT / "Cargo.toml",
+        ROOT / "about.toml",
+        ROOT / "about.hbs",
+        *sorted((ROOT / "crates").glob("*/Cargo.toml")),
+    ]
 
 
 def input_digest() -> str:
     digest = hashlib.sha256()
-    for name in INPUTS:
-        digest.update((ROOT / name).read_bytes())
+    for path in input_paths():
+        digest.update(path.relative_to(ROOT).as_posix().encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
     return digest.hexdigest()
 
 

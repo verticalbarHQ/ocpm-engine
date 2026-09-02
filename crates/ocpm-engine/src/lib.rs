@@ -15,6 +15,7 @@ use ocpm_core::{
 use ocpm_local::LocalProvider;
 use ocpm_prediction::PredictionArtifact;
 use ocpm_provider::{ExecutionSummaryRequest, OcpmProvider, ProviderCapability};
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -30,7 +31,49 @@ pub use ocpm_duckdb::{
     SnapshotWriteResult, SourceTimestampPolicy, SourceValidationPolicy,
 };
 pub use ocpm_io::CsvMapping;
-pub use ocpm_provider::{ExecutionMode, ProcessExecution};
+pub use ocpm_provider::{
+    CapabilityCoverage, CapabilityReport, ExecutionCancellation, ExecutionContext, ExecutionMode,
+    PopulationSelector, ProcessExecution,
+};
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct PopulationBottleneckRequest {
+    pub request: BottleneckRequest,
+    pub population: PopulationSelector,
+}
+
+impl PopulationBottleneckRequest {
+    pub fn new(request: BottleneckRequest, population: PopulationSelector) -> Self {
+        Self {
+            request,
+            population,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct PopulationSummary {
+    pub selector: PopulationSelector,
+    pub object_count: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct UnsupportedMetricFamily {
+    pub family: String,
+    pub reason_code: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct PopulationBottleneckResult {
+    pub result: BottleneckResult,
+    pub population: PopulationSummary,
+    pub capabilities: CapabilityReport,
+    pub unsupported: Vec<UnsupportedMetricFamily>,
+}
 
 #[cfg(feature = "gnn")]
 pub use ocpm_gnn::{
@@ -41,6 +84,26 @@ pub use ocpm_gnn::{
 
 pub struct Engine {
     provider: Arc<dyn OcpmProvider>,
+}
+
+fn push_unsupported(
+    values: &mut Vec<UnsupportedMetricFamily>,
+    family: &str,
+    requirements: &[&CapabilityCoverage],
+) {
+    if let Some(coverage) = requirements
+        .iter()
+        .copied()
+        .find(|coverage| !coverage.available)
+    {
+        values.push(UnsupportedMetricFamily {
+            family: family.to_owned(),
+            reason_code: coverage
+                .reason_code
+                .clone()
+                .unwrap_or_else(|| "capability_unavailable".to_owned()),
+        });
+    }
 }
 
 impl Engine {
@@ -75,6 +138,13 @@ impl Engine {
     #[cfg(feature = "duckdb")]
     pub fn from_duckdb_parquet(source: DuckDbParquetSource) -> OcpmResult<Self> {
         Ok(Self::from_provider(Arc::new(DuckDbProvider::open(source)?)))
+    }
+
+    #[cfg(feature = "duckdb")]
+    pub fn from_duckdb_parquet_isolated(source: DuckDbParquetSource) -> OcpmResult<Self> {
+        Ok(Self::from_provider(Arc::new(
+            DuckDbProvider::open_isolated(source)?,
+        )))
     }
 
     #[cfg(feature = "postgres")]
@@ -188,8 +258,20 @@ impl Engine {
         self.provider.capabilities()
     }
 
+    pub fn analysis_capabilities(&self) -> OcpmResult<CapabilityReport> {
+        self.provider.capability_report()
+    }
+
     pub fn profile(&self, view: &DatasetView) -> OcpmResult<DatasetProfile> {
         self.provider.profile(view)
+    }
+
+    pub fn profile_with_context(
+        &self,
+        view: &DatasetView,
+        context: &ExecutionContext,
+    ) -> OcpmResult<DatasetProfile> {
+        self.provider.profile_with_context(view, context)
     }
 
     pub fn snapshot(&self, view: &DatasetView) -> OcpmResult<CanonicalLog> {
@@ -467,6 +549,113 @@ impl Engine {
         ocpm_bottleneck::analyze(self.provider.as_ref(), request)
     }
 
+    pub fn bottlenecks_with_context(
+        &self,
+        request: &BottleneckRequest,
+        context: &ExecutionContext,
+    ) -> OcpmResult<BottleneckResult> {
+        ocpm_bottleneck::analyze_with_context(self.provider.as_ref(), request, context)
+    }
+
+    /// Resolve an explicit leading-object population before running the
+    /// unchanged bottleneck kernel. Legacy `bottlenecks` view semantics remain
+    /// the default and are never inferred from this opt-in request.
+    pub fn bottlenecks_for_population(
+        &self,
+        typed: &PopulationBottleneckRequest,
+    ) -> OcpmResult<PopulationBottleneckResult> {
+        if typed.request.view.start.is_some()
+            || typed.request.view.end.is_some()
+            || !typed.request.view.object_ids.is_empty()
+        {
+            return Err(ocpm_core::OcpmError::invalid_request(
+                "explicit population cannot be combined with legacy view time or object_ids",
+            ));
+        }
+        if typed.request.comparison_view.is_some() {
+            return Err(ocpm_core::OcpmError::invalid_request(
+                "explicit population does not infer comparison population semantics",
+            ));
+        }
+        match &typed.population {
+            PopulationSelector::EventTime { start, end }
+            | PopulationSelector::LeadingObjectStart { start, end }
+            | PopulationSelector::ExecutionContained { start, end }
+                if start >= end =>
+            {
+                return Err(ocpm_core::OcpmError::invalid_request(
+                    "population window must have start before end",
+                ));
+            }
+            _ => {}
+        }
+        let leading_object_type = typed
+            .request
+            .leading_object_type
+            .as_deref()
+            .or_else(|| {
+                (typed.request.view.object_types.len() == 1)
+                    .then(|| typed.request.view.object_types[0].as_str())
+            })
+            .ok_or_else(|| {
+                ocpm_core::OcpmError::invalid_request(
+                    "explicit population requires exactly one leading object type",
+                )
+            })?;
+        let resolved = self.provider.resolve_population(
+            &typed.request.view,
+            &typed.population,
+            Some(leading_object_type),
+        )?;
+        let mut capabilities = self.provider.capability_report()?;
+        if !typed.request.resource_calendars.is_empty() {
+            capabilities.resource_calendar = CapabilityCoverage::available();
+        }
+        let mut request = typed.request.clone();
+        let result = if let Some(view) = resolved.view {
+            request.view = view;
+            self.bottlenecks(&request)?
+        } else {
+            ocpm_bottleneck::analyze_observations(self.provider.name(), &[], None, &request)?
+        };
+        let mut unsupported = Vec::new();
+        push_unsupported(
+            &mut unsupported,
+            "synchronization",
+            &[&capabilities.shared_event],
+        );
+        for family in [
+            "waiting_causes",
+            "resource_pressure",
+            "performance_patterns",
+            "blocking_cascades",
+        ] {
+            push_unsupported(
+                &mut unsupported,
+                family,
+                &[&capabilities.lifecycle, &capabilities.resource],
+            );
+        }
+        push_unsupported(
+            &mut unsupported,
+            "resource_unavailability",
+            &[
+                &capabilities.lifecycle,
+                &capabilities.resource,
+                &capabilities.resource_calendar,
+            ],
+        );
+        Ok(PopulationBottleneckResult {
+            result,
+            population: PopulationSummary {
+                selector: typed.population.clone(),
+                object_count: resolved.object_count,
+            },
+            capabilities,
+            unsupported,
+        })
+    }
+
     pub fn fit_prediction(&self, request: &FitPredictionRequest) -> OcpmResult<PredictionArtifact> {
         ocpm_prediction::fit(self.provider.as_ref(), request)
     }
@@ -730,5 +919,142 @@ mod tests {
             .unwrap();
         assert_eq!(result.diagnostics.synchronized_event_count, 1);
         assert_eq!(result.synchronization.len(), 2);
+    }
+
+    #[test]
+    fn explicit_populations_are_distinct_and_legacy_behavior_is_unchanged() {
+        let event = |id, activity: &str, timestamp| Event {
+            id,
+            external_id: format!("e{id}"),
+            activity: activity.to_owned(),
+            timestamp: Timestamp::from_epoch_nanos(timestamp),
+            sequence: 0,
+            lifecycle: None,
+            attributes: BTreeMap::new(),
+        };
+        let log = CanonicalLog {
+            dataset_id: "explicit-populations".to_owned(),
+            tenant_id: "tenant".to_owned(),
+            events: vec![
+                event(1, "a", 10),
+                event(2, "b", 30),
+                event(3, "a", 0),
+                event(4, "b", 20),
+            ],
+            objects: vec![
+                Object {
+                    id: 1,
+                    external_id: "o1".to_owned(),
+                    object_type: "order".to_owned(),
+                },
+                Object {
+                    id: 2,
+                    external_id: "o2".to_owned(),
+                    object_type: "order".to_owned(),
+                },
+            ],
+            event_object_relations: (1..=4)
+                .map(|id| EventObjectRelation {
+                    relation_id: id,
+                    event_id: id,
+                    object_id: if id <= 2 { 1 } else { 2 },
+                    qualifier: String::new(),
+                })
+                .collect(),
+            ..CanonicalLog::default()
+        };
+        let engine = Engine::from_log(log).unwrap();
+        let request = BottleneckRequest {
+            view: DatasetView {
+                object_types: vec!["order".to_owned()],
+                ..DatasetView::default()
+            },
+            leading_object_type: Some("order".to_owned()),
+            minimum_support: 1,
+            ..BottleneckRequest::default()
+        };
+        let legacy = engine.bottlenecks(&request).unwrap();
+        assert!(engine.analysis_capabilities().unwrap().lifecycle.available);
+        let analyze_population = |population| {
+            engine
+                .bottlenecks_for_population(&PopulationBottleneckRequest::new(
+                    request.clone(),
+                    population,
+                ))
+                .unwrap()
+        };
+        let event_time = analyze_population(PopulationSelector::EventTime {
+            start: Timestamp::from_epoch_nanos(10),
+            end: Timestamp::from_epoch_nanos(30),
+        });
+        assert_eq!(event_time.population.object_count, 2);
+        assert_eq!(event_time.result.diagnostics.observation_count, 0);
+
+        let leading_start = analyze_population(PopulationSelector::LeadingObjectStart {
+            start: Timestamp::from_epoch_nanos(10),
+            end: Timestamp::from_epoch_nanos(40),
+        });
+        assert_eq!(leading_start.population.object_count, 1);
+        assert_eq!(leading_start.result.diagnostics.observation_count, 1);
+        assert!(leading_start.capabilities.lifecycle.available);
+        assert!(leading_start.capabilities.resource.available);
+        assert!(leading_start.capabilities.shared_event.available);
+        assert!(leading_start.unsupported.iter().any(|value| {
+            value.family == "resource_unavailability"
+                && value.reason_code == "resource_calendar_not_supplied"
+        }));
+
+        let contained = analyze_population(PopulationSelector::ExecutionContained {
+            start: Timestamp::from_epoch_nanos(5),
+            end: Timestamp::from_epoch_nanos(40),
+        });
+        assert_eq!(contained.population.object_count, 1);
+        assert_eq!(contained.result.diagnostics.observation_count, 1);
+
+        let case_set = analyze_population(PopulationSelector::CaseSet {
+            object_ids: vec![2, 2, 999],
+        });
+        assert_eq!(case_set.population.object_count, 1);
+        assert_eq!(case_set.result.diagnostics.observation_count, 1);
+
+        let empty_case_set = analyze_population(PopulationSelector::CaseSet {
+            object_ids: vec![999],
+        });
+        assert_eq!(empty_case_set.population.object_count, 0);
+        assert_eq!(empty_case_set.result.diagnostics.observation_count, 0);
+        assert!(empty_case_set.result.diagnostics.exact);
+        assert_eq!(empty_case_set.result.semantic_version, "1.0");
+
+        let mut ambiguous = request.clone();
+        ambiguous.comparison_view = Some(DatasetView::default());
+        let error = engine
+            .bottlenecks_for_population(&PopulationBottleneckRequest::new(
+                ambiguous,
+                PopulationSelector::CaseSet {
+                    object_ids: vec![1],
+                },
+            ))
+            .unwrap_err();
+        assert_eq!(error.code, ocpm_core::OcpmErrorCode::InvalidRequest);
+        assert_eq!(engine.bottlenecks(&request).unwrap(), legacy);
+    }
+
+    #[test]
+    fn unsupported_family_reports_the_first_missing_requirement() {
+        let available = CapabilityCoverage::available();
+        let missing_resource = CapabilityCoverage::unavailable("resource_not_projected");
+        let mut unsupported = Vec::new();
+        push_unsupported(
+            &mut unsupported,
+            "waiting_causes",
+            &[&available, &missing_resource],
+        );
+        assert_eq!(
+            unsupported,
+            vec![UnsupportedMetricFamily {
+                family: "waiting_causes".to_owned(),
+                reason_code: "resource_not_projected".to_owned(),
+            }]
+        );
     }
 }

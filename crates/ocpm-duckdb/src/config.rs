@@ -173,12 +173,21 @@ impl Default for ParquetCachePolicy {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DuckDbOptions {
+    /// DuckDB memory limit for each pooled connection. Concurrent operations
+    /// can therefore reserve up to this value times the admitted connection
+    /// count, in addition to Rust-side result materialization and caches.
     #[serde(default = "default_memory")]
     pub memory_budget_bytes: u64,
+    /// DuckDB worker-thread limit for each pooled connection.
     #[serde(default = "default_parallelism")]
     pub max_parallelism: usize,
+    /// Maximum number of concurrently checked-out DuckDB connections. Memory,
+    /// worker-thread, and spill admission must account for this multiplier.
     #[serde(default = "default_pool")]
     pub connection_pool_size: usize,
+    /// DuckDB spill limit for each pooled connection. Isolated providers give
+    /// every connection its own directory; legacy providers retain the
+    /// caller-selected shared-directory behavior.
     #[serde(default = "default_temp_bytes")]
     pub max_temp_bytes: u64,
     /// Maximum heap bytes retained for exact aggregate results. Entries are

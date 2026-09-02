@@ -1,7 +1,7 @@
 use crate::{
     DuckDbParquetSource, DuckDbProviderError, parse_attribute, parse_attribute_map,
-    snapshot::ResolvedSnapshot, snapshot::open_database, source_timestamp_to_utc,
-    utc_nanos_to_source_nanos,
+    snapshot::ResolvedSnapshot, snapshot::open_database, snapshot::open_isolated_database,
+    source_timestamp_to_utc, utc_nanos_to_source_nanos,
 };
 use duckdb::{Connection, params_from_iter, types::Value};
 use ocpm_core::{
@@ -14,17 +14,28 @@ use ocpm_core::{
 };
 use ocpm_local::LocalProvider;
 use ocpm_provider::{
-    BottleneckObservation, BottleneckObservationRequest, ExecutionMode, ExecutionSummaryRequest,
+    BottleneckObservation, BottleneckObservationProjection, BottleneckObservationRequest,
+    CapabilityCoverage, CapabilityReport, ExecutionContext, ExecutionMode, ExecutionSummaryRequest,
     OcpmProvider, ProcessExecution, ProviderCapability, ProviderEstimate, bottleneck_leading_types,
     observations_from_executions,
 };
 use std::{
     collections::{BTreeMap, HashMap, VecDeque},
+    panic::{AssertUnwindSafe, catch_unwind, resume_unwind},
     sync::{
-        Arc, Mutex,
-        atomic::{AtomicUsize, Ordering},
+        Arc, Mutex, MutexGuard, TryLockError,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
+    time::Duration,
 };
+
+struct CompletionSignal<'a>(&'a AtomicBool);
+
+impl Drop for CompletionSignal<'_> {
+    fn drop(&mut self) {
+        self.0.store(true, Ordering::Release);
+    }
+}
 
 #[derive(Default)]
 struct SummaryCache {
@@ -85,10 +96,12 @@ impl SummaryCache {
 /// connection across threads and lets concurrent read-only scans use the immutable snapshot
 /// without serializing through a global lock.
 pub struct DuckDbProvider {
+    // Connections must drop before the owned spill directory guard.
     connections: Vec<Mutex<Connection>>,
+    _owned_temp_directory: Option<tempfile::TempDir>,
     next_connection: AtomicUsize,
     resolved: ResolvedSnapshot,
-    memory_budget_bytes: u64,
+    per_connection_memory_budget_bytes: u64,
     summary_cache: Mutex<SummaryCache>,
     cache_canonical_fallback: bool,
     canonical_fallback: Mutex<Option<Arc<LocalProvider>>>,
@@ -113,9 +126,59 @@ impl DuckDbProvider {
         }
         Ok(Self {
             connections,
+            _owned_temp_directory: None,
             next_connection: AtomicUsize::new(0),
             resolved,
-            memory_budget_bytes: source.options.memory_budget_bytes,
+            per_connection_memory_budget_bytes: source.options.memory_budget_bytes,
+            summary_cache: Mutex::new(SummaryCache::with_limit(source.options.result_cache_bytes)),
+            cache_canonical_fallback: source.options.cache_canonical_fallback,
+            canonical_fallback: Mutex::new(None),
+        })
+    }
+
+    /// Open the immutable snapshot with a provider-owned in-memory catalog and
+    /// one private spill directory per pooled connection. This is the safe
+    /// default for independently scaled workers that must not share mutable
+    /// DuckDB runtime files. The legacy `open` contract remains unchanged.
+    pub fn open_isolated(mut source: DuckDbParquetSource) -> Result<Self, DuckDbProviderError> {
+        let parent = source
+            .options
+            .temp_directory
+            .clone()
+            .unwrap_or_else(std::env::temp_dir);
+        std::fs::create_dir_all(&parent)?;
+        let owned_temp_directory = tempfile::Builder::new()
+            .prefix("ocpm-duckdb-session-")
+            .tempdir_in(parent)?;
+        let session_directory = owned_temp_directory.path().to_owned();
+        let connection_count = source.options.connection_pool_size.max(1);
+        let mut connections = Vec::with_capacity(connection_count);
+        let mut resolved: Option<ResolvedSnapshot> = None;
+        for index in 0..connection_count {
+            let connection_directory = session_directory.join(format!("connection-{index}"));
+            std::fs::create_dir(&connection_directory)?;
+            source.options.temp_directory = Some(connection_directory);
+            let (connection, current) = open_isolated_database(&source)?;
+            if let Some(expected) = resolved.as_ref() {
+                if current.manifest_sha256 != expected.manifest_sha256
+                    || current.version_root != expected.version_root
+                {
+                    return Err(DuckDbProviderError::InvalidSource(
+                        "snapshot changed while the isolated connection pool was opening"
+                            .to_owned(),
+                    ));
+                }
+            } else {
+                resolved = Some(current.clone());
+            }
+            connections.push(Mutex::new(connection));
+        }
+        Ok(Self {
+            connections,
+            _owned_temp_directory: Some(owned_temp_directory),
+            next_connection: AtomicUsize::new(0),
+            resolved: resolved.expect("positive connection pool size"),
+            per_connection_memory_budget_bytes: source.options.memory_budget_bytes,
             summary_cache: Mutex::new(SummaryCache::with_limit(source.options.result_cache_bytes)),
             cache_canonical_fallback: source.options.cache_canonical_fallback,
             canonical_fallback: Mutex::new(None),
@@ -141,6 +204,61 @@ impl DuckDbProvider {
         operation(&connection)
     }
 
+    fn with_connection_context<T>(
+        &self,
+        context: &ExecutionContext,
+        operation: impl FnOnce(&Connection) -> Result<T, DuckDbProviderError>,
+    ) -> Result<T, DuckDbProviderError> {
+        context.check().map_err(DuckDbProviderError::Canonical)?;
+        let connection = self.connection_with_context(context)?;
+        let interrupt = connection.interrupt_handle();
+        let finished = AtomicBool::new(false);
+        let result = std::thread::scope(|scope| {
+            scope.spawn(|| {
+                while !finished.load(Ordering::Acquire) {
+                    if context.is_cancelled() || context.is_timed_out() {
+                        interrupt.interrupt();
+                        break;
+                    }
+                    std::thread::sleep(Duration::from_millis(2));
+                }
+            });
+            let _completion = CompletionSignal(&finished);
+            catch_unwind(AssertUnwindSafe(|| operation(&connection)))
+        });
+        drop(connection);
+        match result {
+            Ok(result) => {
+                context.check().map_err(DuckDbProviderError::Canonical)?;
+                result
+            }
+            Err(payload) => resume_unwind(payload),
+        }
+    }
+
+    fn connection_with_context(
+        &self,
+        context: &ExecutionContext,
+    ) -> Result<MutexGuard<'_, Connection>, DuckDbProviderError> {
+        let first = self.next_connection.fetch_add(1, Ordering::Relaxed) % self.connections.len();
+        loop {
+            for offset in 0..self.connections.len() {
+                let index = (first + offset) % self.connections.len();
+                match self.connections[index].try_lock() {
+                    Ok(connection) => return Ok(connection),
+                    Err(TryLockError::WouldBlock) => {}
+                    Err(TryLockError::Poisoned(_)) => {
+                        return Err(DuckDbProviderError::InvalidSource(
+                            "DuckDB connection lock was poisoned".to_owned(),
+                        ));
+                    }
+                }
+            }
+            context.check().map_err(DuckDbProviderError::Canonical)?;
+            std::thread::sleep(Duration::from_millis(2));
+        }
+    }
+
     fn full_log(&self) -> Result<CanonicalLog, DuckDbProviderError> {
         self.with_connection(|connection| load_log(connection, &self.resolved))
     }
@@ -160,6 +278,108 @@ impl DuckDbProvider {
         let provider = Arc::new(LocalProvider::new(self.full_log()?)?);
         *cached = Some(Arc::clone(&provider));
         Ok(provider)
+    }
+
+    /// Compute the unfiltered profile entirely inside DuckDB. This is the
+    /// common discovery/preflight call and does not require a canonical heap
+    /// representation of the snapshot.
+    fn default_profile_aggregated(
+        &self,
+        context: Option<&ExecutionContext>,
+    ) -> Result<DatasetProfile, DuckDbProviderError> {
+        let aggregate = |connection: &Connection| {
+            let (
+                event_count,
+                object_count,
+                e2o_count,
+                o2o_count,
+                object_attribute_change_count,
+                start_nanos,
+                start_source,
+                end_nanos,
+                end_source,
+            ) = connection.query_row(
+                r#"
+                SELECT
+                  (SELECT count(*)::UBIGINT FROM ocpm_events),
+                  (SELECT count(*)::UBIGINT FROM ocpm_objects),
+                  (SELECT count(*)::UBIGINT
+                   FROM ocpm_e2o relation
+                   JOIN ocpm_objects object USING(object_id)),
+                  (SELECT count(*)::UBIGINT
+                   FROM ocpm_o2o relation
+                   JOIN ocpm_objects source
+                     ON source.object_id=relation.source_object_id
+                   JOIN ocpm_objects target
+                     ON target.object_id=relation.target_object_id),
+                  (SELECT count(*)::UBIGINT
+                   FROM ocpm_object_attributes attribute
+                   JOIN ocpm_objects object USING(object_id)),
+                  (SELECT timestamp_nanos_utc FROM ocpm_events
+                   ORDER BY timestamp_nanos_utc,source_timestamp ASC NULLS FIRST LIMIT 1),
+                  (SELECT source_timestamp FROM ocpm_events
+                   ORDER BY timestamp_nanos_utc,source_timestamp ASC NULLS FIRST LIMIT 1),
+                  (SELECT timestamp_nanos_utc FROM ocpm_events
+                   ORDER BY timestamp_nanos_utc DESC,source_timestamp DESC NULLS LAST LIMIT 1),
+                  (SELECT source_timestamp FROM ocpm_events
+                   ORDER BY timestamp_nanos_utc DESC,source_timestamp DESC NULLS LAST LIMIT 1)
+                "#,
+                [],
+                |row| {
+                    Ok((
+                        row.get::<_, u64>(0)?,
+                        row.get::<_, u64>(1)?,
+                        row.get::<_, u64>(2)?,
+                        row.get::<_, u64>(3)?,
+                        row.get::<_, u64>(4)?,
+                        row.get::<_, Option<i128>>(5)?,
+                        row.get::<_, Option<String>>(6)?,
+                        row.get::<_, Option<i128>>(7)?,
+                        row.get::<_, Option<String>>(8)?,
+                    ))
+                },
+            )?;
+            let mut activities = BTreeMap::new();
+            {
+                let mut statement = connection.prepare(
+                    "SELECT activity,count(*)::UBIGINT FROM ocpm_events \
+                     GROUP BY activity ORDER BY activity",
+                )?;
+                let mut rows = statement.query([])?;
+                while let Some(row) = rows.next()? {
+                    activities.insert(row.get::<_, String>(0)?, row.get::<_, u64>(1)?);
+                }
+            }
+            let mut object_types = BTreeMap::new();
+            {
+                let mut statement = connection.prepare(
+                    "SELECT object_type,count(*)::UBIGINT FROM ocpm_objects \
+                     GROUP BY object_type ORDER BY object_type",
+                )?;
+                let mut rows = statement.query([])?;
+                while let Some(row) = rows.next()? {
+                    object_types.insert(row.get::<_, String>(0)?, row.get::<_, u64>(1)?);
+                }
+            }
+            Ok(DatasetProfile {
+                dataset_id: self.resolved.dataset_id.clone(),
+                tenant_id: self.resolved.tenant_id.clone(),
+                source_watermark: self.resolved.source_watermark.clone(),
+                event_count,
+                object_count,
+                e2o_count,
+                o2o_count,
+                object_attribute_change_count,
+                activities,
+                object_types,
+                start: profile_timestamp(start_nanos, start_source, &self.resolved)?,
+                end: profile_timestamp(end_nanos, end_source, &self.resolved)?,
+            })
+        };
+        match context {
+            Some(context) => self.with_connection_context(context, aggregate),
+            None => self.with_connection(aggregate),
+        }
     }
 
     fn scan_executions<T>(
@@ -249,6 +469,61 @@ impl DuckDbProvider {
             Ok(())
         })?;
         Ok(executions)
+    }
+
+    fn scan_projected_bottleneck_observations(
+        &self,
+        request: &BottleneckObservationRequest,
+        projection: &BottleneckObservationProjection,
+        context: Option<&ExecutionContext>,
+    ) -> Result<Vec<BottleneckObservation>, DuckDbProviderError> {
+        let mut observations = Vec::new();
+        for leading in bottleneck_leading_types(request) {
+            let (sql, values) = execution_sql(&request.view, leading, false, &self.resolved)?;
+            let scan = |connection: &Connection| {
+                let mut statement = connection.prepare(&sql)?;
+                let mut rows = statement.query(params_from_iter(values.iter()))?;
+                let mut current_object_id = None;
+                let mut current_object_type = String::new();
+                let mut previous: Option<Event> = None;
+                while let Some(row) = rows.next()? {
+                    let object_id = row.get::<_, u64>(0)?;
+                    if current_object_id != Some(object_id) {
+                        current_object_id = Some(object_id);
+                        current_object_type = row.get(2)?;
+                        previous = None;
+                    }
+                    let mut event = row_event(row, &self.resolved)?;
+                    if !event_matches_post_scan(&request.view, &event)
+                        || previous.as_ref().is_some_and(|value| value.id == event.id)
+                    {
+                        continue;
+                    }
+                    event.attributes.retain(|name, _| {
+                        projection
+                            .attribute_names
+                            .iter()
+                            .any(|wanted| wanted == name)
+                    });
+                    if let Some(source) = previous.as_ref() {
+                        observations.push(observation_from_event_pair(
+                            object_id,
+                            &current_object_type,
+                            source,
+                            &event,
+                        ));
+                    }
+                    previous = Some(event);
+                }
+                Ok(())
+            };
+            if let Some(context) = context {
+                self.with_connection_context(context, scan)?;
+            } else {
+                self.with_connection(scan)?;
+            }
+        }
+        Ok(observations)
     }
 
     fn summarize(
@@ -490,8 +765,44 @@ impl OcpmProvider for DuckDbProvider {
         ]
     }
 
+    fn capability_report(&self) -> OcpmResult<CapabilityReport> {
+        let lifecycle = if self.resolved.layout_name == "canonical_v1" {
+            CapabilityCoverage::available()
+        } else {
+            CapabilityCoverage::unavailable("source_contract_does_not_project_lifecycle")
+        };
+        Ok(CapabilityReport::new(
+            lifecycle,
+            // Both supported layouts preserve event attributes and complete
+            // event-object relations even when a particular snapshot happens
+            // to contain no resource values or shared events.
+            CapabilityCoverage::available(),
+            CapabilityCoverage::available(),
+            CapabilityCoverage::unavailable("resource_calendar_not_supplied"),
+        ))
+    }
+
     fn profile(&self, view: &DatasetView) -> OcpmResult<DatasetProfile> {
-        self.exact_local()?.profile(view)
+        if view == &DatasetView::default() {
+            Ok(self.default_profile_aggregated(None)?)
+        } else {
+            self.exact_local()?.profile(view)
+        }
+    }
+
+    fn profile_with_context(
+        &self,
+        view: &DatasetView,
+        context: &ExecutionContext,
+    ) -> OcpmResult<DatasetProfile> {
+        context.check()?;
+        if view == &DatasetView::default() {
+            Ok(self.default_profile_aggregated(Some(context))?)
+        } else {
+            let provider = self.exact_local()?;
+            context.check()?;
+            provider.profile_with_context(view, context)
+        }
     }
 
     fn process_executions(
@@ -535,6 +846,40 @@ impl OcpmProvider for DuckDbProvider {
         Ok(observations)
     }
 
+    fn projected_bottleneck_observations(
+        &self,
+        request: &BottleneckObservationRequest,
+        projection: &BottleneckObservationProjection,
+    ) -> OcpmResult<Vec<BottleneckObservation>> {
+        // Duration bounds select whole executions and therefore require the
+        // compatibility path until an eligibility pre-pass is available.
+        if request.view.minimum_execution_duration_nanos.is_some()
+            || request.view.maximum_execution_duration_nanos.is_some()
+        {
+            let mut observations = self.bottleneck_observations(request)?;
+            retain_projected_attributes(&mut observations, projection);
+            return Ok(observations);
+        }
+        Ok(self.scan_projected_bottleneck_observations(request, projection, None)?)
+    }
+
+    fn projected_bottleneck_observations_with_context(
+        &self,
+        request: &BottleneckObservationRequest,
+        projection: &BottleneckObservationProjection,
+        context: &ExecutionContext,
+    ) -> OcpmResult<Vec<BottleneckObservation>> {
+        if request.view.minimum_execution_duration_nanos.is_some()
+            || request.view.maximum_execution_duration_nanos.is_some()
+        {
+            context.check()?;
+            let result = self.projected_bottleneck_observations(request, projection)?;
+            context.check()?;
+            return Ok(result);
+        }
+        Ok(self.scan_projected_bottleneck_observations(request, projection, Some(context))?)
+    }
+
     fn snapshot(&self, view: &DatasetView) -> OcpmResult<CanonicalLog> {
         self.exact_local()?.snapshot(view)
     }
@@ -572,7 +917,10 @@ impl OcpmProvider for DuckDbProvider {
             } else {
                 0
             },
-            peak_memory_bytes: self.memory_budget_bytes,
+            // One provider operation checks out one connection. Admission
+            // control must multiply this per-operation estimate by the number
+            // of concurrently admitted operations.
+            peak_memory_bytes: self.per_connection_memory_budget_bytes,
             confidence: 0.6,
         }
     }
@@ -748,6 +1096,15 @@ fn build_execution_sql(
     projection: &str,
     ordered: bool,
 ) -> Result<(String, Vec<Value>), DuckDbProviderError> {
+    if resolved.layout_name == "entity_link_snapshot_v1" && !complete_lifecycle {
+        return build_entity_link_execution_sql(
+            view,
+            leading_object_type,
+            resolved,
+            projection,
+            ordered,
+        );
+    }
     let mut predicates = Vec::new();
     let mut values = Vec::new();
     let leading = leading_object_type.or_else(|| view.object_types.first().map(String::as_str));
@@ -856,6 +1213,162 @@ fn build_execution_sql(
     ))
 }
 
+/// Build a request-scoped EntityLink relation that filters the event parquet
+/// before matching group membership. The canonical compatibility views remain
+/// available for fallback operations, but selective execution never flattens
+/// unrelated membership lists.
+fn build_entity_link_execution_sql(
+    view: &DatasetView,
+    leading_object_type: Option<&str>,
+    resolved: &ResolvedSnapshot,
+    projection: &str,
+    ordered: bool,
+) -> Result<(String, Vec<Value>), DuckDbProviderError> {
+    let mut predicates = Vec::new();
+    let mut values = Vec::new();
+    let leading = leading_object_type.or_else(|| view.object_types.first().map(String::as_str));
+    if let Some(value) = leading {
+        predicates.push("o.object_type = ?".to_owned());
+        values.push(Value::Text(value.to_owned()));
+    }
+    add_json_string_filter(
+        &mut predicates,
+        &mut values,
+        "o.object_type",
+        &view.object_types,
+    )?;
+    add_json_u64_filter(
+        &mut predicates,
+        &mut values,
+        "o.object_id",
+        &view.object_ids,
+    )?;
+    add_json_string_filter(
+        &mut predicates,
+        &mut values,
+        "e.activity_id",
+        &view.activities,
+    )?;
+    add_json_u64_filter(
+        &mut predicates,
+        &mut values,
+        "e.stable_event_id",
+        &view.event_ids,
+    )?;
+    add_json_string_filter(
+        &mut predicates,
+        &mut values,
+        "e.event_object_type",
+        &view.qualifiers,
+    )?;
+    for (name, value) in &view.object_attributes {
+        predicates.push(
+            "(SELECT a.value_json FROM ocpm_object_attributes a \
+             WHERE a.object_id=o.object_id AND a.name=? \
+             AND (? IS NULL OR a.valid_from_nanos_utc < ?) \
+             ORDER BY a.valid_from_nanos_utc DESC LIMIT 1) = ?"
+                .to_owned(),
+        );
+        values.push(Value::Text(name.clone()));
+        let end = view
+            .end
+            .as_ref()
+            .map(|value| {
+                utc_nanos_to_source_nanos(value.epoch_nanos_utc, &resolved.timestamp_policy)
+            })
+            .transpose()?;
+        values.push(end.map_or(Value::Null, Value::HugeInt));
+        values.push(end.map_or(Value::Null, Value::HugeInt));
+        values.push(Value::Text(serde_json::to_string(value)?));
+    }
+    if !view.related_object_types.is_empty() {
+        predicates.push(
+            "EXISTS (SELECT 1 FROM ocpm_o2o link \
+             JOIN ocpm_objects related ON related.object_id = CASE \
+             WHEN link.source_object_id=o.object_id THEN link.target_object_id \
+             ELSE link.source_object_id END \
+             JOIN json_each(?) wanted \
+               ON json_extract_string(wanted.value, '$')=related.object_type \
+             WHERE link.source_object_id=o.object_id OR link.target_object_id=o.object_id)"
+                .to_owned(),
+        );
+        values.push(Value::Text(serde_json::to_string(
+            &view.related_object_types,
+        )?));
+    }
+    if let Some(start) = &view.start {
+        predicates.push("epoch_ns(e.event_timestamp)::HUGEINT >= ?".to_owned());
+        values.push(Value::HugeInt(utc_nanos_to_source_nanos(
+            start.epoch_nanos_utc,
+            &resolved.timestamp_policy,
+        )?));
+    }
+    if let Some(end) = &view.end {
+        predicates.push("epoch_ns(e.event_timestamp)::HUGEINT < ?".to_owned());
+        values.push(Value::HugeInt(utc_nanos_to_source_nanos(
+            end.epoch_nanos_utc,
+            &resolved.timestamp_policy,
+        )?));
+    }
+    let where_clause = if predicates.is_empty() {
+        String::new()
+    } else {
+        format!("WHERE {}", predicates.join(" AND "))
+    };
+    let order_clause = if ordered {
+        "ORDER BY x.object_id,x.timestamp_nanos_utc,x.sequence,x.external_event_id"
+    } else {
+        ""
+    };
+    let sql = format!(
+        r#"
+        WITH selected_events AS MATERIALIZED (
+          SELECT
+            o.object_id,o.external_object_id,o.object_type,
+            e.case_id,e.event_timestamp,e.stable_event_id AS event_id,
+            CAST(e.stable_event_id AS VARCHAR) AS external_event_id,
+            e.activity_id AS activity,e.event_object_type AS qualifier,e.display
+          FROM ocpm_entity_events_raw e
+          JOIN ocpm_objects o ON o.object_id=e.event_object_id
+          {where_clause}
+        ),
+        matched_groups AS MATERIALIZED (
+          SELECT
+            e.event_id,e.case_id,e.event_timestamp,g.time_rank,
+            list_position(g.system_note_ids,e.event_id) AS member_ordinal
+          FROM selected_events e
+          JOIN ocpm_entity_groups_raw g
+            ON g.case_id=e.case_id AND g.event_timestamp=e.event_timestamp
+          WHERE list_position(g.system_note_ids,e.event_id) IS NOT NULL
+        ),
+        entity_execution_events AS (
+          SELECT
+            e.object_id,e.external_object_id,e.object_type,e.qualifier,
+            e.event_id,e.external_event_id,e.activity,
+            epoch_ns(e.event_timestamp)::HUGEINT AS timestamp_nanos_utc,
+            CAST(e.event_timestamp AS VARCHAR) AS source_timestamp,
+            CAST(
+              coalesce(g.time_rank,0) * 1000000 + coalesce(g.member_ordinal,0)
+              AS UBIGINT
+            ) AS sequence,
+            NULL::VARCHAR AS lifecycle,e.display AS attributes_json
+          FROM selected_events e
+          LEFT JOIN matched_groups g
+            ON g.event_id=e.event_id
+           AND g.case_id=e.case_id
+           AND g.event_timestamp=e.event_timestamp
+        )
+        SELECT DISTINCT
+          {projection},
+          NULL::HUGEINT AS lifecycle_start,
+          NULL::HUGEINT AS lifecycle_end
+        FROM entity_execution_events x
+        {order_clause}
+        "#
+    );
+    Ok((sql, values))
+}
+
 fn add_json_string_filter(
     predicates: &mut Vec<String>,
     values: &mut Vec<Value>,
@@ -916,6 +1429,48 @@ fn row_event(
         lifecycle: row.get(9)?,
         attributes: parse_attribute_map(&row.get::<_, String>(10)?)?,
     })
+}
+
+fn observation_from_event_pair(
+    object_id: u64,
+    object_type: &str,
+    source: &Event,
+    target: &Event,
+) -> BottleneckObservation {
+    BottleneckObservation {
+        object_id,
+        object_type: object_type.to_owned(),
+        source_event_id: source.id,
+        source_activity: source.activity.clone(),
+        source_timestamp_nanos: source.timestamp.epoch_nanos_utc,
+        source_lifecycle: source.lifecycle.clone(),
+        source_attributes: source.attributes.clone(),
+        target_event_id: target.id,
+        target_activity: target.activity.clone(),
+        target_timestamp_nanos: target.timestamp.epoch_nanos_utc,
+        target_lifecycle: target.lifecycle.clone(),
+        target_attributes: target.attributes.clone(),
+    }
+}
+
+fn retain_projected_attributes(
+    observations: &mut [BottleneckObservation],
+    projection: &BottleneckObservationProjection,
+) {
+    for observation in observations {
+        observation.source_attributes.retain(|name, _| {
+            projection
+                .attribute_names
+                .iter()
+                .any(|wanted| wanted == name)
+        });
+        observation.target_attributes.retain(|name, _| {
+            projection
+                .attribute_names
+                .iter()
+                .any(|wanted| wanted == name)
+        });
+    }
 }
 
 fn event_matches_post_scan(view: &DatasetView, event: &Event) -> bool {
@@ -979,6 +1534,31 @@ fn source_epoch_nanos_to_utc(
         .format("%Y-%m-%d %H:%M:%S%.f")
         .to_string();
     Ok(source_timestamp_to_utc(&source, &resolved.timestamp_policy)?.epoch_nanos_utc)
+}
+
+fn profile_timestamp(
+    nanos: Option<i128>,
+    source: Option<String>,
+    resolved: &ResolvedSnapshot,
+) -> Result<Option<Timestamp>, DuckDbProviderError> {
+    let Some(nanos) = nanos else {
+        return Ok(None);
+    };
+    if resolved.layout_name == "entity_link_snapshot_v1" {
+        let source = source.ok_or_else(|| {
+            DuckDbProviderError::InvalidSource(
+                "entity-link profile timestamp is missing its source value".to_owned(),
+            )
+        })?;
+        return Ok(Some(source_timestamp_to_utc(
+            &source,
+            &resolved.timestamp_policy,
+        )?));
+    }
+    Ok(Some(Timestamp {
+        epoch_nanos_utc: nanos,
+        source,
+    }))
 }
 
 fn load_log(
@@ -1434,6 +2014,18 @@ mod tests {
             !rows.iter().any(|(id, _)| *id == 55),
             "another tenant must not leak"
         );
+
+        let profile = provider
+            .profile(&DatasetView::default())
+            .expect("aggregate profile");
+        assert_eq!(profile.event_count, 9);
+        assert_eq!(profile.object_count, 5);
+        assert_eq!(profile.e2o_count, 8);
+        assert_eq!(profile.activities.get("b"), Some(&2));
+        assert!(
+            provider.canonical_fallback.lock().unwrap().is_none(),
+            "default profile must not materialize the canonical fallback"
+        );
     }
 
     /// The semantics test above passes against BOTH the old and new forms, because the old form is
@@ -1475,15 +2067,74 @@ mod tests {
     }
 
     #[test]
+    fn entity_link_timeframe_is_applied_before_membership_expansion() {
+        let directory = TestDirectory::new();
+        write_entity_link_fixture(&directory.0);
+        let provider =
+            DuckDbProvider::open(entity_link_source(&directory.0)).expect("open provider");
+        let timestamp = |value: &str| {
+            crate::source_timestamp_to_utc(value, &crate::SourceTimestampPolicy::Utc)
+                .expect("fixture timestamp")
+        };
+        let view = DatasetView {
+            start: Some(timestamp("2026-01-02 00:00:00")),
+            end: Some(timestamp("2026-01-03 00:00:00")),
+            object_types: vec!["T".to_owned()],
+            ..DatasetView::default()
+        };
+        let executions = provider
+            .process_executions(&view, ExecutionMode::LeadingObject, Some("T"))
+            .expect("selective executions");
+        assert_eq!(executions.len(), 1);
+        assert_eq!(executions[0].object_ids, vec![2]);
+        assert_eq!(
+            executions[0]
+                .events
+                .iter()
+                .map(|event| (event.id, event.sequence))
+                .collect::<Vec<_>>(),
+            vec![
+                (77, 0),
+                (30, 5_000_001),
+                (20, 5_000_002),
+                (10, 5_000_003),
+                (20, 7_000_001),
+            ],
+            "request-scoped membership must preserve legacy ordering and physical-row fan-out"
+        );
+
+        let (sql, _) =
+            execution_sql(&view, Some("T"), false, &provider.resolved).expect("selective SQL");
+        let selected = sql.find("selected_events AS MATERIALIZED").unwrap();
+        let timestamp_filter = sql
+            .find("epoch_ns(e.event_timestamp)::HUGEINT >= ?")
+            .unwrap();
+        let membership = sql.find("matched_groups AS MATERIALIZED").unwrap();
+        assert!(selected < timestamp_filter && timestamp_filter < membership);
+        assert!(sql.contains("JOIN ocpm_entity_groups_raw"));
+        assert!(!sql.contains("FROM ocpm_execution_events"));
+
+        let capabilities = provider.capability_report().expect("capability report");
+        assert!(!capabilities.lifecycle.available);
+        assert!(capabilities.resource.available);
+        assert!(capabilities.shared_event.available);
+        assert_eq!(
+            capabilities.lifecycle.reason_code.as_deref(),
+            Some("source_contract_does_not_project_lifecycle")
+        );
+    }
+
+    #[test]
     fn canonical_parquet_round_trip_preserves_engine_semantics() {
         let directory = TestDirectory::new();
-        write_canonical_snapshot(&log(), &directory.0, "v1").expect("write snapshot");
+        let canonical = log();
+        write_canonical_snapshot(&canonical, &directory.0, "v1").expect("write snapshot");
         let provider = DuckDbProvider::open(source(&directory.0)).expect("open provider");
 
         let profile = provider.profile(&DatasetView::default()).expect("profile");
-        assert_eq!(profile.event_count, 3);
-        assert_eq!(profile.object_count, 1);
-        assert_eq!(profile.e2o_count, 3);
+        let local = LocalProvider::new(canonical).expect("local provider");
+        assert_eq!(profile, local.profile(&DatasetView::default()).unwrap());
+        assert!(provider.canonical_fallback.lock().unwrap().is_none());
 
         let view = DatasetView {
             object_types: vec!["Order".to_owned()],
@@ -1531,9 +2182,181 @@ mod tests {
     }
 
     #[test]
+    fn aggregate_profile_timestamp_ties_match_canonical_ordering() {
+        let directory = TestDirectory::new();
+        let mut canonical = log();
+        canonical.events[0].timestamp = Timestamp {
+            epoch_nanos_utc: 1_000_000_000,
+            source: Some("z".to_owned()),
+        };
+        canonical.events[1].timestamp = Timestamp::from_epoch_nanos(1_000_000_000);
+        canonical.events[2].timestamp = Timestamp::from_epoch_nanos(3_000_000_000);
+        let mut final_event = event(4, "close", 3_000_000_000, "closed");
+        final_event.timestamp.source = Some("z".to_owned());
+        canonical.events.push(final_event);
+        canonical.event_object_relations.push(EventObjectRelation {
+            relation_id: 4,
+            event_id: 4,
+            object_id: 10,
+            qualifier: "case".to_owned(),
+        });
+        let expected = LocalProvider::new(canonical.clone())
+            .unwrap()
+            .profile(&DatasetView::default())
+            .unwrap();
+        write_canonical_snapshot(&canonical, &directory.0, "v1").expect("write snapshot");
+        let provider = DuckDbProvider::open(source(&directory.0)).expect("open provider");
+
+        assert_eq!(provider.profile(&DatasetView::default()).unwrap(), expected);
+        assert_eq!(expected.start.unwrap().source, None);
+        assert_eq!(expected.end.unwrap().source.as_deref(), Some("z"));
+    }
+
+    #[test]
+    fn aggregate_profile_matches_an_empty_canonical_log() {
+        let directory = TestDirectory::new();
+        let canonical = CanonicalLog {
+            dataset_id: "empty".to_owned(),
+            tenant_id: "scope".to_owned(),
+            ..CanonicalLog::default()
+        };
+        let expected = LocalProvider::new(canonical.clone())
+            .unwrap()
+            .profile(&DatasetView::default())
+            .unwrap();
+        write_canonical_snapshot(&canonical, &directory.0, "v1").expect("write snapshot");
+        let provider = DuckDbProvider::open(source(&directory.0)).expect("open provider");
+
+        assert_eq!(provider.profile(&DatasetView::default()).unwrap(), expected);
+        assert!(provider.canonical_fallback.lock().unwrap().is_none());
+    }
+
+    #[test]
+    fn cooperative_cancel_interrupts_duckdb_and_connection_recovers() {
+        let directory = TestDirectory::new();
+        write_canonical_snapshot(&log(), &directory.0, "v1").expect("write snapshot");
+        let provider = DuckDbProvider::open(source(&directory.0)).expect("open provider");
+        let context = ExecutionContext::new();
+        let cancellation = context.cancellation();
+        let started = std::time::Instant::now();
+        let error = std::thread::scope(|scope| {
+            scope.spawn(move || {
+                std::thread::sleep(Duration::from_millis(10));
+                cancellation.cancel();
+            });
+            provider
+                .with_connection_context(&context, |connection| {
+                    connection
+                        .query_row(
+                            "SELECT sum(hash(i))::HUGEINT FROM range(1000000000) values(i)",
+                            [],
+                            |row| row.get::<_, i128>(0),
+                        )
+                        .map_err(DuckDbProviderError::from)
+                })
+                .unwrap_err()
+        });
+        assert!(started.elapsed() < Duration::from_secs(5));
+        assert!(matches!(
+            error,
+            DuckDbProviderError::Canonical(OcpmError {
+                code: OcpmErrorCode::Cancelled,
+                ..
+            })
+        ));
+
+        let recovered = provider
+            .with_connection_context(&ExecutionContext::new(), |connection| {
+                connection
+                    .query_row("SELECT 42::BIGINT", [], |row| row.get::<_, i64>(0))
+                    .map_err(DuckDbProviderError::from)
+            })
+            .expect("connection must recover after interrupt");
+        assert_eq!(recovered, 42);
+    }
+
+    #[test]
+    fn deadline_expires_while_waiting_for_a_connection() {
+        let directory = TestDirectory::new();
+        write_canonical_snapshot(&log(), &directory.0, "v1").expect("write snapshot");
+        let mut configured = source(&directory.0);
+        configured.options.connection_pool_size = 1;
+        let provider = DuckDbProvider::open(configured).expect("open provider");
+        let held = provider.connections[0].lock().expect("hold connection");
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let started = std::time::Instant::now();
+        std::thread::scope(|scope| {
+            scope.spawn(|| {
+                let context = ExecutionContext::with_timeout(Duration::from_millis(20));
+                sender
+                    .send(provider.with_connection_context(&context, |connection| {
+                        connection
+                            .query_row("SELECT 42::BIGINT", [], |row| row.get::<_, i64>(0))
+                            .map_err(DuckDbProviderError::from)
+                    }))
+                    .expect("send result");
+            });
+            let error = receiver
+                .recv_timeout(Duration::from_millis(150))
+                .expect("deadline must not wait for the held connection")
+                .unwrap_err();
+            assert!(matches!(
+                error,
+                DuckDbProviderError::Canonical(OcpmError {
+                    code: OcpmErrorCode::Timeout,
+                    ..
+                })
+            ));
+            drop(held);
+        });
+        assert!(started.elapsed() < Duration::from_millis(150));
+    }
+
+    #[test]
+    fn panicking_operation_stops_the_watcher_without_poisoning_the_connection() {
+        let directory = TestDirectory::new();
+        write_canonical_snapshot(&log(), &directory.0, "v1").expect("write snapshot");
+        let mut configured = source(&directory.0);
+        configured.options.connection_pool_size = 1;
+        let provider = DuckDbProvider::open(configured).expect("open provider");
+
+        let panic = catch_unwind(AssertUnwindSafe(|| {
+            provider.with_connection_context(
+                &ExecutionContext::new(),
+                |_| -> Result<(), DuckDbProviderError> { panic!("operation panic") },
+            )
+        }));
+        assert!(panic.is_err());
+        let recovered = provider
+            .with_connection_context(&ExecutionContext::new(), |connection| {
+                connection
+                    .query_row("SELECT 42::BIGINT", [], |row| row.get::<_, i64>(0))
+                    .map_err(DuckDbProviderError::from)
+            })
+            .expect("connection must recover after caller panic");
+        assert_eq!(recovered, 42);
+    }
+
+    #[test]
     fn duckdb_and_local_bottleneck_kernels_have_semantic_parity() {
         let directory = TestDirectory::new();
-        let canonical = performance_log();
+        let mut canonical = performance_log();
+        for (case, events) in canonical.events.chunks_mut(3).enumerate() {
+            let resource = AttributeValue::String(format!("worker-{}", case % 3));
+            for event in events.iter_mut() {
+                event
+                    .attributes
+                    .insert("org:resource".to_owned(), resource.clone());
+                event.attributes.insert(
+                    "unused".to_owned(),
+                    AttributeValue::String("must not affect analysis".to_owned()),
+                );
+            }
+            events[0].activity = "review".to_owned();
+            events[0].lifecycle = Some("start".to_owned());
+            events[1].activity = "review".to_owned();
+            events[1].lifecycle = Some("complete".to_owned());
+        }
         write_canonical_snapshot(&canonical, &directory.0, "v1").expect("write snapshot");
         let duckdb = DuckDbProvider::open(source(&directory.0)).expect("open provider");
         let local = LocalProvider::new(canonical).expect("open local provider");
@@ -1547,10 +2370,39 @@ mod tests {
             minimum_support: 2,
             ..ocpm_bottleneck::BottleneckRequest::default()
         };
-        let mut local_result = ocpm_bottleneck::analyze(&local, &request).unwrap();
-        let duckdb_result = ocpm_bottleneck::analyze(&duckdb, &request).unwrap();
-        local_result.diagnostics.provider = duckdb_result.diagnostics.provider.clone();
-        assert_eq!(local_result, duckdb_result);
+        let assert_parity = |request: &ocpm_bottleneck::BottleneckRequest| {
+            let mut local_result = ocpm_bottleneck::analyze(&local, request).unwrap();
+            let duckdb_result = ocpm_bottleneck::analyze(&duckdb, request).unwrap();
+            local_result.diagnostics.provider = duckdb_result.diagnostics.provider.clone();
+            assert_eq!(local_result, duckdb_result);
+        };
+        assert_parity(&request);
+
+        let mut filtered = request.clone();
+        filtered.view.statuses = vec!["open".to_owned()];
+        assert_parity(&filtered);
+
+        let mut duration_bounded = request.clone();
+        duration_bounded.view.minimum_execution_duration_nanos = Some(1);
+        assert_parity(&duration_bounded);
+
+        let projected = duckdb
+            .projected_bottleneck_observations(
+                &BottleneckObservationRequest {
+                    view: request.view.clone(),
+                    leading_object_type: request.leading_object_type.clone(),
+                },
+                &BottleneckObservationProjection::new(vec!["org:resource".to_owned()]),
+            )
+            .unwrap();
+        assert!(!projected.is_empty());
+        assert!(projected.iter().all(|observation| {
+            observation.source_attributes.contains_key("org:resource")
+                && observation.target_attributes.contains_key("org:resource")
+                && !observation.source_attributes.contains_key("unused")
+                && !observation.target_attributes.contains_key("unused")
+        }));
+        assert!(duckdb.canonical_fallback.lock().unwrap().is_none());
 
         let graph_request = ocpm_gnn::GnnBottleneckRequest {
             view: request.view,
@@ -1677,5 +2529,56 @@ mod tests {
             .expect("missing catalog must fail");
         assert!(error.to_string().contains("does not exist"));
         assert!(!missing.exists());
+    }
+
+    #[test]
+    fn isolated_sessions_own_distinct_catalogs_and_spill_directories() {
+        let directory = TestDirectory::new();
+        write_canonical_snapshot(&log(), &directory.0, "v1").expect("write snapshot");
+        let mut configured = source(&directory.0);
+        configured.options.temp_directory = Some(directory.0.join("sessions"));
+        let first = DuckDbProvider::open_isolated(configured.clone()).expect("first session");
+        let second = DuckDbProvider::open_isolated(configured).expect("second session");
+        let first_temp = first
+            ._owned_temp_directory
+            .as_ref()
+            .expect("owned temp")
+            .path()
+            .to_owned();
+        let second_temp = second
+            ._owned_temp_directory
+            .as_ref()
+            .expect("owned temp")
+            .path()
+            .to_owned();
+        assert_ne!(first_temp, second_temp);
+        assert!(first_temp.is_dir() && second_temp.is_dir());
+
+        std::thread::scope(|scope| {
+            let first_profile = scope.spawn(|| first.profile(&DatasetView::default()));
+            let second_profile = scope.spawn(|| second.profile(&DatasetView::default()));
+            assert_eq!(first_profile.join().unwrap().unwrap().event_count, 3);
+            assert_eq!(second_profile.join().unwrap().unwrap().event_count, 3);
+        });
+        drop(first);
+        drop(second);
+        assert!(!first_temp.exists());
+        assert!(!second_temp.exists());
+    }
+
+    #[test]
+    fn failed_isolated_open_removes_its_partial_session_directory() {
+        let directory = TestDirectory::new();
+        write_canonical_snapshot(&log(), &directory.0, "v1").expect("write snapshot");
+        let sessions = directory.0.join("failed-sessions");
+        let mut configured = source(&directory.0);
+        configured.snapshot = SnapshotSelection::Fixed {
+            version: "missing".to_owned(),
+        };
+        configured.options.temp_directory = Some(sessions.clone());
+
+        assert!(DuckDbProvider::open_isolated(configured).is_err());
+        assert!(sessions.is_dir());
+        assert_eq!(fs::read_dir(sessions).unwrap().count(), 0);
     }
 }

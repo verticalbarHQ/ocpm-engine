@@ -9,7 +9,8 @@ use ocpm_core::{
     OcpmResult, QueryBinding, QueryRequest, QueryResult,
 };
 use ocpm_provider::{
-    ExecutionMode, OcpmProvider, ProcessExecution, ProviderCapability, ProviderEstimate,
+    CapabilityCoverage, CapabilityReport, ExecutionMode, OcpmProvider, ProcessExecution,
+    ProviderCapability, ProviderEstimate,
 };
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
@@ -434,6 +435,15 @@ impl OcpmProvider for LocalProvider {
         ]
     }
 
+    fn capability_report(&self) -> OcpmResult<CapabilityReport> {
+        Ok(CapabilityReport::new(
+            CapabilityCoverage::available(),
+            CapabilityCoverage::available(),
+            CapabilityCoverage::available(),
+            CapabilityCoverage::unavailable("resource_calendar_not_supplied"),
+        ))
+    }
+
     fn profile(&self, view: &DatasetView) -> OcpmResult<DatasetProfile> {
         let allowed_qualifiers = view.qualifiers.iter().collect::<BTreeSet<_>>();
         let selected_object_ids = self
@@ -728,6 +738,7 @@ impl UnionFind {
 mod tests {
     use super::*;
     use ocpm_core::{EventObjectRelation, Object, Timestamp};
+    use ocpm_provider::PopulationSelector;
 
     fn fixture() -> CanonicalLog {
         CanonicalLog {
@@ -787,5 +798,69 @@ mod tests {
             )
             .unwrap();
         assert_eq!(executions[0].activity_path(), vec!["create", "approve"]);
+    }
+
+    #[test]
+    fn case_set_population_intersects_the_base_view_and_preserves_empty() {
+        let mut log = fixture();
+        log.events.push(Event {
+            id: 3,
+            external_id: "e3".to_owned(),
+            activity: "create".to_owned(),
+            timestamp: Timestamp::from_epoch_nanos(3),
+            sequence: 0,
+            lifecycle: None,
+            attributes: BTreeMap::new(),
+        });
+        log.objects.push(Object {
+            id: 20,
+            external_id: "o2".to_owned(),
+            object_type: "order".to_owned(),
+        });
+        log.event_object_relations.push(EventObjectRelation {
+            relation_id: 3,
+            event_id: 3,
+            object_id: 20,
+            qualifier: String::new(),
+        });
+        let provider = LocalProvider::new(log).unwrap();
+        let base_view = DatasetView {
+            object_ids: vec![10],
+            ..DatasetView::default()
+        };
+
+        let disjoint = provider
+            .resolve_population(
+                &base_view,
+                &PopulationSelector::CaseSet {
+                    object_ids: vec![20],
+                },
+                Some("order"),
+            )
+            .unwrap();
+        assert_eq!(disjoint.object_count, 0);
+        assert!(disjoint.view.is_none());
+
+        let overlap = provider
+            .resolve_population(
+                &base_view,
+                &PopulationSelector::CaseSet {
+                    object_ids: vec![10, 20],
+                },
+                Some("order"),
+            )
+            .unwrap();
+        assert_eq!(overlap.object_count, 1);
+        assert_eq!(overlap.view.unwrap().object_ids, vec![10]);
+
+        let explicitly_empty = provider
+            .resolve_population(
+                &DatasetView::default(),
+                &PopulationSelector::CaseSet { object_ids: vec![] },
+                Some("order"),
+            )
+            .unwrap();
+        assert_eq!(explicitly_empty.object_count, 0);
+        assert!(explicitly_empty.view.is_none());
     }
 }
