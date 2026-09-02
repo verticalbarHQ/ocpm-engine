@@ -4,7 +4,7 @@ DIST_DIR ?= $(CURDIR)/dist
 .PHONY: check-python dependency-boundary-check license-check perf-public perf-public-concurrency \
 	perf-public-preview-check perf-public-release-check \
 	perf-sap-release-bridge-preview perf-sap-release-bridge-preview-check \
-	perf-ecosystem \
+	perf-candidate-check perf-ecosystem \
 	perf-ecosystem-rust4pm perf-ecosystem-ocpa perf-release-check \
 	private-wheel private-wheel-verify
 
@@ -74,3 +74,7 @@ perf-ecosystem-ocpa:
 	./benchmarks/run_ecosystem_benchmark.sh --pair ocpa
 
 perf-release-check: perf-public-release-check
+
+perf-candidate-check: check-python
+	$(PYTHON) benchmarks/check_candidate_regression.py \
+		.benchmarks/candidate-regression.json
