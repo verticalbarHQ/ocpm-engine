@@ -64,7 +64,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--samples-per-epoch", type=int, default=20)
     parser.add_argument("--memory-samples", type=int, default=4)
     parser.add_argument("--concurrency-levels", default="1,2,4")
-    parser.add_argument("--concurrency-epochs", type=int, default=3)
+    parser.add_argument("--concurrency-epochs", type=int, default=5)
     parser.add_argument("--concurrency-requests-per-worker", type=int, default=8)
     parser.add_argument("--concurrency-min-seconds", type=float, default=5.0)
     parser.add_argument("--timeout-seconds", type=float, default=120.0)
