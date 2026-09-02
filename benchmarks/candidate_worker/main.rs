@@ -76,10 +76,25 @@ fn main() {
         );
     }
     let result = result.expect("positive iterations");
-    let storage_bytes = std::env::current_exe()
-        .and_then(std::fs::metadata)
-        .map(|metadata| metadata.len())
-        .expect("worker metadata");
+    let answer = json!({
+        "profile": {
+            "event_count": profile.event_count,
+            "object_count": profile.object_count,
+            "e2o_count": profile.e2o_count,
+            "o2o_count": profile.o2o_count,
+            "activities": profile.activities,
+            "object_types": profile.object_types,
+        },
+        "bottlenecks": result,
+    });
+    // The engine has no private persistent store. Measure the deterministic
+    // serialized analysis result rather than an unrelated compiled executable.
+    let storage_bytes = u64::try_from(
+        serde_json::to_vec(&answer)
+            .expect("serialize storage representation")
+            .len(),
+    )
+    .expect("serialized result size fits u64");
     let output = json!({
         "input": {
             "workload": request["workload"],
@@ -87,17 +102,7 @@ fn main() {
             "events_per_case": events_per_case,
             "iterations": iterations,
         },
-        "answer": {
-            "profile": {
-                "event_count": profile.event_count,
-                "object_count": profile.object_count,
-                "e2o_count": profile.e2o_count,
-                "o2o_count": profile.o2o_count,
-                "activities": profile.activities,
-                "object_types": profile.object_types,
-            },
-            "bottlenecks": result,
-        },
+        "answer": answer,
         "storage_bytes": storage_bytes,
     });
     println!(

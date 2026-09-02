@@ -217,6 +217,21 @@ def test_checker_rejects_latency_regression(artifact: dict) -> None:
         )
 
 
+def test_checker_rejects_truncated_latency_samples(artifact: dict) -> None:
+    changed = copy.deepcopy(artifact)
+    serial = changed["workloads"][0]["latency_epochs"][0]["arms"]["candidate"]
+    serial["samples_ns"] = serial["samples_ns"][:1]
+    serial["p50_ns"] = serial["samples_ns"][0]
+    serial["p95_ns"] = serial["samples_ns"][0]
+    with pytest.raises(ValueError, match="latency sample count mismatch"):
+        validate(
+            resign(changed),
+            allow_dirty_controller=True,
+            allow_dirty_candidate=True,
+            allow_unverified_workers=True,
+        )
+
+
 def test_checker_rejects_dirty_baseline(artifact: dict) -> None:
     changed = copy.deepcopy(artifact)
     changed["arms"]["baseline"]["tree_clean"] = False

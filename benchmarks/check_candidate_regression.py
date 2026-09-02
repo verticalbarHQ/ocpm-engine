@@ -347,12 +347,14 @@ def validate(
                 fail(f"{name}: latency order count mismatch")
             if any(code not in (0, 1) for code in epoch["order_codes"]):
                 fail(f"{name}: invalid latency order code")
-            all_baseline.extend(
-                _check_serial(epoch["arms"]["baseline"], f"{name}/baseline")
-            )
-            all_candidate.extend(
-                _check_serial(epoch["arms"]["candidate"], f"{name}/candidate")
-            )
+            for arm, collected in (
+                ("baseline", all_baseline),
+                ("candidate", all_candidate),
+            ):
+                samples = _check_serial(epoch["arms"][arm], f"{name}/{arm}")
+                if len(samples) != settings["samples_per_epoch"]:
+                    fail(f"{name}: latency sample count mismatch")
+                collected.extend(samples)
         baseline_p50 = int(statistics.median(all_baseline))
         candidate_p50 = int(statistics.median(all_candidate))
         if candidate_p50 > _allowed(
