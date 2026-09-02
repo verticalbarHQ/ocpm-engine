@@ -8,6 +8,43 @@ permissions:
   contents: read
 
 jobs:
+  candidate-regression:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out candidate
+        uses: actions/checkout@v4
+        with:
+          path: candidate
+      - name: Check out exact base
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: baseline
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Rust MSRV
+        run: >-
+          rustup toolchain install 1.85.1 --profile minimal --no-self-update
+      - name: Execute candidate regression gate
+        working-directory: candidate
+        run: >-
+          make perf-candidate-run
+          BASELINE_SOURCE=../baseline
+          CANDIDATE_RESULT=../candidate-regression.json
+      - name: Independently verify candidate evidence
+        working-directory: candidate
+        run: >-
+          make perf-candidate-check
+          CANDIDATE_RESULT=../candidate-regression.json
+      - name: Upload candidate evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: candidate-regression
+          path: candidate-regression.json
+          if-no-files-found: error
+
   test:
     runs-on: ubuntu-latest
     env:

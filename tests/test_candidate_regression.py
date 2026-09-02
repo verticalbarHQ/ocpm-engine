@@ -58,6 +58,7 @@ def artifact(tmp_path_factory: pytest.TempPathFactory) -> dict:
             "0.5",
             "--allow-dirty-controller",
             "--allow-dirty-candidate",
+            "--allow-unverified-workers",
         ],
         cwd=ROOT,
         check=True,
@@ -70,8 +71,34 @@ def resign(value: dict) -> dict:
     return value
 
 
+def with_worker_provenance(value: dict) -> dict:
+    changed = copy.deepcopy(value)
+    for arm_name in ("baseline", "candidate"):
+        arm = changed["arms"][arm_name]
+        provenance = {
+            "schema_version": 1,
+            "artifact_type": "ocpm_engine_candidate_worker",
+            "source": {
+                name: arm[name] for name in ("revision", "tree_clean", "tree_sha256")
+            },
+            "inputs": {
+                "builder_sha256": "1" * 64,
+                "worker_source_sha256": "2" * 64,
+            },
+            "worker_sha256": arm["worker_sha256"],
+        }
+        provenance["payload_sha256"] = payload_sha256(provenance)
+        arm["worker_provenance"] = provenance
+    return resign(changed)
+
+
 def test_executed_noop_candidate_passes(artifact: dict) -> None:
-    validate(artifact, allow_dirty_controller=True, allow_dirty_candidate=True)
+    validate(
+        artifact,
+        allow_dirty_controller=True,
+        allow_dirty_candidate=True,
+        allow_unverified_workers=True,
+    )
     assert (
         artifact["arms"]["baseline"]["worker_sha256"]
         == artifact["arms"]["candidate"]["worker_sha256"]
@@ -89,6 +116,7 @@ def test_checker_rejects_an_answer_mismatch(artifact: dict) -> None:
             resign(changed),
             allow_dirty_controller=True,
             allow_dirty_candidate=True,
+            allow_unverified_workers=True,
         )
 
 
@@ -101,6 +129,7 @@ def test_checker_rejects_a_historical_payload_without_workloads(artifact: dict) 
             resign(changed),
             allow_dirty_controller=True,
             allow_dirty_candidate=True,
+            allow_unverified_workers=True,
         )
 
 
@@ -117,6 +146,7 @@ def test_checker_rejects_latency_regression(artifact: dict) -> None:
             resign(changed),
             allow_dirty_controller=True,
             allow_dirty_candidate=True,
+            allow_unverified_workers=True,
         )
 
 
@@ -124,6 +154,48 @@ def test_checker_rejects_dirty_baseline(artifact: dict) -> None:
     changed = copy.deepcopy(artifact)
     changed["arms"]["baseline"]["tree_clean"] = False
     with pytest.raises(ValueError, match="baseline source is dirty"):
+        validate(
+            resign(changed),
+            allow_dirty_controller=True,
+            allow_dirty_candidate=True,
+            allow_unverified_workers=True,
+        )
+
+
+def test_checker_rejects_unverified_workers_by_default(artifact: dict) -> None:
+    with pytest.raises(ValueError, match="worker provenance fields changed"):
+        validate(
+            artifact,
+            allow_dirty_controller=True,
+            allow_dirty_candidate=True,
+        )
+
+
+def test_checker_rejects_another_candidate_revision(artifact: dict) -> None:
+    with pytest.raises(ValueError, match="candidate revision does not match"):
+        validate(
+            artifact,
+            allow_dirty_controller=True,
+            allow_dirty_candidate=True,
+            allow_unverified_workers=True,
+            expected_candidate_revision="0" * 40,
+        )
+
+
+def test_checker_accepts_workers_bound_to_each_source(artifact: dict) -> None:
+    validate(
+        with_worker_provenance(artifact),
+        allow_dirty_controller=True,
+        allow_dirty_candidate=True,
+    )
+
+
+def test_checker_rejects_a_worker_bound_to_the_other_source(artifact: dict) -> None:
+    changed = with_worker_provenance(artifact)
+    changed["arms"]["candidate"]["worker_provenance"] = copy.deepcopy(
+        changed["arms"]["baseline"]["worker_provenance"]
+    )
+    with pytest.raises(ValueError, match="worker source does not match"):
         validate(
             resign(changed),
             allow_dirty_controller=True,

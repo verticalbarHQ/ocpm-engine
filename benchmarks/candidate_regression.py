@@ -70,6 +70,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--timeout-seconds", type=float, default=120.0)
     parser.add_argument("--allow-dirty-controller", action="store_true")
     parser.add_argument("--allow-dirty-candidate", action="store_true")
+    parser.add_argument("--allow-unverified-workers", action="store_true")
     args = parser.parse_args()
     positive = (
         "warmups",
@@ -139,6 +140,24 @@ def source_provenance(repository: Path) -> dict[str, Any]:
         "tree_clean": not bool(status),
         "tree_sha256": sha256_bytes(tree_material),
     }
+
+
+def worker_provenance(
+    worker: Path, source: dict[str, Any], *, allow_unverified: bool
+) -> dict[str, Any] | None:
+    path = worker.with_name(worker.name + ".provenance.json")
+    if not path.is_file():
+        if allow_unverified:
+            return None
+        raise SystemExit(f"worker provenance is missing: {path}")
+    value = json.loads(path.read_text())
+    if value.get("payload_sha256") != payload_sha256(value):
+        raise SystemExit(f"worker provenance digest mismatch: {path}")
+    if value.get("source") != source:
+        raise SystemExit(f"worker provenance source mismatch: {path}")
+    if value.get("worker_sha256") != file_sha256(worker):
+        raise SystemExit(f"worker provenance executable mismatch: {path}")
+    return value
 
 
 def _rss_bytes(pid: int) -> int:
@@ -403,6 +422,15 @@ def main() -> None:
         not path.is_file() or not os.access(path, os.X_OK) for path in workers.values()
     ):
         raise SystemExit("worker paths must be executable files")
+    sources = {"baseline": baseline, "candidate": candidate}
+    worker_provenances = {
+        arm: worker_provenance(
+            worker,
+            sources[arm],
+            allow_unverified=args.allow_unverified_workers,
+        )
+        for arm, worker in workers.items()
+    }
     rng = random.Random(RANDOM_SEED)
     artifact = {
         "schema_version": SCHEMA_VERSION,
@@ -431,10 +459,15 @@ def main() -> None:
             "storage_ceiling": STORAGE_CEILING,
         },
         "arms": {
-            "baseline": {**baseline, "worker_sha256": file_sha256(workers["baseline"])},
+            "baseline": {
+                **baseline,
+                "worker_sha256": file_sha256(workers["baseline"]),
+                "worker_provenance": worker_provenances["baseline"],
+            },
             "candidate": {
                 **candidate,
                 "worker_sha256": file_sha256(workers["candidate"]),
+                "worker_provenance": worker_provenances["candidate"],
             },
         },
         "workloads": [
@@ -449,6 +482,7 @@ def main() -> None:
         artifact,
         allow_dirty_controller=args.allow_dirty_controller,
         allow_dirty_candidate=args.allow_dirty_candidate,
+        allow_unverified_workers=args.allow_unverified_workers,
     )
     print(f"candidate regression gate passed: {args.output}")
 

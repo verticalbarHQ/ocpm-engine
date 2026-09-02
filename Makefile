@@ -75,6 +75,13 @@ perf-ecosystem-ocpa:
 
 perf-release-check: perf-public-release-check
 
+perf-candidate-run: check-python
+	@test -n "$(BASELINE_SOURCE)" || \
+		(echo "BASELINE_SOURCE is required" >&2; exit 2)
+	./benchmarks/run_candidate_regression.sh \
+		"$(BASELINE_SOURCE)" \
+		"$(or $(CANDIDATE_RESULT),.benchmarks/candidate-regression.json)"
+
 perf-candidate-check: check-python
 	$(PYTHON) benchmarks/check_candidate_regression.py \
-		.benchmarks/candidate-regression.json
+		"$(or $(CANDIDATE_RESULT),.benchmarks/candidate-regression.json)"

@@ -8,6 +8,7 @@ import hashlib
 import json
 import math
 import statistics
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -66,8 +67,53 @@ def _allowed(prior: int, ceiling: float, slack: int) -> int:
     return max(math.ceil(prior * ceiling), prior + slack)
 
 
+def _check_worker_provenance(
+    arm: dict[str, Any], label: str, *, allow_unverified_workers: bool
+) -> None:
+    provenance = arm.get("worker_provenance")
+    if provenance is None and allow_unverified_workers:
+        return
+    required = {
+        "schema_version",
+        "artifact_type",
+        "source",
+        "inputs",
+        "worker_sha256",
+        "payload_sha256",
+    }
+    if not isinstance(provenance, dict) or set(provenance) != required:
+        fail(f"{label}: worker provenance fields changed")
+    if (
+        provenance["schema_version"] != 1
+        or provenance["artifact_type"] != "ocpm_engine_candidate_worker"
+        or provenance["payload_sha256"] != payload_sha256(provenance)
+    ):
+        fail(f"{label}: invalid worker provenance")
+    source = {name: arm.get(name) for name in ("revision", "tree_clean", "tree_sha256")}
+    if provenance["source"] != source:
+        fail(f"{label}: worker source does not match declared source")
+    if provenance["worker_sha256"] != arm.get("worker_sha256"):
+        fail(f"{label}: worker digest does not match provenance")
+    inputs = provenance["inputs"]
+    if not isinstance(inputs, dict) or set(inputs) != {
+        "builder_sha256",
+        "worker_source_sha256",
+    }:
+        fail(f"{label}: worker build inputs changed")
+    if any(
+        not isinstance(digest, str) or len(digest) != 64 for digest in inputs.values()
+    ):
+        fail(f"{label}: invalid worker build input digest")
+
+
 def validate(
-    value: dict[str, Any], *, allow_dirty_controller: bool, allow_dirty_candidate: bool
+    value: dict[str, Any],
+    *,
+    allow_dirty_controller: bool,
+    allow_dirty_candidate: bool,
+    allow_unverified_workers: bool = False,
+    expected_controller_revision: str | None = None,
+    expected_candidate_revision: str | None = None,
 ) -> None:
     required = {
         "schema_version",
@@ -103,12 +149,26 @@ def validate(
             fail(f"settings/{name}: threshold changed")
     controller = value["controller"]
     arms = value["arms"]
+    if (
+        expected_controller_revision is not None
+        and controller.get("revision") != expected_controller_revision
+    ):
+        fail("controller revision does not match current checkout")
+    if (
+        expected_candidate_revision is not None
+        and arms.get("candidate", {}).get("revision") != expected_candidate_revision
+    ):
+        fail("candidate revision does not match current checkout")
     if not controller.get("tree_clean") and not allow_dirty_controller:
         fail("controller source is dirty")
     if not arms.get("baseline", {}).get("tree_clean"):
         fail("baseline source is dirty")
     if not arms.get("candidate", {}).get("tree_clean") and not allow_dirty_candidate:
         fail("candidate source is dirty")
+    for arm in ("baseline", "candidate"):
+        _check_worker_provenance(
+            arms.get(arm, {}), arm, allow_unverified_workers=allow_unverified_workers
+        )
     if value["fixture"].get("workload_count") != len(value["workloads"]):
         fail("fixture workload count mismatch")
     if not value["workloads"]:
@@ -233,14 +293,30 @@ def validate(
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("artifact", type=Path)
+    root = Path(__file__).resolve().parents[1]
+    parser.add_argument("--controller-source", type=Path, default=root)
+    parser.add_argument("--candidate-source", type=Path, default=root)
     parser.add_argument("--allow-dirty-controller", action="store_true")
     parser.add_argument("--allow-dirty-candidate", action="store_true")
+    parser.add_argument("--allow-unverified-workers", action="store_true")
     args = parser.parse_args()
     value = json.loads(args.artifact.read_text())
+
+    def revision(source: Path) -> str:
+        return subprocess.run(
+            ["git", "-C", str(source), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
     validate(
         value,
         allow_dirty_controller=args.allow_dirty_controller,
         allow_dirty_candidate=args.allow_dirty_candidate,
+        allow_unverified_workers=args.allow_unverified_workers,
+        expected_controller_revision=revision(args.controller_source),
+        expected_candidate_revision=revision(args.candidate_source),
     )
     print(f"candidate regression artifact valid: {args.artifact}")
 
