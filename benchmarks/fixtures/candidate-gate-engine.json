@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "workloads": [
+    {
+      "name": "provider_neutral_bottleneck",
+      "expected_input": {
+        "workload": "provider_neutral_bottleneck",
+        "cases": 250,
+        "events_per_case": 8,
+        "iterations": 20
+      },
+      "payload": {
+        "cases": 250,
+        "events_per_case": 8,
+        "iterations": 20
+      }
+    }
+  ]
+}

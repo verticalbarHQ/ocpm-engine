@@ -4,7 +4,7 @@ DIST_DIR ?= $(CURDIR)/dist
 .PHONY: check-python dependency-boundary-check license-check perf-public perf-public-concurrency \
 	perf-public-preview-check perf-public-release-check \
 	perf-sap-release-bridge-preview perf-sap-release-bridge-preview-check \
-	perf-ecosystem \
+	perf-candidate-check perf-ecosystem \
 	perf-ecosystem-rust4pm perf-ecosystem-ocpa perf-release-check \
 	private-wheel private-wheel-verify
 
@@ -74,3 +74,18 @@ perf-ecosystem-ocpa:
 	./benchmarks/run_ecosystem_benchmark.sh --pair ocpa
 
 perf-release-check: perf-public-release-check
+
+perf-candidate-run: check-python
+	@test -n "$(BASELINE_SOURCE)" || \
+		(echo "BASELINE_SOURCE is required" >&2; exit 2)
+	PYTHON="$(PYTHON)" ./benchmarks/run_candidate_regression.sh \
+		"$(BASELINE_SOURCE)" \
+		"$(or $(CANDIDATE_RESULT),.benchmarks/candidate-regression.json)"
+
+perf-candidate-check: check-python
+	@test -n "$(BASELINE_SOURCE)" || \
+		(echo "BASELINE_SOURCE is required" >&2; exit 2)
+	$(PYTHON) benchmarks/check_candidate_regression.py \
+		--baseline-source "$(BASELINE_SOURCE)" \
+		--manifest benchmarks/fixtures/candidate-gate-engine.json \
+		"$(or $(CANDIDATE_RESULT),.benchmarks/candidate-regression.json)"
