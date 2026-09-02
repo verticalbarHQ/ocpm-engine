@@ -113,6 +113,7 @@ def validate(
     allow_dirty_candidate: bool,
     allow_unverified_workers: bool = False,
     expected_controller_revision: str | None = None,
+    expected_baseline_revision: str | None = None,
     expected_candidate_revision: str | None = None,
 ) -> None:
     required = {
@@ -154,6 +155,11 @@ def validate(
         and controller.get("revision") != expected_controller_revision
     ):
         fail("controller revision does not match current checkout")
+    if (
+        expected_baseline_revision is not None
+        and arms.get("baseline", {}).get("revision") != expected_baseline_revision
+    ):
+        fail("baseline revision does not match checked-out baseline")
     if (
         expected_candidate_revision is not None
         and arms.get("candidate", {}).get("revision") != expected_candidate_revision
@@ -255,7 +261,8 @@ def validate(
                         row["workers"] * settings["concurrency_requests_per_worker"]
                     ):
                         fail(f"{name}: concurrency request floor not met")
-                    if epoch.get("wall_ns", 0) < int(
+                    wall_ns = epoch.get("wall_ns")
+                    if type(wall_ns) is not int or wall_ns < int(
                         settings["concurrency_min_seconds"] * 1_000_000_000
                     ):
                         fail(f"{name}: concurrency duration floor not met")
@@ -267,6 +274,11 @@ def validate(
                     throughput = epoch.get("throughput_qps")
                     if not isinstance(throughput, (int, float)) or throughput <= 0:
                         fail(f"{name}: invalid concurrency throughput")
+                    expected_throughput = round(
+                        epoch["requests"] / (wall_ns / 1_000_000_000), 6
+                    )
+                    if throughput != expected_throughput:
+                        fail(f"{name}: concurrency throughput summary mismatch")
                     qps.append(float(throughput))
                     p95.append(epoch["p95_ns"])
                 mean = statistics.mean(qps)
@@ -295,6 +307,7 @@ def main() -> None:
     parser.add_argument("artifact", type=Path)
     root = Path(__file__).resolve().parents[1]
     parser.add_argument("--controller-source", type=Path, default=root)
+    parser.add_argument("--baseline-source", required=True, type=Path)
     parser.add_argument("--candidate-source", type=Path, default=root)
     parser.add_argument("--allow-dirty-controller", action="store_true")
     parser.add_argument("--allow-dirty-candidate", action="store_true")
@@ -316,6 +329,7 @@ def main() -> None:
         allow_dirty_candidate=args.allow_dirty_candidate,
         allow_unverified_workers=args.allow_unverified_workers,
         expected_controller_revision=revision(args.controller_source),
+        expected_baseline_revision=revision(args.baseline_source),
         expected_candidate_revision=revision(args.candidate_source),
     )
     print(f"candidate regression artifact valid: {args.artifact}")

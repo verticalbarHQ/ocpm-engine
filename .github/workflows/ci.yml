@@ -37,6 +37,7 @@ jobs:
         working-directory: candidate
         run: >-
           make perf-candidate-check
+          BASELINE_SOURCE=../baseline
           CANDIDATE_RESULT=../candidate-regression.json
       - name: Upload candidate evidence
         uses: actions/upload-artifact@v4

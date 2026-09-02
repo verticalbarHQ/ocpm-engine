@@ -182,6 +182,31 @@ def test_checker_rejects_another_candidate_revision(artifact: dict) -> None:
         )
 
 
+def test_checker_rejects_another_baseline_revision(artifact: dict) -> None:
+    with pytest.raises(ValueError, match="baseline revision does not match"):
+        validate(
+            artifact,
+            allow_dirty_controller=True,
+            allow_dirty_candidate=True,
+            allow_unverified_workers=True,
+            expected_baseline_revision="0" * 40,
+        )
+
+
+def test_checker_recomputes_concurrency_throughput(artifact: dict) -> None:
+    changed = copy.deepcopy(artifact)
+    changed["workloads"][0]["concurrency"][0]["arms"]["candidate"][0][
+        "throughput_qps"
+    ] *= 2
+    with pytest.raises(ValueError, match="throughput summary mismatch"):
+        validate(
+            resign(changed),
+            allow_dirty_controller=True,
+            allow_dirty_candidate=True,
+            allow_unverified_workers=True,
+        )
+
+
 def test_checker_accepts_workers_bound_to_each_source(artifact: dict) -> None:
     validate(
         with_worker_provenance(artifact),

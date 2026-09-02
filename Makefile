@@ -83,5 +83,8 @@ perf-candidate-run: check-python
 		"$(or $(CANDIDATE_RESULT),.benchmarks/candidate-regression.json)"
 
 perf-candidate-check: check-python
+	@test -n "$(BASELINE_SOURCE)" || \
+		(echo "BASELINE_SOURCE is required" >&2; exit 2)
 	$(PYTHON) benchmarks/check_candidate_regression.py \
+		--baseline-source "$(BASELINE_SOURCE)" \
 		"$(or $(CANDIDATE_RESULT),.benchmarks/candidate-regression.json)"
