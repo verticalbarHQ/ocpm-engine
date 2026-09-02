@@ -78,7 +78,7 @@ perf-release-check: perf-public-release-check
 perf-candidate-run: check-python
 	@test -n "$(BASELINE_SOURCE)" || \
 		(echo "BASELINE_SOURCE is required" >&2; exit 2)
-	./benchmarks/run_candidate_regression.sh \
+	PYTHON="$(PYTHON)" ./benchmarks/run_candidate_regression.sh \
 		"$(BASELINE_SOURCE)" \
 		"$(or $(CANDIDATE_RESULT),.benchmarks/candidate-regression.json)"
 

@@ -15,20 +15,21 @@ if [[ "${OUTPUT}" != /* ]]; then
 fi
 
 RUN_ROOT="$(mktemp -d)"
+PYTHON_BIN="${PYTHON:-python3}"
 cleanup() {
   find "${RUN_ROOT}" -depth -delete
 }
 trap cleanup EXIT
 
-python "${SCRIPT_DIR}/build_candidate_worker.py" \
+"${PYTHON_BIN}" "${SCRIPT_DIR}/build_candidate_worker.py" \
   --engine-source "${BASELINE_SOURCE}" \
   --build-root "${RUN_ROOT}/baseline-build" \
   --output "${RUN_ROOT}/baseline-worker"
-python "${SCRIPT_DIR}/build_candidate_worker.py" \
+"${PYTHON_BIN}" "${SCRIPT_DIR}/build_candidate_worker.py" \
   --engine-source "${CANDIDATE_SOURCE}" \
   --build-root "${RUN_ROOT}/candidate-build" \
   --output "${RUN_ROOT}/candidate-worker"
-python "${SCRIPT_DIR}/candidate_regression.py" \
+"${PYTHON_BIN}" "${SCRIPT_DIR}/candidate_regression.py" \
   --baseline-source "${BASELINE_SOURCE}" \
   --candidate-source "${CANDIDATE_SOURCE}" \
   --baseline-worker "${RUN_ROOT}/baseline-worker" \

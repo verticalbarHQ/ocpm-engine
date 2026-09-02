@@ -32,6 +32,46 @@ def payload_sha256(value: dict[str, Any]) -> str:
     return hashlib.sha256(canonical_payload(value)).hexdigest()
 
 
+def canonical(value: object) -> bytes:
+    return json.dumps(
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
+
+
+def file_sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def git(repository: Path, *args: str) -> str:
+    return subprocess.run(
+        ["git", "-C", str(repository), *args],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+
+def source_provenance(repository: Path) -> dict[str, Any]:
+    root = Path(git(repository, "rev-parse", "--show-toplevel"))
+    status = git(root, "status", "--porcelain", "--untracked-files=all")
+    tracked = subprocess.run(
+        ["git", "-C", str(root), "diff", "--binary", "HEAD"],
+        check=True,
+        capture_output=True,
+    ).stdout
+    untracked = []
+    for relative in git(
+        root, "ls-files", "--others", "--exclude-standard"
+    ).splitlines():
+        path = root / relative
+        untracked.append((relative, file_sha256(path) if path.is_file() else None))
+    return {
+        "revision": git(root, "rev-parse", "HEAD"),
+        "tree_clean": not bool(status),
+        "tree_sha256": hashlib.sha256(tracked + canonical(untracked)).hexdigest(),
+    }
+
+
 def fail(message: str) -> None:
     raise ValueError(message)
 
@@ -68,7 +108,11 @@ def _allowed(prior: int, ceiling: float, slack: int) -> int:
 
 
 def _check_worker_provenance(
-    arm: dict[str, Any], label: str, *, allow_unverified_workers: bool
+    arm: dict[str, Any],
+    label: str,
+    *,
+    allow_unverified_workers: bool,
+    expected_source_lock_sha256: str | None,
 ) -> None:
     provenance = arm.get("worker_provenance")
     if provenance is None and allow_unverified_workers:
@@ -97,6 +141,7 @@ def _check_worker_provenance(
     inputs = provenance["inputs"]
     if not isinstance(inputs, dict) or set(inputs) != {
         "builder_sha256",
+        "source_lock_sha256",
         "worker_source_sha256",
     }:
         fail(f"{label}: worker build inputs changed")
@@ -104,6 +149,11 @@ def _check_worker_provenance(
         not isinstance(digest, str) or len(digest) != 64 for digest in inputs.values()
     ):
         fail(f"{label}: invalid worker build input digest")
+    if (
+        expected_source_lock_sha256 is not None
+        and inputs["source_lock_sha256"] != expected_source_lock_sha256
+    ):
+        fail(f"{label}: worker lock does not match checked-out source")
 
 
 def validate(
@@ -115,6 +165,11 @@ def validate(
     expected_controller_revision: str | None = None,
     expected_baseline_revision: str | None = None,
     expected_candidate_revision: str | None = None,
+    expected_controller_source: dict[str, Any] | None = None,
+    expected_baseline_source: dict[str, Any] | None = None,
+    expected_candidate_source: dict[str, Any] | None = None,
+    expected_baseline_lock_sha256: str | None = None,
+    expected_candidate_lock_sha256: str | None = None,
 ) -> None:
     required = {
         "schema_version",
@@ -165,6 +220,21 @@ def validate(
         and arms.get("candidate", {}).get("revision") != expected_candidate_revision
     ):
         fail("candidate revision does not match current checkout")
+    if (
+        expected_controller_source is not None
+        and controller != expected_controller_source
+    ):
+        fail("controller checkout state does not match artifact")
+    for arm, expected in (
+        ("baseline", expected_baseline_source),
+        ("candidate", expected_candidate_source),
+    ):
+        identity = {
+            name: arms.get(arm, {}).get(name)
+            for name in ("revision", "tree_clean", "tree_sha256")
+        }
+        if expected is not None and identity != expected:
+            fail(f"{arm} checkout state does not match artifact")
     if not controller.get("tree_clean") and not allow_dirty_controller:
         fail("controller source is dirty")
     if not arms.get("baseline", {}).get("tree_clean"):
@@ -173,7 +243,13 @@ def validate(
         fail("candidate source is dirty")
     for arm in ("baseline", "candidate"):
         _check_worker_provenance(
-            arms.get(arm, {}), arm, allow_unverified_workers=allow_unverified_workers
+            arms.get(arm, {}),
+            arm,
+            allow_unverified_workers=allow_unverified_workers,
+            expected_source_lock_sha256={
+                "baseline": expected_baseline_lock_sha256,
+                "candidate": expected_candidate_lock_sha256,
+            }[arm],
         )
     if value["fixture"].get("workload_count") != len(value["workloads"]):
         fail("fixture workload count mismatch")
@@ -315,22 +391,25 @@ def main() -> None:
     args = parser.parse_args()
     value = json.loads(args.artifact.read_text())
 
-    def revision(source: Path) -> str:
-        return subprocess.run(
-            ["git", "-C", str(source), "rev-parse", "HEAD"],
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout.strip()
+    controller_source = source_provenance(args.controller_source)
+    baseline_source = source_provenance(args.baseline_source)
+    candidate_source = source_provenance(args.candidate_source)
 
     validate(
         value,
         allow_dirty_controller=args.allow_dirty_controller,
         allow_dirty_candidate=args.allow_dirty_candidate,
         allow_unverified_workers=args.allow_unverified_workers,
-        expected_controller_revision=revision(args.controller_source),
-        expected_baseline_revision=revision(args.baseline_source),
-        expected_candidate_revision=revision(args.candidate_source),
+        expected_controller_revision=controller_source["revision"],
+        expected_baseline_revision=baseline_source["revision"],
+        expected_candidate_revision=candidate_source["revision"],
+        expected_controller_source=controller_source,
+        expected_baseline_source=baseline_source,
+        expected_candidate_source=candidate_source,
+        expected_baseline_lock_sha256=file_sha256(args.baseline_source / "Cargo.lock"),
+        expected_candidate_lock_sha256=file_sha256(
+            args.candidate_source / "Cargo.lock"
+        ),
     )
     print(f"candidate regression artifact valid: {args.artifact}")
 

@@ -83,6 +83,7 @@ def with_worker_provenance(value: dict) -> dict:
             },
             "inputs": {
                 "builder_sha256": "1" * 64,
+                "source_lock_sha256": "3" * 64,
                 "worker_source_sha256": "2" * 64,
             },
             "worker_sha256": arm["worker_sha256"],
@@ -190,6 +191,34 @@ def test_checker_rejects_another_baseline_revision(artifact: dict) -> None:
             allow_dirty_candidate=True,
             allow_unverified_workers=True,
             expected_baseline_revision="0" * 40,
+        )
+
+
+def test_checker_rejects_dirty_same_revision_checkout(artifact: dict) -> None:
+    expected = {
+        name: artifact["controller"][name]
+        for name in ("revision", "tree_clean", "tree_sha256")
+    }
+    expected["tree_clean"] = False
+    expected["tree_sha256"] = "4" * 64
+    with pytest.raises(ValueError, match="controller checkout state does not match"):
+        validate(
+            artifact,
+            allow_dirty_controller=True,
+            allow_dirty_candidate=True,
+            allow_unverified_workers=True,
+            expected_controller_source=expected,
+        )
+
+
+def test_checker_rejects_worker_built_with_another_lock(artifact: dict) -> None:
+    changed = with_worker_provenance(artifact)
+    with pytest.raises(ValueError, match="worker lock does not match"):
+        validate(
+            changed,
+            allow_dirty_controller=True,
+            allow_dirty_candidate=True,
+            expected_baseline_lock_sha256="0" * 64,
         )
 
 

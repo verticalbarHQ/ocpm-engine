@@ -67,42 +67,23 @@ def main() -> None:
     if not core.is_dir() or not engine.is_dir():
         raise SystemExit("engine source does not contain the required crates")
     build_root = args.build_root.resolve()
-    source_dir = build_root / "src"
-    source_dir.mkdir(parents=True, exist_ok=True)
-    manifest = f"""[package]
-name = "ocpm-candidate-worker"
-version = "0.0.0"
-edition = "2024"
-rust-version = "1.85.1"
-publish = false
-
-[dependencies]
-ocpm-core = {{ path = {json.dumps(str(core))} }}
-ocpm-engine = {{ path = {json.dumps(str(engine))} }}
-serde_json = "1.0.149"
-
-[profile.release]
-codegen-units = 1
-lto = "fat"
-panic = "abort"
-strip = "symbols"
-
-[workspace]
-"""
-    (build_root / "Cargo.toml").write_text(manifest)
+    source_lock = source / "Cargo.lock"
+    if not source_lock.is_file():
+        raise SystemExit("engine source does not contain Cargo.lock")
+    source_copy = build_root / "source"
+    shutil.copytree(
+        source,
+        source_copy,
+        symlinks=True,
+        ignore=shutil.ignore_patterns(
+            ".git", "target", ".venv", ".benchmarks", "__pycache__", "*.pyc"
+        ),
+    )
+    example = source_copy / "crates/ocpm-engine/examples/candidate_worker.rs"
+    example.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(
         Path(__file__).with_name("candidate_worker") / "main.rs",
-        source_dir / "main.rs",
-    )
-    subprocess.run(
-        [
-            "cargo",
-            "+1.85.1",
-            "generate-lockfile",
-            "--manifest-path",
-            str(build_root / "Cargo.toml"),
-        ],
-        check=True,
+        example,
     )
     subprocess.run(
         [
@@ -111,12 +92,16 @@ strip = "symbols"
             "build",
             "--release",
             "--locked",
+            "--package",
+            "ocpm-engine",
+            "--example",
+            "candidate_worker",
             "--manifest-path",
-            str(build_root / "Cargo.toml"),
+            str(source_copy / "Cargo.toml"),
         ],
         check=True,
     )
-    built = build_root / "target/release/ocpm-candidate-worker"
+    built = source_copy / "target/release/examples/candidate_worker"
     args.output.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(built, args.output)
     args.output.chmod(0o755)
@@ -126,6 +111,7 @@ strip = "symbols"
         "source": source_provenance(source),
         "inputs": {
             "builder_sha256": file_sha256(Path(__file__)),
+            "source_lock_sha256": file_sha256(source_lock),
             "worker_source_sha256": file_sha256(
                 Path(__file__).with_name("candidate_worker") / "main.rs"
             ),
