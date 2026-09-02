@@ -163,7 +163,13 @@ def worker_provenance(
 def _rss_bytes(pid: int) -> int:
     status = Path(f"/proc/{pid}/status")
     if status.exists():
-        for line in status.read_text().splitlines():
+        try:
+            lines = status.read_text().splitlines()
+        except (FileNotFoundError, ProcessLookupError):
+            # Short-lived workers can exit between the existence check and the
+            # read. Once gone, they no longer contribute to the sampled RSS.
+            return 0
+        for line in lines:
             if line.startswith("VmRSS:"):
                 return int(line.split()[1]) * 1024
         return 0

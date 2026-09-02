@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+import benchmarks.candidate_regression as candidate_regression
 from benchmarks.check_candidate_regression import payload_sha256, validate
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -69,6 +70,20 @@ def artifact(tmp_path_factory: pytest.TempPathFactory) -> dict:
 def resign(value: dict) -> dict:
     value["payload_sha256"] = payload_sha256(value)
     return value
+
+
+def test_rss_sampling_tolerates_a_worker_exiting_during_proc_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class VanishedStatus:
+        def exists(self) -> bool:
+            return True
+
+        def read_text(self) -> str:
+            raise ProcessLookupError
+
+    monkeypatch.setattr(candidate_regression, "Path", lambda _value: VanishedStatus())
+    assert candidate_regression._rss_bytes(1) == 0
 
 
 def with_worker_provenance(value: dict) -> dict:
