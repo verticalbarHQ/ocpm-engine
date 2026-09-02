@@ -32,11 +32,7 @@ pub(crate) fn open_database(
     source: &DuckDbParquetSource,
 ) -> Result<(Connection, ResolvedSnapshot), DuckDbProviderError> {
     validate_options(&source.options)?;
-    let mut config = Config::default()
-        .max_memory(&format!("{}B", source.options.memory_budget_bytes))?
-        .threads(i64::try_from(source.options.max_parallelism).map_err(|_| {
-            DuckDbProviderError::InvalidSource("max_parallelism does not fit i64".to_owned())
-        })?)?;
+    let mut config = client_config(source)?;
     let DuckDbDatabase::Existing { path, read_only } = &source.database;
     if !path.is_file() {
         return Err(DuckDbProviderError::InvalidSource(format!(
@@ -49,7 +45,31 @@ pub(crate) fn open_database(
     } else {
         AccessMode::ReadWrite
     })?;
-    let connection = Connection::open_with_flags(path, config)?;
+    initialize_database(Connection::open_with_flags(path, config)?, source)
+}
+
+pub(crate) fn open_isolated_database(
+    source: &DuckDbParquetSource,
+) -> Result<(Connection, ResolvedSnapshot), DuckDbProviderError> {
+    validate_options(&source.options)?;
+    initialize_database(
+        Connection::open_with_flags(":memory:", client_config(source)?)?,
+        source,
+    )
+}
+
+fn client_config(source: &DuckDbParquetSource) -> Result<Config, DuckDbProviderError> {
+    Ok(Config::default()
+        .max_memory(&format!("{}B", source.options.memory_budget_bytes))?
+        .threads(i64::try_from(source.options.max_parallelism).map_err(|_| {
+            DuckDbProviderError::InvalidSource("max_parallelism does not fit i64".to_owned())
+        })?)?)
+}
+
+fn initialize_database(
+    connection: Connection,
+    source: &DuckDbParquetSource,
+) -> Result<(Connection, ResolvedSnapshot), DuckDbProviderError> {
     validate_client_version(&connection)?;
     configure_resources(&connection, &source.options)?;
     let is_s3 = matches!(source.location, ParquetLocation::S3 { .. });
@@ -544,12 +564,25 @@ fn create_entity_link_views(
     let tenant = config.tenant_id;
     connection.execute_batch(&format!(
         r#"
-        CREATE TEMP VIEW ocpm_events AS
-        WITH events AS (
-          SELECT *, CAST(json_extract_string(display, '$.system_note_id') AS UBIGINT) AS stable_event_id
+        CREATE TEMP VIEW ocpm_entity_events_raw AS
+          SELECT
+            case_id,
+            timestamp AS event_timestamp,
+            CAST(json_extract_string(display, '$.system_note_id') AS UBIGINT) AS stable_event_id,
+            activity_id,
+            object_type AS event_object_type,
+            CAST(object_id AS UBIGINT) AS event_object_id,
+            display
           FROM read_parquet({event_path})
-          WHERE tenant_id = {tenant}
-        ), groups AS (
+          WHERE tenant_id = {tenant};
+
+        CREATE TEMP VIEW ocpm_entity_groups_raw AS
+          SELECT case_id,timestamp AS event_timestamp,system_note_ids,time_rank
+          FROM read_parquet({group_path})
+          WHERE tenant_id = {tenant};
+
+        CREATE TEMP VIEW ocpm_events AS
+        WITH groups AS (
           -- Membership is flattened to one scalar row per (physical group row, member), carrying
           -- the member's 1-based ordinal. `generate_subscripts` aligns with `unnest` and is
           -- 1-based, so the ordinal equals what `list_position` returned.
@@ -570,28 +603,28 @@ fn create_entity_link_views(
           -- so row-group pruning is not lost.
           SELECT
             g.case_id,
-            g.timestamp,
+            g.event_timestamp,
             g.time_rank,
             u.member_id,
             min(u.member_ordinal) AS member_ordinal
           FROM (
             SELECT row_number() OVER () AS group_row_id, *
-            FROM read_parquet({group_path})
-            WHERE tenant_id = {tenant}
+            FROM ocpm_entity_groups_raw
           ) g,
           LATERAL (
             SELECT
               unnest(g.system_note_ids) AS member_id,
               generate_subscripts(g.system_note_ids, 1) AS member_ordinal
           ) u
-          GROUP BY g.group_row_id, g.case_id, g.timestamp, g.time_rank, u.member_id
+          GROUP BY
+            g.group_row_id,g.case_id,g.event_timestamp,g.time_rank,u.member_id
         )
         SELECT
           events.stable_event_id AS event_id,
           CAST(events.stable_event_id AS VARCHAR) AS external_event_id,
           events.activity_id AS activity,
-          epoch_ns(events.timestamp)::HUGEINT AS timestamp_nanos_utc,
-          CAST(events.timestamp AS VARCHAR) AS source_timestamp,
+          epoch_ns(events.event_timestamp)::HUGEINT AS timestamp_nanos_utc,
+          CAST(events.event_timestamp AS VARCHAR) AS source_timestamp,
           CAST(
             coalesce(groups.time_rank, 0) * 1000000
             + coalesce(groups.member_ordinal, 0)
@@ -599,10 +632,10 @@ fn create_entity_link_views(
           ) AS sequence,
           NULL::VARCHAR AS lifecycle,
           events.display AS attributes_json
-        FROM events
+        FROM ocpm_entity_events_raw events
         LEFT JOIN groups
           ON groups.case_id = events.case_id
-         AND groups.timestamp = events.timestamp
+         AND groups.event_timestamp = events.event_timestamp
          AND groups.member_id = events.stable_event_id;
 
         CREATE TEMP VIEW ocpm_objects AS

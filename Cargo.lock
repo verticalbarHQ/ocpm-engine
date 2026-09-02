@@ -1092,6 +1092,7 @@ dependencies = [
  "ocpm-prediction",
  "ocpm-provider",
  "ocpm-query",
+ "serde",
  "serde_json",
 ]
 

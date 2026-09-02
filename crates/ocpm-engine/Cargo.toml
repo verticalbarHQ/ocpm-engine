@@ -30,4 +30,5 @@ ocpm-gnn = { workspace = true, optional = true }
 ocpm-provider.workspace = true
 ocpm-postgres = { workspace = true, optional = true }
 ocpm-query.workspace = true
+serde.workspace = true
 serde_json.workspace = true
