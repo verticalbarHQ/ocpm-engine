@@ -192,6 +192,7 @@ def test_checker_accepts_workers_bound_to_each_source(artifact: dict) -> None:
 
 def test_checker_rejects_a_worker_bound_to_the_other_source(artifact: dict) -> None:
     changed = with_worker_provenance(artifact)
+    changed["arms"]["candidate"]["revision"] = "3" * 40
     changed["arms"]["candidate"]["worker_provenance"] = copy.deepcopy(
         changed["arms"]["baseline"]["worker_provenance"]
     )
