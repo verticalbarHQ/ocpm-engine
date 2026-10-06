@@ -2296,11 +2296,60 @@ mod tests {
                 .unwrap()
                 .unwrap();
             assert_eq!(summary.event_count, expected_events as u64);
-            // The reference Timestamp ordering includes source text. Strip only
-            // boundary provenance so that this oracle selects by the same instants.
-            let mut reference_view = view.clone();
-            reference_view.start.as_mut().unwrap().source = None;
-            reference_view.end.as_mut().unwrap().source = None;
+            // Exercise the canonical fallback with the original boundary provenance.
+            assert_eq!(
+                provider.profile(&view).unwrap().event_count,
+                expected_events as u64
+            );
+            assert_eq!(
+                provider.snapshot(&view).unwrap().events.len(),
+                expected_events
+            );
+            assert_eq!(
+                provider
+                    .process_executions(&view, ExecutionMode::ConnectedComponent, None)
+                    .unwrap()
+                    .iter()
+                    .map(|execution| execution.events.len())
+                    .sum::<usize>(),
+                expected_events
+            );
+            let query = provider
+                .query(&QueryRequest {
+                    semantic_version: "1.0".to_owned(),
+                    view: view.clone(),
+                    constraint: Constraint::EventActivity {
+                        activities: vec!["a".to_owned(), "b".to_owned(), "c".to_owned()],
+                    },
+                    limit: 100,
+                })
+                .unwrap();
+            assert_eq!(query.total_matches, u64::from(expected_events > 0));
+            let mut population_view = view.clone();
+            population_view.start = None;
+            population_view.end = None;
+            for selector in [
+                ocpm_provider::PopulationSelector::EventTime {
+                    start: view.start.clone().unwrap(),
+                    end: view.end.clone().unwrap(),
+                },
+                ocpm_provider::PopulationSelector::LeadingObjectStart {
+                    start: view.start.clone().unwrap(),
+                    end: view.end.clone().unwrap(),
+                },
+                ocpm_provider::PopulationSelector::ExecutionContained {
+                    start: view.start.clone().unwrap(),
+                    end: view.end.clone().unwrap(),
+                },
+            ] {
+                assert_eq!(
+                    provider
+                        .resolve_population(&population_view, &selector, Some("T"))
+                        .unwrap()
+                        .object_count,
+                    u64::from(expected_events > 0)
+                );
+            }
             let request = BottleneckObservationRequest {
                 view: view.clone(),
                 leading_object_type: Some("T".to_owned()),
@@ -2311,7 +2360,7 @@ mod tests {
                 .exact_local()
                 .unwrap()
                 .bottleneck_observations(&BottleneckObservationRequest {
-                    view: reference_view.clone(),
+                    view: view.clone(),
                     leading_object_type: request.leading_object_type.clone(),
                 })
                 .unwrap();
@@ -2330,7 +2379,7 @@ mod tests {
                 provider
                     .exact_local()
                     .unwrap()
-                    .process_executions(&reference_view, ExecutionMode::LeadingObject, Some("T"))
+                    .process_executions(&view, ExecutionMode::LeadingObject, Some("T"))
                     .unwrap()
             );
         }

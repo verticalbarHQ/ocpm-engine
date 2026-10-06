@@ -56,9 +56,14 @@ impl LocalProvider {
             .filter(|change| {
                 change.object_id == object_id
                     && change.name == name
-                    && before.is_none_or(|end| change.valid_from < *end)
+                    && before
+                        .is_none_or(|end| change.valid_from.epoch_nanos_utc < end.epoch_nanos_utc)
             })
-            .max_by(|left, right| left.valid_from.cmp(&right.valid_from))
+            .max_by(|left, right| {
+                left.valid_from
+                    .epoch_nanos_utc
+                    .cmp(&right.valid_from.epoch_nanos_utc)
+            })
             .map(|change| &change.value)
     }
 
@@ -146,7 +151,8 @@ impl LocalProvider {
             .collect::<Vec<_>>();
         events.sort_by(|left, right| {
             left.timestamp
-                .cmp(&right.timestamp)
+                .epoch_nanos_utc
+                .cmp(&right.timestamp.epoch_nanos_utc)
                 .then_with(|| left.sequence.cmp(&right.sequence))
                 .then_with(|| left.external_id.cmp(&right.external_id))
         });
@@ -502,14 +508,16 @@ impl OcpmProvider for LocalProvider {
                         && selected_object_ids.contains(&relation.target_object_id)
                         && (allowed_qualifiers.is_empty()
                             || allowed_qualifiers.contains(&relation.qualifier))
-                        && relation
-                            .valid_from
-                            .as_ref()
-                            .is_none_or(|from| view.end.as_ref().is_none_or(|end| from < end))
-                        && relation
-                            .valid_to
-                            .as_ref()
-                            .is_none_or(|to| view.start.as_ref().is_none_or(|start| to > start))
+                        && relation.valid_from.as_ref().is_none_or(|from| {
+                            view.end
+                                .as_ref()
+                                .is_none_or(|end| from.epoch_nanos_utc < end.epoch_nanos_utc)
+                        })
+                        && relation.valid_to.as_ref().is_none_or(|to| {
+                            view.start
+                                .as_ref()
+                                .is_none_or(|start| to.epoch_nanos_utc > start.epoch_nanos_utc)
+                        })
                 })
                 .count() as u64,
             object_attribute_change_count: self
@@ -654,14 +662,16 @@ impl OcpmProvider for LocalProvider {
                         && object_ids.contains(&relation.target_object_id)
                         && (allowed_qualifiers.is_empty()
                             || allowed_qualifiers.contains(&relation.qualifier))
-                        && relation
-                            .valid_from
-                            .as_ref()
-                            .is_none_or(|from| view.end.as_ref().is_none_or(|end| from < end))
-                        && relation
-                            .valid_to
-                            .as_ref()
-                            .is_none_or(|to| view.start.as_ref().is_none_or(|start| to > start))
+                        && relation.valid_from.as_ref().is_none_or(|from| {
+                            view.end
+                                .as_ref()
+                                .is_none_or(|end| from.epoch_nanos_utc < end.epoch_nanos_utc)
+                        })
+                        && relation.valid_to.as_ref().is_none_or(|to| {
+                            view.start
+                                .as_ref()
+                                .is_none_or(|start| to.epoch_nanos_utc > start.epoch_nanos_utc)
+                        })
                 })
                 .cloned()
                 .collect(),
@@ -798,6 +808,127 @@ mod tests {
             )
             .unwrap();
         assert_eq!(executions[0].activity_path(), vec!["create", "approve"]);
+    }
+
+    fn sourced_timestamp(epoch: i128, source: &str) -> Timestamp {
+        Timestamp {
+            epoch_nanos_utc: epoch,
+            source: Some(source.to_owned()),
+        }
+    }
+
+    #[test]
+    fn population_windows_compare_instants_and_reject_equal_instants() {
+        let mut log = fixture();
+        log.events[0].timestamp = sourced_timestamp(1, "a");
+        log.events[1].timestamp = sourced_timestamp(1, "z");
+        // Same instant: sequence, not timestamp provenance, orders execution events.
+        log.events[0].sequence = 1;
+        log.events[1].sequence = 0;
+        let provider = LocalProvider::new(log).unwrap();
+        let executions = provider
+            .process_executions(
+                &DatasetView::default(),
+                ExecutionMode::LeadingObject,
+                Some("order"),
+            )
+            .unwrap();
+        assert_eq!(executions[0].activity_path(), vec!["approve", "create"]);
+        for (start, end, expected) in [(1, 2, 1), (0, 1, 0)] {
+            for selector in [
+                PopulationSelector::EventTime {
+                    start: sourced_timestamp(start, "z"),
+                    end: sourced_timestamp(end, "z"),
+                },
+                PopulationSelector::LeadingObjectStart {
+                    start: sourced_timestamp(start, "z"),
+                    end: sourced_timestamp(end, "z"),
+                },
+                PopulationSelector::ExecutionContained {
+                    start: sourced_timestamp(start, "z"),
+                    end: sourced_timestamp(end, "z"),
+                },
+            ] {
+                assert_eq!(
+                    provider
+                        .resolve_population(&DatasetView::default(), &selector, Some("order"))
+                        .unwrap()
+                        .object_count,
+                    expected
+                );
+            }
+        }
+        for selector in [
+            PopulationSelector::EventTime {
+                start: sourced_timestamp(1, "a"),
+                end: sourced_timestamp(1, "z"),
+            },
+            PopulationSelector::LeadingObjectStart {
+                start: sourced_timestamp(1, "a"),
+                end: sourced_timestamp(1, "z"),
+            },
+            PopulationSelector::ExecutionContained {
+                start: sourced_timestamp(1, "a"),
+                end: sourced_timestamp(1, "z"),
+            },
+        ] {
+            assert!(
+                provider
+                    .resolve_population(&DatasetView::default(), &selector, Some("order"))
+                    .is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn relation_and_attribute_boundaries_ignore_timestamp_provenance() {
+        let mut log = fixture();
+        log.objects.push(Object {
+            id: 20,
+            external_id: "o2".to_owned(),
+            object_type: "order".to_owned(),
+        });
+        for (id, from, to) in [(1, 0, 1), (2, 2, 3), (3, 0, 3)] {
+            log.object_object_relations
+                .push(ocpm_core::ObjectObjectRelation {
+                    relation_id: id,
+                    source_object_id: 10,
+                    target_object_id: 20,
+                    qualifier: String::new(),
+                    valid_from: Some(sourced_timestamp(from, "a")),
+                    valid_to: Some(sourced_timestamp(to, "z")),
+                });
+        }
+        for (instant, value) in [(0, "before"), (2, "at_end")] {
+            log.object_attribute_history
+                .push(ocpm_core::ObjectAttributeChange {
+                    object_id: 10,
+                    name: "status".to_owned(),
+                    valid_from: sourced_timestamp(instant, "a"),
+                    value: ocpm_core::AttributeValue::String(value.to_owned()),
+                });
+        }
+        let provider = LocalProvider::new(log).unwrap();
+        let view = DatasetView {
+            start: Some(sourced_timestamp(1, "a")),
+            end: Some(sourced_timestamp(2, "z")),
+            ..DatasetView::default()
+        };
+        assert_eq!(provider.profile(&view).unwrap().o2o_count, 1);
+        assert_eq!(
+            provider
+                .snapshot(&view)
+                .unwrap()
+                .object_object_relations
+                .iter()
+                .map(|relation| relation.relation_id)
+                .collect::<Vec<_>>(),
+            vec![3]
+        );
+        assert_eq!(
+            provider.object_attribute_value_at(10, "status", view.end.as_ref()),
+            Some(&ocpm_core::AttributeValue::String("before".to_owned()))
+        );
     }
 
     #[test]

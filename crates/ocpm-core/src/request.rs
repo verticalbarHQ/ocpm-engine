@@ -34,8 +34,13 @@ pub struct DatasetView {
 
 impl DatasetView {
     pub fn contains_timestamp(&self, timestamp: &Timestamp) -> bool {
-        self.start.as_ref().is_none_or(|start| timestamp >= start)
-            && self.end.as_ref().is_none_or(|end| timestamp < end)
+        self.start
+            .as_ref()
+            .is_none_or(|start| timestamp.epoch_nanos_utc >= start.epoch_nanos_utc)
+            && self
+                .end
+                .as_ref()
+                .is_none_or(|end| timestamp.epoch_nanos_utc < end.epoch_nanos_utc)
     }
 }
 
@@ -239,4 +244,36 @@ pub struct FitPredictionRequest {
     pub parameters: BTreeMap<String, serde_json::Value>,
     #[serde(default)]
     pub seed: u64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn time_window_uses_instants_without_discarding_provenance() {
+        for boundary_source in [None, Some("a"), Some("z")] {
+            let view = DatasetView {
+                start: Some(Timestamp {
+                    epoch_nanos_utc: 10,
+                    source: boundary_source.map(str::to_owned),
+                }),
+                end: Some(Timestamp {
+                    epoch_nanos_utc: 20,
+                    source: boundary_source.map(str::to_owned),
+                }),
+                ..DatasetView::default()
+            };
+            for event_source in [None, Some("a"), Some("z")] {
+                for (instant, included) in [(9, false), (10, true), (19, true), (20, false)] {
+                    let timestamp = Timestamp {
+                        epoch_nanos_utc: instant,
+                        source: event_source.map(str::to_owned),
+                    };
+                    assert_eq!(view.contains_timestamp(&timestamp), included);
+                    assert_eq!(timestamp.source.as_deref(), event_source);
+                }
+            }
+        }
+    }
 }
