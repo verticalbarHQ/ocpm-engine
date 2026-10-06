@@ -718,8 +718,14 @@ impl DuckDbProvider {
                     continue;
                 }
                 last_event_id = Some(event_id);
-                activities.push(row.get(2)?);
                 let nanos = source_epoch_nanos_to_utc(row.get(3)?, &self.resolved)?;
+                if !request.view.contains_timestamp(&Timestamp {
+                    epoch_nanos_utc: nanos,
+                    source: None,
+                }) {
+                    continue;
+                }
+                activities.push(row.get(2)?);
                 timestamps.push(i64::try_from(nanos / 1_000).map_err(|_| {
                     DuckDbProviderError::InvalidSource(
                         "event timestamp is outside microsecond summary range".to_owned(),
@@ -1167,7 +1173,7 @@ fn build_execution_sql(
             &view.related_object_types,
         )?));
     }
-    if !complete_lifecycle {
+    if !complete_lifecycle && !requires_interpreted_time_filter(resolved) {
         if let Some(start) = &view.start {
             predicates.push("x.timestamp_nanos_utc >= ?".to_owned());
             values.push(Value::HugeInt(utc_nanos_to_source_nanos(
@@ -1296,14 +1302,22 @@ fn build_entity_link_execution_sql(
             &view.related_object_types,
         )?));
     }
-    if let Some(start) = &view.start {
+    if let Some(start) = view
+        .start
+        .as_ref()
+        .filter(|_| !requires_interpreted_time_filter(resolved))
+    {
         predicates.push("epoch_ns(e.event_timestamp)::HUGEINT >= ?".to_owned());
         values.push(Value::HugeInt(utc_nanos_to_source_nanos(
             start.epoch_nanos_utc,
             &resolved.timestamp_policy,
         )?));
     }
-    if let Some(end) = &view.end {
+    if let Some(end) = view
+        .end
+        .as_ref()
+        .filter(|_| !requires_interpreted_time_filter(resolved))
+    {
         predicates.push("epoch_ns(e.event_timestamp)::HUGEINT < ?".to_owned());
         values.push(Value::HugeInt(utc_nanos_to_source_nanos(
             end.epoch_nanos_utc,
@@ -1471,6 +1485,18 @@ fn retain_projected_attributes(
                 .any(|wanted| wanted == name)
         });
     }
+}
+
+// A UTC boundary mapped to a naive IANA time is not an inverse at a DST fold.
+// Keep object/activity pushdown, stream the bounded DuckDB scan, and apply the
+// window after interpreting each event with the configured fold policy. UTC
+// and fixed offsets retain their existing exact Parquet time pushdown.
+fn requires_interpreted_time_filter(resolved: &ResolvedSnapshot) -> bool {
+    resolved.is_entity_link_layout()
+        && matches!(
+            resolved.timestamp_policy,
+            crate::SourceTimestampPolicy::Iana { .. }
+        )
 }
 
 fn event_matches_post_scan(view: &DatasetView, event: &Event) -> bool {
@@ -2152,6 +2178,122 @@ mod tests {
                     .unwrap()
                     .epoch_nanos_utc
             }));
+        }
+    }
+
+    #[test]
+    fn serving_edition_iana_windows_filter_interpreted_fold_instants() {
+        let directory = TestDirectory::new();
+        write_serving_edition_fixture(&directory.0, false);
+        let conn = Connection::open_in_memory().unwrap();
+        for name in ["event_log", "case_event_group"] {
+            let input = quote_literal(
+                &directory
+                    .0
+                    .join(format!("{name}.parquet"))
+                    .to_string_lossy(),
+            );
+            let output_path = directory.0.join(format!("{name}-fold.parquet"));
+            let output = quote_literal(&output_path.to_string_lossy());
+            conn.execute_batch(&format!("COPY (SELECT * REPLACE (TIMESTAMP '2026-11-01 01:45:00' AS timestamp) FROM read_parquet({input})) TO {output} (FORMAT parquet)")).unwrap();
+            fs::rename(output_path, directory.0.join(format!("{name}.parquet"))).unwrap();
+        }
+        for (ambiguous, start, end, expected_events) in [
+            (
+                crate::AmbiguousTimePolicy::Earliest,
+                "2026-11-01T06:30:00Z",
+                "2026-11-01T07:00:00Z",
+                0,
+            ),
+            (
+                crate::AmbiguousTimePolicy::Earliest,
+                "2026-11-01T05:30:00Z",
+                "2026-11-01T06:30:00Z",
+                4,
+            ),
+            (
+                crate::AmbiguousTimePolicy::Latest,
+                "2026-11-01T05:30:00Z",
+                "2026-11-01T06:30:00Z",
+                0,
+            ),
+            (
+                crate::AmbiguousTimePolicy::Latest,
+                "2026-11-01T06:30:00Z",
+                "2026-11-01T07:00:00Z",
+                4,
+            ),
+        ] {
+            let mut source = serving_edition_source(&directory.0);
+            let crate::ParquetLayout::ServingEditionV1(layout) = &mut source.layout else {
+                unreachable!()
+            };
+            layout.timestamp_policy = crate::SourceTimestampPolicy::Iana {
+                zone: "America/New_York".to_owned(),
+                ambiguous,
+            };
+            let provider = DuckDbProvider::open(source).unwrap();
+            let view = DatasetView {
+                start: Some(
+                    crate::source_timestamp_to_utc(start, &crate::SourceTimestampPolicy::Utc)
+                        .unwrap(),
+                ),
+                end: Some(
+                    crate::source_timestamp_to_utc(end, &crate::SourceTimestampPolicy::Utc)
+                        .unwrap(),
+                ),
+                object_types: vec!["T".to_owned()],
+                object_ids: vec![2],
+                ..DatasetView::default()
+            };
+            let actual = provider
+                .process_executions(&view, ExecutionMode::LeadingObject, Some("T"))
+                .unwrap();
+            assert_eq!(
+                actual
+                    .iter()
+                    .map(|execution| execution.events.len())
+                    .sum::<usize>(),
+                expected_events
+            );
+            let summary = provider
+                .execution_summary(&ExecutionSummaryRequest {
+                    view: view.clone(),
+                    leading_object_type: Some("T".to_owned()),
+                    complete_lifecycle: false,
+                })
+                .unwrap()
+                .unwrap();
+            assert_eq!(summary.event_count, expected_events as u64);
+            let request = BottleneckObservationRequest {
+                view: view.clone(),
+                leading_object_type: Some("T".to_owned()),
+            };
+            let projection =
+                BottleneckObservationProjection::new(vec!["system_note_id".to_owned()]);
+            let expected = provider
+                .exact_local()
+                .unwrap()
+                .bottleneck_observations(&request)
+                .unwrap();
+            assert_eq!(
+                provider.bottleneck_observations(&request).unwrap(),
+                expected
+            );
+            assert_eq!(
+                provider
+                    .projected_bottleneck_observations(&request, &projection)
+                    .unwrap(),
+                expected
+            );
+            assert_eq!(
+                actual,
+                provider
+                    .exact_local()
+                    .unwrap()
+                    .process_executions(&view, ExecutionMode::LeadingObject, Some("T"))
+                    .unwrap()
+            );
         }
     }
 
