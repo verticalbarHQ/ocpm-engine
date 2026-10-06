@@ -435,8 +435,8 @@ fn resolve_snapshot(
             (
                 layout.dataset_id.clone(),
                 layout.environment_id.clone(),
-                manifest_watermark(&manifest_json, &SourceTimestampPolicy::Utc),
-                SourceTimestampPolicy::Utc,
+                manifest_watermark(&manifest_json, &layout.timestamp_policy),
+                layout.timestamp_policy.clone(),
                 "serving_edition_v1",
             )
         }

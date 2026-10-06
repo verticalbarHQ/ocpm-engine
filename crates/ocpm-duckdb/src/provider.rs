@@ -1970,6 +1970,7 @@ mod tests {
             account_binding_id: "account-fixture".to_owned(),
             authorization_revision: "3".to_owned(),
             reader_contract_revision: "fixture-contract".to_owned(),
+            timestamp_policy: crate::SourceTimestampPolicy::Utc,
         });
         source
     }
@@ -2077,6 +2078,80 @@ mod tests {
                 actual.object_object_relations,
                 expected.object_object_relations
             );
+        }
+    }
+
+    #[test]
+    fn serving_edition_requires_and_preserves_explicit_source_time_policy() {
+        let directory = TestDirectory::new();
+        write_serving_edition_fixture(&directory.0, false);
+        let mut config = serde_json::to_value(serving_edition_source(&directory.0)).unwrap();
+        config
+            .pointer_mut("/layout/config")
+            .unwrap()
+            .as_object_mut()
+            .unwrap()
+            .remove("timestamp_policy");
+        assert!(serde_json::from_value::<DuckDbParquetSource>(config).is_err());
+
+        for policy in [
+            crate::SourceTimestampPolicy::FixedOffset { seconds_east: 7200 },
+            crate::SourceTimestampPolicy::Iana {
+                zone: "America/New_York".to_owned(),
+                ambiguous: crate::AmbiguousTimePolicy::Reject,
+            },
+        ] {
+            let legacy_directory = TestDirectory::new();
+            write_parity_fixture(&legacy_directory.0);
+            let mut legacy_source = entity_link_source(&legacy_directory.0);
+            let crate::ParquetLayout::EntityLinkSnapshotV1(layout) = &mut legacy_source.layout
+            else {
+                unreachable!()
+            };
+            layout.timestamp_policy = policy.clone();
+            let legacy = DuckDbProvider::open(legacy_source).unwrap();
+            let edition_directory = TestDirectory::new();
+            write_serving_edition_fixture(&edition_directory.0, false);
+            let mut edition_source = serving_edition_source(&edition_directory.0);
+            let crate::ParquetLayout::ServingEditionV1(layout) = &mut edition_source.layout else {
+                unreachable!()
+            };
+            layout.timestamp_policy = policy.clone();
+            let edition = DuckDbProvider::open(edition_source).unwrap();
+            assert_eq!(edition.resolved.timestamp_policy, policy);
+            let view = DatasetView {
+                start: Some(
+                    crate::source_timestamp_to_utc("2026-01-02 00:00:00", &policy).unwrap(),
+                ),
+                end: Some(crate::source_timestamp_to_utc("2026-01-03 00:00:00", &policy).unwrap()),
+                object_types: vec!["T".to_owned()],
+                object_ids: vec![2],
+                ..DatasetView::default()
+            };
+            assert_eq!(
+                edition
+                    .process_executions(&view, ExecutionMode::LeadingObject, Some("T"))
+                    .unwrap(),
+                legacy
+                    .process_executions(&view, ExecutionMode::LeadingObject, Some("T"))
+                    .unwrap()
+            );
+            let actual = edition
+                .with_connection(|conn| load_log(conn, &edition.resolved))
+                .unwrap();
+            let expected = legacy
+                .with_connection(|conn| load_log(conn, &legacy.resolved))
+                .unwrap();
+            assert_eq!(actual.events, expected.events);
+            assert!(actual.events.iter().any(|event| {
+                event.timestamp.epoch_nanos_utc
+                    != crate::source_timestamp_to_utc(
+                        event.timestamp.source.as_deref().unwrap(),
+                        &crate::SourceTimestampPolicy::Utc,
+                    )
+                    .unwrap()
+                    .epoch_nanos_utc
+            }));
         }
     }
 

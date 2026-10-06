@@ -122,6 +122,8 @@ pub struct ServingEditionV1 {
     pub account_binding_id: String,
     pub authorization_revision: String,
     pub reader_contract_revision: String,
+    /// Required explicit interpretation of offset-less source timestamps.
+    pub timestamp_policy: SourceTimestampPolicy,
 }
 
 fn event_log_file() -> String {
