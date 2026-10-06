@@ -719,10 +719,7 @@ impl DuckDbProvider {
                 }
                 last_event_id = Some(event_id);
                 let nanos = source_epoch_nanos_to_utc(row.get(3)?, &self.resolved)?;
-                if !request.view.contains_timestamp(&Timestamp {
-                    epoch_nanos_utc: nanos,
-                    source: None,
-                }) {
+                if !matches_utc_window(&request.view, nanos) {
                     continue;
                 }
                 activities.push(row.get(2)?);
@@ -1499,8 +1496,18 @@ fn requires_interpreted_time_filter(resolved: &ResolvedSnapshot) -> bool {
         )
 }
 
+fn matches_utc_window(view: &DatasetView, nanos: i128) -> bool {
+    view.start
+        .as_ref()
+        .is_none_or(|start| nanos >= start.epoch_nanos_utc)
+        && view
+            .end
+            .as_ref()
+            .is_none_or(|end| nanos < end.epoch_nanos_utc)
+}
+
 fn event_matches_post_scan(view: &DatasetView, event: &Event) -> bool {
-    view.contains_timestamp(&event.timestamp)
+    matches_utc_window(view, event.timestamp.epoch_nanos_utc)
         && view
             .event_attributes
             .iter()
@@ -2223,6 +2230,30 @@ mod tests {
                 "2026-11-01T07:00:00Z",
                 4,
             ),
+            (
+                crate::AmbiguousTimePolicy::Earliest,
+                "2026-11-01T05:45:00Z",
+                "2026-11-01T06:00:00Z",
+                4,
+            ),
+            (
+                crate::AmbiguousTimePolicy::Earliest,
+                "2026-11-01T05:00:00Z",
+                "2026-11-01T05:45:00Z",
+                0,
+            ),
+            (
+                crate::AmbiguousTimePolicy::Latest,
+                "2026-11-01T06:45:00Z",
+                "2026-11-01T07:00:00Z",
+                4,
+            ),
+            (
+                crate::AmbiguousTimePolicy::Latest,
+                "2026-11-01T06:00:00Z",
+                "2026-11-01T06:45:00Z",
+                0,
+            ),
         ] {
             let mut source = serving_edition_source(&directory.0);
             let crate::ParquetLayout::ServingEditionV1(layout) = &mut source.layout else {
@@ -2265,6 +2296,11 @@ mod tests {
                 .unwrap()
                 .unwrap();
             assert_eq!(summary.event_count, expected_events as u64);
+            // The reference Timestamp ordering includes source text. Strip only
+            // boundary provenance so that this oracle selects by the same instants.
+            let mut reference_view = view.clone();
+            reference_view.start.as_mut().unwrap().source = None;
+            reference_view.end.as_mut().unwrap().source = None;
             let request = BottleneckObservationRequest {
                 view: view.clone(),
                 leading_object_type: Some("T".to_owned()),
@@ -2274,7 +2310,10 @@ mod tests {
             let expected = provider
                 .exact_local()
                 .unwrap()
-                .bottleneck_observations(&request)
+                .bottleneck_observations(&BottleneckObservationRequest {
+                    view: reference_view.clone(),
+                    leading_object_type: request.leading_object_type.clone(),
+                })
                 .unwrap();
             assert_eq!(
                 provider.bottleneck_observations(&request).unwrap(),
@@ -2291,7 +2330,7 @@ mod tests {
                 provider
                     .exact_local()
                     .unwrap()
-                    .process_executions(&view, ExecutionMode::LeadingObject, Some("T"))
+                    .process_executions(&reference_view, ExecutionMode::LeadingObject, Some("T"))
                     .unwrap()
             );
         }
