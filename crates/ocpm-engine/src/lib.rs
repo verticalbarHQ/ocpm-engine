@@ -27,8 +27,8 @@ pub use ocpm_bottleneck::{
 #[cfg(feature = "duckdb")]
 pub use ocpm_duckdb::{
     DuckDbOptions, DuckDbParquetSource, DuckDbProvider, EntityLinkSnapshotV1, ExtensionPolicy,
-    ParquetCachePolicy, ParquetLayout, ParquetLocation, S3CredentialReference, SnapshotSelection,
-    SnapshotWriteResult, SourceTimestampPolicy, SourceValidationPolicy,
+    ParquetCachePolicy, ParquetLayout, ParquetLocation, S3CredentialReference, ServingEditionV1,
+    SnapshotSelection, SnapshotWriteResult, SourceTimestampPolicy, SourceValidationPolicy,
 };
 pub use ocpm_io::CsvMapping;
 pub use ocpm_provider::{
