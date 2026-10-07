@@ -28,6 +28,15 @@ pub(crate) struct ResolvedSnapshot {
     pub is_s3: bool,
 }
 
+impl ResolvedSnapshot {
+    pub(crate) fn is_entity_link_layout(&self) -> bool {
+        matches!(
+            self.layout_name,
+            "entity_link_snapshot_v1" | "serving_edition_v1"
+        )
+    }
+}
+
 pub(crate) fn open_database(
     source: &DuckDbParquetSource,
 ) -> Result<(Connection, ResolvedSnapshot), DuckDbProviderError> {
@@ -385,6 +394,52 @@ fn resolve_snapshot(
             layout.timestamp_policy.clone(),
             "entity_link_snapshot_v1",
         ),
+        ParquetLayout::ServingEditionV1(layout) => {
+            let binding_matches = [
+                ("/binding/environmentId", &layout.environment_id),
+                ("/binding/accountBindingId", &layout.account_binding_id),
+                (
+                    "/binding/authorizationRevision",
+                    &layout.authorization_revision,
+                ),
+                ("/rowIdentity/value", &layout.environment_id),
+                ("/readerContractRevision", &layout.reader_contract_revision),
+            ]
+            .iter()
+            .all(|(path, expected)| {
+                !expected.trim().is_empty()
+                    && manifest_json.pointer(path).and_then(JsonValue::as_str)
+                        == Some(expected.as_str())
+            });
+            if !binding_matches
+                || manifest_json
+                    .get("schemaVersion")
+                    .and_then(JsonValue::as_u64)
+                    != Some(2)
+                || manifest_json.get("kind").and_then(JsonValue::as_str)
+                    != Some("corpus_environment_serving_manifest")
+                || manifest_json.get("status").and_then(JsonValue::as_str) != Some("materialized")
+                || manifest_json
+                    .pointer("/rowIdentity/column")
+                    .and_then(JsonValue::as_str)
+                    != Some("environment_id")
+                || (!matches!(source.snapshot, SnapshotSelection::Root)
+                    && manifest_json.get("version").and_then(JsonValue::as_str)
+                        != Some(version.as_str()))
+            {
+                return Err(DuckDbProviderError::InvalidSource(
+                    "serving edition manifest binding does not match configured authority"
+                        .to_owned(),
+                ));
+            }
+            (
+                layout.dataset_id.clone(),
+                layout.environment_id.clone(),
+                manifest_watermark(&manifest_json, &layout.timestamp_policy),
+                layout.timestamp_policy.clone(),
+                "serving_edition_v1",
+            )
+        }
     };
     Ok(ResolvedSnapshot {
         version,
@@ -514,6 +569,17 @@ fn create_views(
         ParquetLayout::EntityLinkSnapshotV1(config) => {
             create_entity_link_views(connection, resolved, config)
         }
+        ParquetLayout::ServingEditionV1(config) => create_entity_link_relations(
+            connection,
+            resolved,
+            [
+                &config.event_log_file,
+                &config.object_file,
+                &config.object_link_file,
+                &config.event_group_file,
+            ],
+            None,
+        ),
     }
 }
 
@@ -549,19 +615,55 @@ fn create_entity_link_views(
     resolved: &ResolvedSnapshot,
     config: &EntityLinkSnapshotV1,
 ) -> Result<(), DuckDbProviderError> {
-    for value in [
-        &config.event_log_file,
-        &config.object_file,
-        &config.object_link_file,
-        &config.event_group_file,
-    ] {
+    create_entity_link_relations(
+        connection,
+        resolved,
+        [
+            &config.event_log_file,
+            &config.object_file,
+            &config.object_link_file,
+            &config.event_group_file,
+        ],
+        Some(config.tenant_id),
+    )
+}
+
+fn create_entity_link_relations(
+    connection: &Connection,
+    resolved: &ResolvedSnapshot,
+    files: [&str; 4],
+    legacy_tenant: Option<i64>,
+) -> Result<(), DuckDbProviderError> {
+    for value in files {
         validate_relative_file(value)?;
     }
-    let event_path = quote_literal(&join_uri(&resolved.version_root, &config.event_log_file));
-    let object_path = quote_literal(&join_uri(&resolved.version_root, &config.object_file));
-    let link_path = quote_literal(&join_uri(&resolved.version_root, &config.object_link_file));
-    let group_path = quote_literal(&join_uri(&resolved.version_root, &config.event_group_file));
-    let tenant = config.tenant_id;
+    let [event_path, object_path, link_path, group_path] =
+        files.map(|file| quote_literal(&join_uri(&resolved.version_root, file)));
+    let owner_filter = legacy_tenant
+        .map(|tenant| format!("WHERE tenant_id = {tenant}"))
+        .unwrap_or_default();
+    // V2 transaction facets retain their source types. UNPIVOT needs one common type,
+    // and the canonical attribute contract already represents these values as strings.
+    let attribute_projection = if legacy_tenant.is_some() {
+        "*".to_owned()
+    } else {
+        format!(
+            "id, {}",
+            [
+                "status",
+                "currency",
+                "subsidiary",
+                "trandate",
+                "recordtype",
+                "customform",
+                "entity",
+                "postingperiod",
+                "lastmodifiedby"
+            ]
+            .map(|name| format!("CAST({name} AS VARCHAR) AS {name}"))
+            .join(", ")
+        )
+    };
     connection.execute_batch(&format!(
         r#"
         CREATE TEMP VIEW ocpm_entity_events_raw AS
@@ -574,12 +676,12 @@ fn create_entity_link_views(
             CAST(object_id AS UBIGINT) AS event_object_id,
             display
           FROM read_parquet({event_path})
-          WHERE tenant_id = {tenant};
+          {owner_filter};
 
         CREATE TEMP VIEW ocpm_entity_groups_raw AS
           SELECT case_id,timestamp AS event_timestamp,system_note_ids,time_rank
           FROM read_parquet({group_path})
-          WHERE tenant_id = {tenant};
+          {owner_filter};
 
         CREATE TEMP VIEW ocpm_events AS
         WITH groups AS (
@@ -644,7 +746,7 @@ fn create_entity_link_views(
           CAST(id AS VARCHAR) AS external_object_id,
           type AS object_type
         FROM read_parquet({object_path})
-        WHERE tenant_id = {tenant};
+        {owner_filter};
 
         CREATE TEMP VIEW ocpm_e2o AS
         SELECT
@@ -653,7 +755,7 @@ fn create_entity_link_views(
           CAST(object_id AS UBIGINT) AS object_id,
           object_type AS qualifier
         FROM read_parquet({event_path})
-        WHERE tenant_id = {tenant};
+        {owner_filter};
 
         CREATE TEMP VIEW ocpm_o2o AS
         SELECT
@@ -666,7 +768,7 @@ fn create_entity_link_views(
           NULL::HUGEINT AS valid_from_nanos_utc,
           NULL::HUGEINT AS valid_to_nanos_utc
         FROM read_parquet({link_path})
-        WHERE tenant_id = {tenant};
+        {owner_filter};
 
         CREATE TEMP VIEW ocpm_object_attributes AS
         SELECT
@@ -676,7 +778,7 @@ fn create_entity_link_views(
           json_object('type', 'string', 'value', attribute_value)::VARCHAR AS value_json
         FROM (
           UNPIVOT (
-            SELECT * FROM read_parquet({object_path}) WHERE tenant_id = {tenant}
+            SELECT {attribute_projection} FROM read_parquet({object_path}) {owner_filter}
           )
           ON status, currency, subsidiary, trandate, recordtype,
              customform, entity, postingperiod, lastmodifiedby

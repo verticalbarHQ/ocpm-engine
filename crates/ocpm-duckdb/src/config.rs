@@ -105,6 +105,27 @@ pub struct EntityLinkSnapshotV1 {
     pub timestamp_policy: SourceTimestampPolicy,
 }
 
+/// Four relations of one immutable, Environment-owned serving edition.
+/// Ownership is established by the manifest binding; rows are never tenant-filtered.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ServingEditionV1 {
+    #[serde(default = "event_log_file")]
+    pub event_log_file: String,
+    #[serde(default = "object_file")]
+    pub object_file: String,
+    #[serde(default = "object_link_file")]
+    pub object_link_file: String,
+    #[serde(default = "event_group_file")]
+    pub event_group_file: String,
+    pub dataset_id: String,
+    pub environment_id: String,
+    pub account_binding_id: String,
+    pub authorization_revision: String,
+    pub reader_contract_revision: String,
+    /// Required explicit interpretation of offset-less source timestamps.
+    pub timestamp_policy: SourceTimestampPolicy,
+}
+
 fn event_log_file() -> String {
     "event_log.parquet".to_owned()
 }
@@ -126,6 +147,7 @@ fn event_group_file() -> String {
 pub enum ParquetLayout {
     CanonicalV1,
     EntityLinkSnapshotV1(EntityLinkSnapshotV1),
+    ServingEditionV1(ServingEditionV1),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]

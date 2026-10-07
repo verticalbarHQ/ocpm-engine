@@ -718,8 +718,11 @@ impl DuckDbProvider {
                     continue;
                 }
                 last_event_id = Some(event_id);
-                activities.push(row.get(2)?);
                 let nanos = source_epoch_nanos_to_utc(row.get(3)?, &self.resolved)?;
+                if !matches_utc_window(&request.view, nanos) {
+                    continue;
+                }
+                activities.push(row.get(2)?);
                 timestamps.push(i64::try_from(nanos / 1_000).map_err(|_| {
                     DuckDbProviderError::InvalidSource(
                         "event timestamp is outside microsecond summary range".to_owned(),
@@ -1096,7 +1099,7 @@ fn build_execution_sql(
     projection: &str,
     ordered: bool,
 ) -> Result<(String, Vec<Value>), DuckDbProviderError> {
-    if resolved.layout_name == "entity_link_snapshot_v1" && !complete_lifecycle {
+    if resolved.is_entity_link_layout() && !complete_lifecycle {
         return build_entity_link_execution_sql(
             view,
             leading_object_type,
@@ -1167,7 +1170,7 @@ fn build_execution_sql(
             &view.related_object_types,
         )?));
     }
-    if !complete_lifecycle {
+    if !complete_lifecycle && !requires_interpreted_time_filter(resolved) {
         if let Some(start) = &view.start {
             predicates.push("x.timestamp_nanos_utc >= ?".to_owned());
             values.push(Value::HugeInt(utc_nanos_to_source_nanos(
@@ -1296,14 +1299,22 @@ fn build_entity_link_execution_sql(
             &view.related_object_types,
         )?));
     }
-    if let Some(start) = &view.start {
+    if let Some(start) = view
+        .start
+        .as_ref()
+        .filter(|_| !requires_interpreted_time_filter(resolved))
+    {
         predicates.push("epoch_ns(e.event_timestamp)::HUGEINT >= ?".to_owned());
         values.push(Value::HugeInt(utc_nanos_to_source_nanos(
             start.epoch_nanos_utc,
             &resolved.timestamp_policy,
         )?));
     }
-    if let Some(end) = &view.end {
+    if let Some(end) = view
+        .end
+        .as_ref()
+        .filter(|_| !requires_interpreted_time_filter(resolved))
+    {
         predicates.push("epoch_ns(e.event_timestamp)::HUGEINT < ?".to_owned());
         values.push(Value::HugeInt(utc_nanos_to_source_nanos(
             end.epoch_nanos_utc,
@@ -1405,7 +1416,7 @@ fn row_event(
 ) -> Result<Event, DuckDbProviderError> {
     let stored_timestamp = row.get::<_, i128>(6)?;
     let source = row.get::<_, Option<String>>(7)?;
-    let timestamp = if resolved.layout_name == "entity_link_snapshot_v1" {
+    let timestamp = if resolved.is_entity_link_layout() {
         source_timestamp_to_utc(
             source.as_deref().ok_or_else(|| {
                 DuckDbProviderError::InvalidSource(
@@ -1473,8 +1484,30 @@ fn retain_projected_attributes(
     }
 }
 
+// A UTC boundary mapped to a naive IANA time is not an inverse at a DST fold.
+// Keep object/activity pushdown, stream the bounded DuckDB scan, and apply the
+// window after interpreting each event with the configured fold policy. UTC
+// and fixed offsets retain their existing exact Parquet time pushdown.
+fn requires_interpreted_time_filter(resolved: &ResolvedSnapshot) -> bool {
+    resolved.is_entity_link_layout()
+        && matches!(
+            resolved.timestamp_policy,
+            crate::SourceTimestampPolicy::Iana { .. }
+        )
+}
+
+fn matches_utc_window(view: &DatasetView, nanos: i128) -> bool {
+    view.start
+        .as_ref()
+        .is_none_or(|start| nanos >= start.epoch_nanos_utc)
+        && view
+            .end
+            .as_ref()
+            .is_none_or(|end| nanos < end.epoch_nanos_utc)
+}
+
 fn event_matches_post_scan(view: &DatasetView, event: &Event) -> bool {
-    view.contains_timestamp(&event.timestamp)
+    matches_utc_window(view, event.timestamp.epoch_nanos_utc)
         && view
             .event_attributes
             .iter()
@@ -1521,7 +1554,7 @@ fn source_epoch_nanos_to_utc(
     value: i128,
     resolved: &ResolvedSnapshot,
 ) -> Result<i128, DuckDbProviderError> {
-    if resolved.layout_name != "entity_link_snapshot_v1" {
+    if !resolved.is_entity_link_layout() {
         return Ok(value);
     }
     let value = i64::try_from(value).map_err(|_| {
@@ -1544,7 +1577,7 @@ fn profile_timestamp(
     let Some(nanos) = nanos else {
         return Ok(None);
     };
-    if resolved.layout_name == "entity_link_snapshot_v1" {
+    if resolved.is_entity_link_layout() {
         let source = source.ok_or_else(|| {
             DuckDbProviderError::InvalidSource(
                 "entity-link profile timestamp is missing its source value".to_owned(),
@@ -1594,7 +1627,7 @@ fn load_log(
         let mut rows = statement.query([])?;
         while let Some(row) = rows.next()? {
             let source = row.get::<_, Option<String>>(4)?;
-            let timestamp = if resolved.layout_name == "entity_link_snapshot_v1" {
+            let timestamp = if resolved.is_entity_link_layout() {
                 source_timestamp_to_utc(
                     source.as_deref().ok_or_else(|| {
                         DuckDbProviderError::InvalidSource(
@@ -1676,7 +1709,7 @@ fn load_log(
         let mut rows = statement.query([])?;
         while let Some(row) = rows.next()? {
             let source_nanos = row.get::<_, i128>(2)?;
-            let utc_nanos = if resolved.layout_name == "entity_link_snapshot_v1" {
+            let utc_nanos = if resolved.is_entity_link_layout() {
                 // Non-temporal facets are marked outside the event history. Preserve the
                 // sentinel so historical views cannot accidentally treat them as facts.
                 source_nanos
@@ -1700,6 +1733,7 @@ fn load_log(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::quote_literal;
     use crate::{
         DuckDbDatabase, DuckDbOptions, ParquetCachePolicy, ParquetLocation, SnapshotSelection,
         SourceValidationPolicy, write_canonical_snapshot,
@@ -1954,6 +1988,443 @@ mod tests {
                 connection_pool_size: 1,
                 ..DuckDbOptions::default()
             },
+        }
+    }
+
+    fn serving_edition_source(root: &std::path::Path) -> DuckDbParquetSource {
+        let mut source = entity_link_source(root);
+        source.layout = crate::ParquetLayout::ServingEditionV1(crate::ServingEditionV1 {
+            event_log_file: "event_log.parquet".to_owned(),
+            object_file: "txn.parquet".to_owned(),
+            object_link_file: "object_link.parquet".to_owned(),
+            event_group_file: "case_event_group.parquet".to_owned(),
+            dataset_id: "fixture".to_owned(),
+            environment_id: "environment-fixture".to_owned(),
+            account_binding_id: "account-fixture".to_owned(),
+            authorization_revision: "3".to_owned(),
+            reader_contract_revision: "fixture-contract".to_owned(),
+            timestamp_policy: crate::SourceTimestampPolicy::Utc,
+        });
+        source
+    }
+
+    fn write_serving_edition_fixture(root: &std::path::Path, compatibility_tenant: bool) {
+        write_parity_fixture(root);
+        let conn = Connection::open_in_memory().unwrap();
+        for name in ["event_log", "txn", "case_event_group", "object_link"] {
+            let input = quote_literal(&root.join(format!("{name}.parquet")).to_string_lossy());
+            let output_path = root.join(format!("{name}-edition.parquet"));
+            let output = quote_literal(&output_path.to_string_lossy());
+            let owner = if name == "event_log" || name == "txn" || !compatibility_tenant {
+                "'environment-fixture' AS environment_id"
+            } else {
+                // Current PP derived relations retain tenant_id=0 until S8. It is not authority.
+                "0 AS tenant_id"
+            };
+            conn.execute_batch(&format!(
+                "COPY (SELECT * EXCLUDE (tenant_id), {owner} FROM read_parquet({input}) WHERE tenant_id=7) TO {output} (FORMAT parquet)"
+            )).unwrap();
+            fs::rename(output_path, root.join(format!("{name}.parquet"))).unwrap();
+        }
+        fs::write(root.join("manifest.json"), serde_json::to_vec(&serde_json::json!({
+            "schemaVersion": 2, "kind": "corpus_environment_serving_manifest", "status": "materialized",
+            "version": "root", "binding": { "environmentId": "environment-fixture", "accountBindingId": "account-fixture", "authorizationRevision": "3" },
+            "rowIdentity": { "column": "environment_id", "value": "environment-fixture" },
+            "readerContractRevision": "fixture-contract"
+        })).unwrap()).unwrap();
+    }
+
+    fn write_parity_fixture(root: &std::path::Path) {
+        write_entity_link_fixture(root);
+        // Canonical fallback requires unique event IDs. Membership fan-out is covered by
+        // the separate legacy join tests; parity here uses a valid canonical population.
+        let conn = Connection::open_in_memory().unwrap();
+        let input = quote_literal(&root.join("case_event_group.parquet").to_string_lossy());
+        let output_path = root.join("unique-groups.parquet");
+        let output = quote_literal(&output_path.to_string_lossy());
+        conn.execute_batch(&format!("COPY (SELECT * FROM read_parquet({input}) WHERE time_rank<>7) TO {output} (FORMAT parquet)")).unwrap();
+        fs::rename(output_path, root.join("case_event_group.parquet")).unwrap();
+    }
+
+    #[test]
+    fn serving_edition_matches_legacy_population_and_time_semantics_without_tenant_columns() {
+        let legacy_directory = TestDirectory::new();
+        write_parity_fixture(&legacy_directory.0);
+        let legacy = DuckDbProvider::open(entity_link_source(&legacy_directory.0)).unwrap();
+        for compatibility_tenant in [false, true] {
+            let directory = TestDirectory::new();
+            write_serving_edition_fixture(&directory.0, compatibility_tenant);
+            let edition = DuckDbProvider::open(serving_edition_source(&directory.0)).unwrap();
+            assert_eq!(edition.resolved.tenant_id, "environment-fixture");
+            for view in [
+                DatasetView::default(),
+                DatasetView {
+                    start: Some(
+                        crate::source_timestamp_to_utc(
+                            "2026-01-02 00:00:00",
+                            &crate::SourceTimestampPolicy::Utc,
+                        )
+                        .unwrap(),
+                    ),
+                    end: Some(
+                        crate::source_timestamp_to_utc(
+                            "2026-01-03 00:00:00",
+                            &crate::SourceTimestampPolicy::Utc,
+                        )
+                        .unwrap(),
+                    ),
+                    object_types: vec!["T".to_owned()],
+                    object_ids: vec![2],
+                    ..DatasetView::default()
+                },
+            ] {
+                let actual_profile = edition.profile(&view).unwrap();
+                let mut expected_profile = legacy.profile(&view).unwrap();
+                // The source owner is deliberately migrated from VB tenant to CC Environment.
+                expected_profile.tenant_id = "environment-fixture".to_owned();
+                assert_eq!(actual_profile, expected_profile);
+                if view.object_ids.is_empty() {
+                    assert!(edition.canonical_fallback.lock().unwrap().is_none());
+                }
+                assert_eq!(
+                    edition
+                        .process_executions(&view, ExecutionMode::LeadingObject, Some("T"))
+                        .unwrap(),
+                    legacy
+                        .process_executions(&view, ExecutionMode::LeadingObject, Some("T"))
+                        .unwrap()
+                );
+            }
+            let actual = edition
+                .with_connection(|conn| load_log(conn, &edition.resolved))
+                .unwrap();
+            let expected = legacy
+                .with_connection(|conn| load_log(conn, &legacy.resolved))
+                .unwrap();
+            assert_eq!(actual.events, expected.events);
+            assert_eq!(actual.objects, expected.objects);
+            assert_eq!(
+                actual.event_object_relations,
+                expected.event_object_relations
+            );
+            assert_eq!(
+                actual.object_object_relations,
+                expected.object_object_relations
+            );
+        }
+    }
+
+    #[test]
+    fn serving_edition_requires_and_preserves_explicit_source_time_policy() {
+        let directory = TestDirectory::new();
+        write_serving_edition_fixture(&directory.0, false);
+        let mut config = serde_json::to_value(serving_edition_source(&directory.0)).unwrap();
+        config
+            .pointer_mut("/layout/config")
+            .unwrap()
+            .as_object_mut()
+            .unwrap()
+            .remove("timestamp_policy");
+        assert!(serde_json::from_value::<DuckDbParquetSource>(config).is_err());
+
+        for policy in [
+            crate::SourceTimestampPolicy::FixedOffset { seconds_east: 7200 },
+            crate::SourceTimestampPolicy::Iana {
+                zone: "America/New_York".to_owned(),
+                ambiguous: crate::AmbiguousTimePolicy::Reject,
+            },
+        ] {
+            let legacy_directory = TestDirectory::new();
+            write_parity_fixture(&legacy_directory.0);
+            let mut legacy_source = entity_link_source(&legacy_directory.0);
+            let crate::ParquetLayout::EntityLinkSnapshotV1(layout) = &mut legacy_source.layout
+            else {
+                unreachable!()
+            };
+            layout.timestamp_policy = policy.clone();
+            let legacy = DuckDbProvider::open(legacy_source).unwrap();
+            let edition_directory = TestDirectory::new();
+            write_serving_edition_fixture(&edition_directory.0, false);
+            let mut edition_source = serving_edition_source(&edition_directory.0);
+            let crate::ParquetLayout::ServingEditionV1(layout) = &mut edition_source.layout else {
+                unreachable!()
+            };
+            layout.timestamp_policy = policy.clone();
+            let edition = DuckDbProvider::open(edition_source).unwrap();
+            assert_eq!(edition.resolved.timestamp_policy, policy);
+            let view = DatasetView {
+                start: Some(
+                    crate::source_timestamp_to_utc("2026-01-02 00:00:00", &policy).unwrap(),
+                ),
+                end: Some(crate::source_timestamp_to_utc("2026-01-03 00:00:00", &policy).unwrap()),
+                object_types: vec!["T".to_owned()],
+                object_ids: vec![2],
+                ..DatasetView::default()
+            };
+            assert_eq!(
+                edition
+                    .process_executions(&view, ExecutionMode::LeadingObject, Some("T"))
+                    .unwrap(),
+                legacy
+                    .process_executions(&view, ExecutionMode::LeadingObject, Some("T"))
+                    .unwrap()
+            );
+            let actual = edition
+                .with_connection(|conn| load_log(conn, &edition.resolved))
+                .unwrap();
+            let expected = legacy
+                .with_connection(|conn| load_log(conn, &legacy.resolved))
+                .unwrap();
+            assert_eq!(actual.events, expected.events);
+            assert!(actual.events.iter().any(|event| {
+                event.timestamp.epoch_nanos_utc
+                    != crate::source_timestamp_to_utc(
+                        event.timestamp.source.as_deref().unwrap(),
+                        &crate::SourceTimestampPolicy::Utc,
+                    )
+                    .unwrap()
+                    .epoch_nanos_utc
+            }));
+        }
+    }
+
+    #[test]
+    fn serving_edition_iana_windows_filter_interpreted_fold_instants() {
+        let directory = TestDirectory::new();
+        write_serving_edition_fixture(&directory.0, false);
+        let conn = Connection::open_in_memory().unwrap();
+        for name in ["event_log", "case_event_group"] {
+            let input = quote_literal(
+                &directory
+                    .0
+                    .join(format!("{name}.parquet"))
+                    .to_string_lossy(),
+            );
+            let output_path = directory.0.join(format!("{name}-fold.parquet"));
+            let output = quote_literal(&output_path.to_string_lossy());
+            conn.execute_batch(&format!("COPY (SELECT * REPLACE (TIMESTAMP '2026-11-01 01:45:00' AS timestamp) FROM read_parquet({input})) TO {output} (FORMAT parquet)")).unwrap();
+            fs::rename(output_path, directory.0.join(format!("{name}.parquet"))).unwrap();
+        }
+        for (ambiguous, start, end, expected_events) in [
+            (
+                crate::AmbiguousTimePolicy::Earliest,
+                "2026-11-01T06:30:00Z",
+                "2026-11-01T07:00:00Z",
+                0,
+            ),
+            (
+                crate::AmbiguousTimePolicy::Earliest,
+                "2026-11-01T05:30:00Z",
+                "2026-11-01T06:30:00Z",
+                4,
+            ),
+            (
+                crate::AmbiguousTimePolicy::Latest,
+                "2026-11-01T05:30:00Z",
+                "2026-11-01T06:30:00Z",
+                0,
+            ),
+            (
+                crate::AmbiguousTimePolicy::Latest,
+                "2026-11-01T06:30:00Z",
+                "2026-11-01T07:00:00Z",
+                4,
+            ),
+            (
+                crate::AmbiguousTimePolicy::Earliest,
+                "2026-11-01T05:45:00Z",
+                "2026-11-01T06:00:00Z",
+                4,
+            ),
+            (
+                crate::AmbiguousTimePolicy::Earliest,
+                "2026-11-01T05:00:00Z",
+                "2026-11-01T05:45:00Z",
+                0,
+            ),
+            (
+                crate::AmbiguousTimePolicy::Latest,
+                "2026-11-01T06:45:00Z",
+                "2026-11-01T07:00:00Z",
+                4,
+            ),
+            (
+                crate::AmbiguousTimePolicy::Latest,
+                "2026-11-01T06:00:00Z",
+                "2026-11-01T06:45:00Z",
+                0,
+            ),
+        ] {
+            let mut source = serving_edition_source(&directory.0);
+            let crate::ParquetLayout::ServingEditionV1(layout) = &mut source.layout else {
+                unreachable!()
+            };
+            layout.timestamp_policy = crate::SourceTimestampPolicy::Iana {
+                zone: "America/New_York".to_owned(),
+                ambiguous,
+            };
+            let provider = DuckDbProvider::open(source).unwrap();
+            let view = DatasetView {
+                start: Some(
+                    crate::source_timestamp_to_utc(start, &crate::SourceTimestampPolicy::Utc)
+                        .unwrap(),
+                ),
+                end: Some(
+                    crate::source_timestamp_to_utc(end, &crate::SourceTimestampPolicy::Utc)
+                        .unwrap(),
+                ),
+                object_types: vec!["T".to_owned()],
+                object_ids: vec![2],
+                ..DatasetView::default()
+            };
+            let actual = provider
+                .process_executions(&view, ExecutionMode::LeadingObject, Some("T"))
+                .unwrap();
+            assert_eq!(
+                actual
+                    .iter()
+                    .map(|execution| execution.events.len())
+                    .sum::<usize>(),
+                expected_events
+            );
+            let summary = provider
+                .execution_summary(&ExecutionSummaryRequest {
+                    view: view.clone(),
+                    leading_object_type: Some("T".to_owned()),
+                    complete_lifecycle: false,
+                })
+                .unwrap()
+                .unwrap();
+            assert_eq!(summary.event_count, expected_events as u64);
+            // Exercise the canonical fallback with the original boundary provenance.
+            assert_eq!(
+                provider.profile(&view).unwrap().event_count,
+                expected_events as u64
+            );
+            assert_eq!(
+                provider.snapshot(&view).unwrap().events.len(),
+                expected_events
+            );
+            assert_eq!(
+                provider
+                    .process_executions(&view, ExecutionMode::ConnectedComponent, None)
+                    .unwrap()
+                    .iter()
+                    .map(|execution| execution.events.len())
+                    .sum::<usize>(),
+                expected_events
+            );
+            let query = provider
+                .query(&QueryRequest {
+                    semantic_version: "1.0".to_owned(),
+                    view: view.clone(),
+                    constraint: Constraint::EventActivity {
+                        activities: vec!["a".to_owned(), "b".to_owned(), "c".to_owned()],
+                    },
+                    limit: 100,
+                })
+                .unwrap();
+            assert_eq!(query.total_matches, u64::from(expected_events > 0));
+            let mut population_view = view.clone();
+            population_view.start = None;
+            population_view.end = None;
+            for selector in [
+                ocpm_provider::PopulationSelector::EventTime {
+                    start: view.start.clone().unwrap(),
+                    end: view.end.clone().unwrap(),
+                },
+                ocpm_provider::PopulationSelector::LeadingObjectStart {
+                    start: view.start.clone().unwrap(),
+                    end: view.end.clone().unwrap(),
+                },
+                ocpm_provider::PopulationSelector::ExecutionContained {
+                    start: view.start.clone().unwrap(),
+                    end: view.end.clone().unwrap(),
+                },
+            ] {
+                assert_eq!(
+                    provider
+                        .resolve_population(&population_view, &selector, Some("T"))
+                        .unwrap()
+                        .object_count,
+                    u64::from(expected_events > 0)
+                );
+            }
+            let request = BottleneckObservationRequest {
+                view: view.clone(),
+                leading_object_type: Some("T".to_owned()),
+            };
+            let projection =
+                BottleneckObservationProjection::new(vec!["system_note_id".to_owned()]);
+            let expected = provider
+                .exact_local()
+                .unwrap()
+                .bottleneck_observations(&BottleneckObservationRequest {
+                    view: view.clone(),
+                    leading_object_type: request.leading_object_type.clone(),
+                })
+                .unwrap();
+            assert_eq!(
+                provider.bottleneck_observations(&request).unwrap(),
+                expected
+            );
+            assert_eq!(
+                provider
+                    .projected_bottleneck_observations(&request, &projection)
+                    .unwrap(),
+                expected
+            );
+            assert_eq!(
+                actual,
+                provider
+                    .exact_local()
+                    .unwrap()
+                    .process_executions(&view, ExecutionMode::LeadingObject, Some("T"))
+                    .unwrap()
+            );
+        }
+    }
+
+    #[test]
+    fn serving_edition_unpivots_typed_facets_and_rejects_changed_authority() {
+        let directory = TestDirectory::new();
+        write_serving_edition_fixture(&directory.0, true);
+        let conn = Connection::open_in_memory().unwrap();
+        let input = quote_literal(&directory.0.join("txn.parquet").to_string_lossy());
+        let output_path = directory.0.join("typed-txn.parquet");
+        let output = quote_literal(&output_path.to_string_lossy());
+        conn.execute_batch(&format!("COPY (SELECT * EXCLUDE (currency, trandate), 42::BIGINT AS currency, DATE '2026-01-02' AS trandate FROM read_parquet({input})) TO {output} (FORMAT parquet)")).unwrap();
+        fs::rename(output_path, directory.0.join("txn.parquet")).unwrap();
+        let edition = DuckDbProvider::open(serving_edition_source(&directory.0)).unwrap();
+        let facets: Vec<(String, String)> = edition.with_connection(|conn| {
+            let mut stmt = conn.prepare("SELECT name, json_extract_string(value_json, '$.value') FROM ocpm_object_attributes WHERE object_id=1 ORDER BY name")?;
+            let values = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
+            Ok(values.collect::<Result<_, _>>()?)
+        }).unwrap();
+        assert_eq!(
+            facets,
+            vec![
+                ("currency".to_owned(), "42".to_owned()),
+                ("trandate".to_owned(), "2026-01-02".to_owned())
+            ]
+        );
+        drop(edition);
+        for field in [
+            "environment_id",
+            "account_binding_id",
+            "authorization_revision",
+            "reader_contract_revision",
+        ] {
+            let mut value = serde_json::to_value(serving_edition_source(&directory.0)).unwrap();
+            value["layout"]["config"][field] = serde_json::json!("wrong");
+            let config = serde_json::from_value(value).unwrap();
+            assert!(
+                matches!(
+                    DuckDbProvider::open(config),
+                    Err(DuckDbProviderError::InvalidSource(_))
+                ),
+                "must reject {field}"
+            );
         }
     }
 

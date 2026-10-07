@@ -371,7 +371,7 @@ pub trait OcpmProvider: Send + Sync {
             PopulationSelector::EventTime { start, end }
             | PopulationSelector::LeadingObjectStart { start, end }
             | PopulationSelector::ExecutionContained { start, end }
-                if start >= end =>
+                if start.epoch_nanos_utc >= end.epoch_nanos_utc =>
             {
                 return Err(OcpmError::invalid_request(
                     "population window must have start before end",
@@ -380,10 +380,12 @@ pub trait OcpmProvider: Send + Sync {
             _ => {}
         }
         let mut view = base_view.clone();
-        let matches_window =
-            |value: &ocpm_core::Timestamp,
-             start: &ocpm_core::Timestamp,
-             end: &ocpm_core::Timestamp| { value >= start && value < end };
+        let matches_window = |value: &ocpm_core::Timestamp,
+                              start: &ocpm_core::Timestamp,
+                              end: &ocpm_core::Timestamp| {
+            value.epoch_nanos_utc >= start.epoch_nanos_utc
+                && value.epoch_nanos_utc < end.epoch_nanos_utc
+        };
         let mut selected_ids = match selector {
             PopulationSelector::EventTime { start, end } => {
                 view.start = Some(start.clone());
@@ -430,7 +432,8 @@ pub trait OcpmProvider: Send + Sync {
                         .first()
                         .zip(execution.events.last())
                         .is_some_and(|(first, last)| {
-                            &first.timestamp >= start && &last.timestamp < end
+                            matches_window(&first.timestamp, start, end)
+                                && matches_window(&last.timestamp, start, end)
                         })
                 })
                 .filter_map(|execution| execution.object_ids.first().copied())

@@ -27,8 +27,8 @@ pub use ocpm_bottleneck::{
 #[cfg(feature = "duckdb")]
 pub use ocpm_duckdb::{
     DuckDbOptions, DuckDbParquetSource, DuckDbProvider, EntityLinkSnapshotV1, ExtensionPolicy,
-    ParquetCachePolicy, ParquetLayout, ParquetLocation, S3CredentialReference, SnapshotSelection,
-    SnapshotWriteResult, SourceTimestampPolicy, SourceValidationPolicy,
+    ParquetCachePolicy, ParquetLayout, ParquetLocation, S3CredentialReference, ServingEditionV1,
+    SnapshotSelection, SnapshotWriteResult, SourceTimestampPolicy, SourceValidationPolicy,
 };
 pub use ocpm_io::CsvMapping;
 pub use ocpm_provider::{
@@ -490,17 +490,15 @@ impl Engine {
         for execution in executions {
             if request.complete_lifecycle
                 && (execution.events.first().is_none_or(|event| {
-                    request
-                        .view
-                        .start
-                        .as_ref()
-                        .is_none_or(|start| &event.timestamp < start)
+                    request.view.start.as_ref().is_some_and(|start| {
+                        event.timestamp.epoch_nanos_utc < start.epoch_nanos_utc
+                    })
                 }) || execution.events.last().is_none_or(|event| {
                     request
                         .view
                         .end
                         .as_ref()
-                        .is_none_or(|end| &event.timestamp >= end)
+                        .is_some_and(|end| event.timestamp.epoch_nanos_utc >= end.epoch_nanos_utc)
                 }))
             {
                 continue;
@@ -845,6 +843,95 @@ mod tests {
             engine.profile(&DatasetView::default()).unwrap().event_count,
             1
         );
+    }
+
+    #[test]
+    fn complete_lifecycle_summary_uses_instants_and_open_bounds() {
+        let timestamp = |nanos, source: Option<&str>| Timestamp {
+            epoch_nanos_utc: nanos,
+            source: source.map(str::to_owned),
+        };
+        for event_source in [None, Some("a"), Some("z")] {
+            let log = CanonicalLog {
+                dataset_id: "complete-lifecycle".to_owned(),
+                tenant_id: "tenant".to_owned(),
+                events: ["begin", "end"]
+                    .into_iter()
+                    .enumerate()
+                    .map(|(index, activity)| Event {
+                        id: index as u64 + 1,
+                        external_id: format!("e{index}"),
+                        activity: activity.to_owned(),
+                        timestamp: timestamp((index as i128 + 1) * 10_000, event_source),
+                        sequence: 0,
+                        lifecycle: None,
+                        attributes: BTreeMap::new(),
+                    })
+                    .collect(),
+                objects: vec![Object {
+                    id: 1,
+                    external_id: "o1".to_owned(),
+                    object_type: "order".to_owned(),
+                }],
+                event_object_relations: (1..=2)
+                    .map(|id| EventObjectRelation {
+                        relation_id: id,
+                        event_id: id,
+                        object_id: 1,
+                        qualifier: String::new(),
+                    })
+                    .collect(),
+                ..CanonicalLog::default()
+            };
+            let engine = Engine::from_log(log).unwrap();
+            let mut expected = EventSummaryBuilder::new();
+            expected
+                .push_case(&["begin".to_owned(), "end".to_owned()], &[10, 20])
+                .unwrap();
+            let expected = expected.finish();
+            for boundary_source in [Some("a"), Some("z"), None] {
+                for (start, end, included) in [
+                    (Some(10_000), Some(21_000), true),
+                    (Some(9_000), Some(20_000), false),
+                    (Some(11_000), Some(21_000), false),
+                    (Some(9_000), Some(19_000), false),
+                    (None, Some(21_000), true),
+                    (Some(10_000), None, true),
+                    (None, None, true),
+                    (None, Some(20_000), false),
+                    (Some(11_000), None, false),
+                ] {
+                    let result = engine
+                        .execution_summary(&ExecutionSummaryRequest {
+                            view: DatasetView {
+                                start: start.map(|nanos| timestamp(nanos, boundary_source)),
+                                end: end.map(|nanos| timestamp(nanos, boundary_source)),
+                                ..DatasetView::default()
+                            },
+                            leading_object_type: Some("order".to_owned()),
+                            complete_lifecycle: true,
+                        })
+                        .unwrap();
+                    assert_eq!(
+                        result,
+                        if included {
+                            expected.clone()
+                        } else {
+                            EventSummaryBuilder::new().finish()
+                        },
+                        "event={event_source:?}, boundary={boundary_source:?}, window={start:?}..{end:?}"
+                    );
+                }
+            }
+            assert!(
+                engine
+                    .snapshot(&DatasetView::default())
+                    .unwrap()
+                    .events
+                    .iter()
+                    .all(|event| event.timestamp.source.as_deref() == event_source)
+            );
+        }
     }
 
     #[test]
